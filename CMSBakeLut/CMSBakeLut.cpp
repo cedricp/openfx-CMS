@@ -72,17 +72,17 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 
     
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
-    std::unique_ptr<OFX::Image> src(_inputClip->fetchImage(args.time));
+    OFX::auto_ptr<OFX::Image> src(_inputClip->fetchImage(args.time));
     if (!src.get())
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
+        return;
     }
-    OfxRectD rod = _inputClip->getRegionOfDefinition(time, args.renderView);
-    printf(">> %f %f %f %f\n", rod.x1, rod.y1, rod.x2, rod.y2);
-    
+    OfxRectD rodd = _dstClip->getRegionOfDefinition(time, args.renderView);
+    OfxRectD rods = _inputClip->getRegionOfDefinition(time, args.renderView);
 
-    int width_img = (int)(rod.x2 - rod.x1);
-    int height_img = (int)(rod.y2 - rod.y1);
+    int width_img = (int)(rods.x2 - rods.x1);
+    int height_img = (int)(rods.y2 - rods.y1);
 
     float num_x = width_img / 7;
     float num_y = height_img / 7;
@@ -96,22 +96,20 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 
     for(int y=0; y < num_y; y++) {
         for(int x=0; x < num_x; x++) {
-            float *srcPix = (float *)src->getPixelAddress(x*7 + 3, y*7 + 3);
-            float *dstPix = (float *)dst->getPixelAddress(x, y);
-            memcpy(dstPix, srcPix, 3 * sizeof(float));
+            float *srcPix = (float *)src->getPixelAddress((x+rods.x1)*7 + 3, (y+rods.y1)*7 + 3);
+            float *dstPix = (float *)dst->getPixelAddress(x+rodd.x1, y+rodd.y1);
             Color sample;
             sample.r = srcPix[0];
             sample.g = srcPix[1];
             sample.b = srcPix[2];
             _lut.push_back(sample);
-
+            memcpy(dstPix, srcPix, 3 * sizeof(float));
             samples_count++;
             if (samples_count >= total_samples) {
                 break;
             }
         }
     }
-
 }
 
 void CMSBakeLutPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
@@ -127,6 +125,21 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
     if (paramName == "BakeLUT")
     {
         printf("BakeLUT !!\n");
+
+        std::string filename = _outputLutFile->getValue();
+        FILE *file = fopen(filename.c_str(), "w");
+        if (file == NULL) {
+            printf("Error opening file %s\n", filename.c_str());
+            return;
+        }
+        fprintf(file, "# TITLE Generated LUT with openfx-CMS\n");
+        fprintf(file, "LUT_3D_SIZE %llu\n", _lut.size());
+        fprintf(file, "DOMAIN_MIN 0.0 0.0 0.0\n");
+        fprintf(file, "DOMAIN_MAX 1.0 1.0 1.0\n");
+        for (int i = 0; i < _lut.size(); i++) {
+            fprintf(file, "%f %f %f\n", _lut[i].r, _lut[i].g, _lut[i].b);
+        }
+        fclose(file);
     }
 }
 
