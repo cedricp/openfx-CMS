@@ -132,10 +132,10 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
             printf("Error opening file %s\n", filename.c_str());
             return;
         }
-        fprintf(file, "# TITLE Generated LUT with openfx-CMS\n");
-        fprintf(file, "LUT_3D_SIZE %llu\n", _lut.size());
+        fprintf(file, "# Generated LUT with openfx-CMS\n");
+        fprintf(file, "LUT_3D_SIZE %llu\n\n", _lut.size());
         fprintf(file, "DOMAIN_MIN 0.0 0.0 0.0\n");
-        fprintf(file, "DOMAIN_MAX 1.0 1.0 1.0\n");
+        fprintf(file, "DOMAIN_MAX 1.0 1.0 1.0\n\n");
         for (int i = 0; i < _lut.size(); i++) {
             fprintf(file, "%f %f %f\n", _lut[i].r, _lut[i].g, _lut[i].b);
         }
