@@ -1,4 +1,0 @@
-E:/Applications/Natron/Plugins/OFX/Natron/CMS.ofx.bundle/Contents/Win64/CMS.ofx
-E:/Applications/Natron/Plugins/OFX/Natron/CMS.ofx.bundle/Contents/Resources/net.sf.openfx.CMSPattern.png
-E:/Applications/Natron/Plugins/OFX/Natron/CMS.ofx.bundle/Contents/Resources/net.sf.openfx.CMSPattern.svg
-E:/Applications/Natron/Plugins/OFX/Natron/CMS.ofx.bundle/Contents/Info.plist
