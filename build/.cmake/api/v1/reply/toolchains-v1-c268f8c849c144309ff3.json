@@ -1,0 +1,87 @@
+{
+	"kind" : "toolchains",
+	"toolchains" : 
+	[
+		{
+			"compiler" : 
+			{
+				"id" : "Clang",
+				"implicit" : 
+				{
+					"includeDirectories" : 
+					[
+						"D:/Development/tools/msys2/mingw64/include/c++/14.2.0",
+						"D:/Development/tools/msys2/mingw64/include/c++/14.2.0/x86_64-w64-mingw32",
+						"D:/Development/tools/msys2/mingw64/include/c++/14.2.0/backward",
+						"D:/Development/tools/msys2/mingw64/lib/clang/19/include",
+						"D:/Development/tools/msys2/mingw64/include"
+					],
+					"linkDirectories" : 
+					[
+						"D:/Development/tools/msys2/mingw64/lib/gcc/x86_64-w64-mingw32/14.2.0",
+						"D:/Development/tools/msys2/mingw64/x86_64-w64-mingw32/lib",
+						"D:/Development/tools/msys2/mingw64/x86_64-w64-mingw32/mingw/lib",
+						"D:/Development/tools/msys2/mingw64/lib"
+					],
+					"linkFrameworkDirectories" : [],
+					"linkLibraries" : 
+					[
+						"stdc++",
+						"mingw32",
+						"gcc_s",
+						"gcc",
+						"moldname",
+						"mingwex",
+						"pthread",
+						"advapi32",
+						"shell32",
+						"user32",
+						"kernel32",
+						"mingw32",
+						"gcc_s",
+						"gcc",
+						"moldname",
+						"mingwex",
+						"kernel32"
+					]
+				},
+				"path" : "D:/Development/tools/msys2/mingw64/bin/clang++.exe",
+				"version" : "19.1.6"
+			},
+			"language" : "CXX",
+			"sourceFileExtensions" : 
+			[
+				"C",
+				"M",
+				"c++",
+				"cc",
+				"cpp",
+				"cxx",
+				"m",
+				"mm",
+				"mpp",
+				"CPP",
+				"ixx",
+				"cppm"
+			]
+		},
+		{
+			"compiler" : 
+			{
+				"implicit" : {},
+				"path" : "D:/Development/tools/msys2/mingw64/bin/windres.exe"
+			},
+			"language" : "RC",
+			"sourceFileExtensions" : 
+			[
+				"rc",
+				"RC"
+			]
+		}
+	],
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}

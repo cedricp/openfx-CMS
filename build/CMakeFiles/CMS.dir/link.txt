@@ -1,0 +1,3 @@
+D:\Development\tools\Strawberry\c\bin\cmake.exe -E rm -f CMakeFiles\CMS.dir/objects.a
+D:\Development\tools\msys2\mingw64\bin\llvm-ar.exe qc CMakeFiles\CMS.dir/objects.a @CMakeFiles\CMS.dir\objects1.rsp
+D:\Development\tools\msys2\mingw64\bin\clang++.exe -g -DDEBUG -DDEBUG -shared -fvisibility=hidden -Xlinker --version-script=D:/Development/sources/openfx-CMS/openfx/Support/include/linuxSymbols -shared -o CMS.ofx -Wl,--out-implib,libCMS.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles\CMS.dir/objects.a -Wl,--no-whole-archive @CMakeFiles\CMS.dir\linkLibs.rsp

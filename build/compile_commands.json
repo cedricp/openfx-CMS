@@ -1,0 +1,140 @@
+[
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\CMSBakeLut\\CMSBakeLut.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\CMSBakeLut\\CMSBakeLut.cpp",
+  "file": "D:/Development/sources/openfx-CMS/CMSBakeLut/CMSBakeLut.cpp",
+  "output": "CMakeFiles/CMS.dir/CMSBakeLut/CMSBakeLut.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\CMSPattern\\CMSPattern.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\CMSPattern\\CMSPattern.cpp",
+  "file": "D:/Development/sources/openfx-CMS/CMSPattern/CMSPattern.cpp",
+  "output": "CMakeFiles/CMS.dir/CMSPattern/CMSPattern.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsGenerator.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsGenerator.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsGenerator.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsGenerator.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsLut.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsLut.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsLut.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsLut.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsMultiPlane.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsMultiPlane.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsMultiPlane.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsMultiPlane.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsOGLFontData.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsOGLFontData.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsOGLFontData.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsOGLFontData.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsOGLTextRenderer.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsOGLTextRenderer.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsOGLTextRenderer.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsOGLTextRenderer.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsRamp.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsRamp.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsRamp.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsRamp.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsRectangleInteract.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsRectangleInteract.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsRectangleInteract.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsRectangleInteract.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsShutter.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsShutter.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsShutter.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsShutter.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsThreadSuite.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsThreadSuite.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsThreadSuite.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsThreadSuite.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsTracking.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsTracking.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsTracking.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsTracking.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsTransform3x3.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsTransform3x3.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsTransform3x3.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsTransform3x3.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\ofxsTransformInteract.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\ofxsTransformInteract.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/ofxsTransformInteract.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/ofxsTransformInteract.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\SupportExt\\tinythread.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\SupportExt\\tinythread.cpp",
+  "file": "D:/Development/sources/openfx-CMS/SupportExt/tinythread.cpp",
+  "output": "CMakeFiles/CMS.dir/SupportExt/tinythread.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsCore.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsCore.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsCore.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsCore.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsImageEffect.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsImageEffect.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsImageEffect.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsImageEffect.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsInteract.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsInteract.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsInteract.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsInteract.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsLog.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsLog.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsLog.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsLog.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsMultiThread.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsMultiThread.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsMultiThread.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsMultiThread.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsParams.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsParams.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsParams.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsParams.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsProperty.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsProperty.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsProperty.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsProperty.cpp.obj"
+},
+{
+  "directory": "D:/Development/sources/openfx-CMS/build",
+  "command": "D:\\Development\\tools\\msys2\\mingw64\\bin\\clang++.exe -DCMS_EXPORTS -DNOMINMAX -DOFX_EXTENSIONS_NATRON -DOFX_EXTENSIONS_NUKE -DOFX_EXTENSIONS_TUTTLE -DOFX_EXTENSIONS_VEGAS -DOFX_SUPPORTS_OPENGLRENDER @CMakeFiles/CMS.dir/includes_CXX.rsp -g -DDEBUG -DDEBUG -std=gnu++11 -o CMakeFiles\\CMS.dir\\openfx\\Support\\Library\\ofxsPropertyValidation.cpp.obj -c D:\\Development\\sources\\openfx-CMS\\openfx\\Support\\Library\\ofxsPropertyValidation.cpp",
+  "file": "D:/Development/sources/openfx-CMS/openfx/Support/Library/ofxsPropertyValidation.cpp",
+  "output": "CMakeFiles/CMS.dir/openfx/Support/Library/ofxsPropertyValidation.cpp.obj"
+}
+]
