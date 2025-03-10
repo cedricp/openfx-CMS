@@ -26,7 +26,7 @@
 #include <cfloat>
 
 #include "CMSPattern.h"
-#include "../utils.h"
+#include "../utils.h" 
 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER

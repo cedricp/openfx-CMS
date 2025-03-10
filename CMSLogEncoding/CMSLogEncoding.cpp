@@ -26,11 +26,11 @@
  #include <cfloat>
  
  #include "CMSLogEncoding.h"
+ #include "../utils.h"
  
  OFXS_NAMESPACE_ANONYMOUS_ENTER
  
- #include "../utils.h"
-
+ 
  class CMSLogProcessor
     : public OFX::ImageProcessor
 {

@@ -26,10 +26,10 @@
 #include <cfloat>
 
 #include "CMSBakeLut.h"
+#include "../utils.h"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
-#include "../utils.h"
 
 bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
