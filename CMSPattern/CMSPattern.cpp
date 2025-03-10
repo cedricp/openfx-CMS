@@ -26,6 +26,7 @@
 #include <cfloat>
 
 #include "CMSPattern.h"
+#include "../utils.h"
 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
@@ -36,17 +37,31 @@ class CMSPatternProcessor
 public:
     CMSPatternProcessor(OFX::ImageEffect &instance): ImageProcessor(instance)
     {
+        _logencoder = nullptr;
         _res.x  =_res.y = 0;
     } 
 
-    void setValues(const int lutsize,
-                   const OfxPointI &rod)
+    ~CMSPatternProcessor()
     {
+        if (_logencoder) delete _logencoder;
+    }
+
+    void setValues(const int lutsize,
+                    const OfxPointI &rod, bool isAntiLog,
+                    double logmin, double logmax)
+    {
+        if (_logencoder) delete _logencoder;
         _lutsize = lutsize;
         _res = rod;
+        if (isAntiLog){
+            _logencoder = new logEncode(logmin, logmax);
+        } else {
+            _logencoder = nullptr;
+        }
     }
 
 private:
+    logEncode* _logencoder;
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
         OFX::unused(rs);
@@ -73,12 +88,17 @@ private:
                     *dstPix++ = 0;
                     *dstPix++ = 0;
                 } else {
-                    float curr_red = curr_pos % _lutsize;
-                    float curr_green = (curr_pos / _lutsize) % _lutsize;
-                    float curr_blue = (curr_pos / _lutsize / _lutsize) % _lutsize;
-                    *dstPix++ = curr_red / (_lutsize - 1);
-                    *dstPix++ = curr_green / (_lutsize - 1);  
-                    *dstPix++ = curr_blue / (_lutsize - 1);
+                    float curr_red = float(curr_pos % _lutsize) / (_lutsize - 1);
+                    float curr_green = float((curr_pos / _lutsize) % _lutsize) / (_lutsize - 1);
+                    float curr_blue = float((curr_pos / _lutsize / _lutsize) % _lutsize) / (_lutsize - 1);
+                    if (_logencoder){
+                        curr_red = _logencoder->apply_backward(curr_red);
+                        curr_green = _logencoder->apply_backward(curr_green);
+                        curr_blue = _logencoder->apply_backward(curr_blue);
+                    }
+                    *dstPix++ = curr_red;
+                    *dstPix++ = curr_green;  
+                    *dstPix++ = curr_blue;
                 }
             }
         }
@@ -140,7 +160,10 @@ void CMSPatternPlugin::render(const OFX::RenderArguments &args)
 
     double lutsize = _lutSize->getValue();
     OfxPointI resolution = getCMSResolution();
-    processor.setValues(lutsize, resolution);
+    bool isAntilog = _antiLogScale->getValue();
+    double min, max;
+    _logminmax->getValue(min, max);
+    processor.setValues(lutsize, resolution, isAntilog, min, max);
     processor.process();
 }
 
@@ -225,6 +248,26 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         param->setDisplayRange(0., 33);
         if (page)
         {
+            page->addChild(*param);
+        }
+    }
+
+    {
+        OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("log2 encode");
+        param->setLabel("AntiLog2 Encode");
+        param->setHint("AntiLog2 encode output samples");
+        param->setDefault(false);
+        if (page) {
+            page->addChild(*param);
+        }
+    }
+
+    {
+        OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
+        param->setLabel("Log2 Min Max values");
+        param->setHint("Min and max exposure values");
+        param->setDefault(-8, 4);
+        if (page) {
             page->addChild(*param);
         }
     }

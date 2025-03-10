@@ -29,6 +29,8 @@
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+#include "../utils.h"
+
 bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
     if (!kSupportsRenderScale && ((args.renderScale.x != 1.) || (args.renderScale.y != 1.)))
@@ -37,25 +39,10 @@ bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
 
         return false;
     }
-    getOutputRoD(args.time, args.view, &rod, 0);
+
+    rod = _inputClip->getRegionOfDefinition(args.time, args.view);
 
     return true;
-}
-
-void CMSBakeLutPlugin::getOutputRoD(OfxTime time, int view, OfxRectD *rod, double *par)
-{
-    assert(rod || par);
-
-    // user wants RoD written, don't care parameters
-
-    if (rod)
-    {
-        *rod = _inputClip->getRegionOfDefinition(time, view);
-    }
-    if (par)
-    {
-        *par = _inputClip->getPixelAspectRatio();
-    }
 }
 
 // the overridden render function
@@ -81,18 +68,23 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     OfxRectD rodd = _dstClip->getRegionOfDefinition(time, args.renderView);
     OfxRectD rods = _inputClip->getRegionOfDefinition(time, args.renderView);
 
+    bool isLog = _logScale->getValue();
+    double logmin, logmax;
+    _logminmax->getValue(logmin, logmax);
+    logEncode encoder(logmin, logmax);
+
+
     int width_img = (int)(rods.x2 - rods.x1);
     int height_img = (int)(rods.y2 - rods.y1);
 
     float num_x = width_img / 7;
     float num_y = height_img / 7;
     int num_samples = num_x * num_y;
-    int lut_size = round(pow(num_samples, 1.0 / 3.0));
-    int total_samples = pow(lut_size, 3);
-    int samples_count = 0;
+    _lutSize = round(pow(num_samples, 1.0 / 3.0));
+    int total_samples = pow(_lutSize, 3);
+    int sample_count = 0;
 
     _lut.resize(total_samples);
-    _lut.clear();
 
     for(int y=0; y < num_y; y++) {
         for(int x=0; x < num_x; x++) {
@@ -102,10 +94,17 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
             sample.r = srcPix[0];
             sample.g = srcPix[1];
             sample.b = srcPix[2];
-            _lut.push_back(sample);
-            memcpy(dstPix, srcPix, 3 * sizeof(float));
-            samples_count++;
-            if (samples_count >= total_samples) {
+            if (isLog){
+                sample.r = encoder.apply(sample.r);
+                sample.g = encoder.apply(sample.g);
+                sample.b = encoder.apply(sample.b);
+            }
+            _lut[sample_count] = sample;
+            dstPix[0] = sample.r;
+            dstPix[1] = sample.g;
+            dstPix[2] = sample.b;
+            sample_count++;
+            if (sample_count >= total_samples) {
                 break;
             }
         }
@@ -124,8 +123,6 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
 {
     if (paramName == "BakeLUT")
     {
-        printf("BakeLUT !!\n");
-
         std::string filename = _outputLutFile->getValue();
         FILE *file = fopen(filename.c_str(), "w");
         if (file == NULL) {
@@ -133,7 +130,7 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
             return;
         }
         fprintf(file, "# Generated LUT with openfx-CMS\n");
-        fprintf(file, "LUT_3D_SIZE %llu\n\n", _lut.size());
+        fprintf(file, "LUT_3D_SIZE %i\n\n", _lutSize);
         fprintf(file, "DOMAIN_MIN 0.0 0.0 0.0\n");
         fprintf(file, "DOMAIN_MAX 1.0 1.0 1.0\n\n");
         for (int i = 0; i < _lut.size(); i++) {
@@ -204,6 +201,26 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
             OFX::PushButtonParamDescriptor* param = desc.definePushButtonParam("BakeLUT");
             param->setLabel("Bake LUT");
             param->setHint("Create the 3D LUT file in cube format.");
+            if (page) {
+                page->addChild(*param);
+            }
+        }
+
+        {
+            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("log2 encode");
+            param->setLabel("Log2 Encode");
+            param->setHint("Log2 encode input samples");
+            param->setDefault(false);
+            if (page) {
+                page->addChild(*param);
+            }
+        }
+
+        {
+            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
+            param->setLabel("Log2 Min Max values");
+            param->setHint("Min and max exposure values");
+            param->setDefault(-8, 4);
             if (page) {
                 page->addChild(*param);
             }

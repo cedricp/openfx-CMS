@@ -29,7 +29,8 @@ PROJECT(OpenFXCMS CXX)
 ENABLE_TESTING()
 
 
-set(CMAKE_INSTALL_PREFIX "E:/Applications/Natron/Plugins/OFX/Natron")
+#set(CMAKE_INSTALL_PREFIX "E:/Applications/Natron/Plugins/OFX/Natron")
+set(CMAKE_INSTALL_PREFIX "C:/Users/cedric/Documents/ofx")
 
 # ========================== build platform ==========================
 
@@ -128,6 +129,7 @@ FILE(GLOB SUPPORT_SOURCES
 FILE(GLOB CMS_SOURCES
   "CMSPattern/CMSPattern.cpp"
   "CMSBakeLut/CMSBakeLut.cpp"
+  "CMSLogEncoding/CMSLogEncoding.cpp"
 )
 
 FILE(GLOB CMS_RESOURCES

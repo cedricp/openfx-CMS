@@ -10,12 +10,12 @@
 #endif
 #include "ofxsThreadSuite.h"
 
-#define kPluginName "CMSBakeLutOFX"
+#define kPluginName "CMSLogEncodingOFX"
 #define kPluginGrouping "CMSPlugin"
 #define kPluginDescription                                                                                                                                                                                                                                             \
-    "Generate a 3D LUT from a CMS pattern."
+    "Log2 allocation utility."
 
-#define kPluginIdentifier "net.sf.openfx.CMSBakeLut"
+#define kPluginIdentifier "net.sf.openfx.CMSLogEncoding"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
 
@@ -24,7 +24,7 @@
 #define kSupportsHalf false
 #define kSupportsFloat true
 
-#define kSupportsTiles 0
+#define kSupportsTiles 1
 #define kSupportsMultiResolution 0
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
@@ -39,23 +39,18 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentAlpha || (c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
 #endif
 
-struct Color
-{
-    float r, g, b;
-};
-
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSBakeLutPlugin: public GeneratorPlugin
+class CMSLogEncodingPlugin: public GeneratorPlugin
 {
 public:
     /** @brief ctor */
-    CMSBakeLutPlugin(OfxImageEffectHandle handle)
+    CMSLogEncodingPlugin(OfxImageEffectHandle handle)
         : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
-        _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        _logScale = fetchBooleanParam("log2 encode");
+        _outputClip = fetchClip(kOfxImageEffectOutputClipName);
+        _isAntiLog = fetchBooleanParam("antiLog");
         _logminmax = fetchDouble2DParam("log2 min max");
     }
 
@@ -70,11 +65,11 @@ private:
     int _lutSize;
     OFX::StringParam* _outputLutFile;
     OFX::Clip* _inputClip;
-    std::vector<Color> _lut;
-    OFX::BooleanParam *_logScale;
+    OFX::Clip* _outputClip;
+    OFX::BooleanParam *_isAntiLog;
     OFX::Double2DParam *_logminmax;
 };
 
-mDeclarePluginFactory(CMSBakeLutPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+mDeclarePluginFactory(CMSLogEncodingPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

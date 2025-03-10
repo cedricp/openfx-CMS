@@ -11,7 +11,7 @@
 #include "ofxsThreadSuite.h"
 
 #define kPluginName "CMSPatternOFX"
-#define kPluginGrouping "Image"
+#define kPluginGrouping "CMSPlugin"
 #define kPluginDescription                                                                                                                                                                                                                                             \
     "Generate an image for 3D LUT creation"
 
@@ -54,6 +54,8 @@ public:
         : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
     {
         _lutSize = fetchIntParam(kParamLUTSize);
+        _antiLogScale = fetchBooleanParam("log2 encode");
+        _logminmax = fetchDouble2DParam("log2 min max");
         assert(_lutSize);
     }
 
@@ -66,6 +68,8 @@ private:
 
 private:
     OFX::IntParam *_lutSize;
+    OFX::BooleanParam *_antiLogScale;
+    OFX::Double2DParam *_logminmax;
 };
 
 mDeclarePluginFactory(CMSPatternPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
