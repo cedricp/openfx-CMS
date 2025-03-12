@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <limits>
 
 class logEncode
 {
@@ -46,7 +47,7 @@ public:
     {
         double out = in * m + b;
         if (in >= logbreak){
-            out = std::max(DBL_EPSILON, out);
+            out = std::max( std::numeric_limits<double>::min(), out );
             out = log2(out);
             out = out * klog + kb;
             out *= scale;
