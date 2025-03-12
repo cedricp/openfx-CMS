@@ -34,9 +34,9 @@
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #ifdef OFX_EXTENSIONS_NATRON
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentAlpha || (c) == OFX::ePixelComponentXY || (c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
 #else
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentAlpha || (c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,12 +60,13 @@ private:
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
     void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
+    bool isIdentity(const OFX::IsIdentityArguments &args, OFX::Clip * &identityClip, double &identityTime, int&view, std::string& plane) OVERRIDE FINAL;
 
 private:
     int _lutSize;
-    OFX::StringParam* _outputLutFile;
     OFX::Clip* _inputClip;
     OFX::Clip* _outputClip;
+    OFX::StringParam* _outputLutFile;
     OFX::BooleanParam *_isAntiLog;
     OFX::Double2DParam *_logminmax;
 };

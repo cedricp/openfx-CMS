@@ -41,6 +41,8 @@ bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
     }
 
     rod = _inputClip->getRegionOfDefinition(args.time, args.view);
+    // rod.x2 = rod.x1 + ((rod.x2 - rod.x1) / 7);
+    // rod.y2 = rod.y1 + ((rod.y2 - rod.y1) / 7);
 
     return true;
 }
@@ -56,7 +58,6 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     assert(OFX_COMPONENTS_OK(dstComponents));
 
     checkComponents(dstBitDepth, dstComponents);
-
     
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
     OFX::auto_ptr<OFX::Image> src(_inputClip->fetchImage(args.time));

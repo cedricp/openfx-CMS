@@ -39,9 +39,9 @@
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #ifdef OFX_EXTENSIONS_NATRON
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentAlpha || (c) == OFX::ePixelComponentXY || (c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
 #else
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentAlpha || (c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////

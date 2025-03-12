@@ -215,7 +215,7 @@ void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
 #ifdef OFX_EXTENSIONS_NATRON
-    desc.setChannelSelector(OFX::ePixelComponentRGBA);
+    desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
 
     OFX::generatorDescribe(desc);
