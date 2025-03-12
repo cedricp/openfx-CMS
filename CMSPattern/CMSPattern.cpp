@@ -125,6 +125,14 @@ bool CMSPatternPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
     return true;
 }
 
+void CMSPatternPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
+{
+    if (paramName == kParamLUTSize)
+    {
+
+    }
+}
+
 
 // the overridden render function
 void CMSPatternPlugin::render(const OFX::RenderArguments &args)
@@ -190,10 +198,20 @@ OfxPointI CMSPatternPlugin::getCMSResolution()
 
 void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+    OfxPointI res = getCMSResolution();
+    OfxRectI format;
+    format.x1 = 0;
+    format.x2 = res.x;
+    format.y1 = 0;
+    format.y2 = res.y;
+
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
+    double par = 1.;
+    clipPreferences.setPixelAspectRatio(*_dstClip, par);
+    clipPreferences.setOutputFormat(format);
 
-    GeneratorPlugin::getClipPreferences(clipPreferences);
+    //GeneratorPlugin::getClipPreferences(clipPreferences);
 }
 
 void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -250,6 +268,7 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         {
             page->addChild(*param);
         }
+        desc.addClipPreferencesSlaveParam(*param);
     }
 
     {
