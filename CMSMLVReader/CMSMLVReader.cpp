@@ -39,11 +39,15 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
 
         return false;
     }
-    
-    // rod.x1 = 0;
-    // rod.x2 = resolution.x;
-    // rod.y1 = 0;
-    // rod.y2 = resolution.y;
+
+    if (!_mlv_video || !_mlv_video->valid()){
+        return false;
+    }
+
+    rod.x1 = 0;
+    rod.x2 = _mlv_video->raw_resolution_x();
+    rod.y1 = 0;
+    rod.y2 = _mlv_video->raw_resolution_y();
     return true;
 }
 
@@ -65,11 +69,9 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     // instantiate the render code based on the pixel depth of the dst clip
-    const double time = args.time;
     OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
 
-    printf(">> time :%f\n", time);
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
