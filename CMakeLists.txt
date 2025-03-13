@@ -24,10 +24,16 @@ ENDIF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 ########################################################################
 # Project setup
 ########################################################################
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
-PROJECT(OpenFXCMS CXX)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+PROJECT(OpenFXCMS CXX C)
 ENABLE_TESTING()
+set(CMAKE_CXX_STANDARD 17)
 
+if(MINGW)
+set(PC_LIBRAW_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64")
+endif()
+
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 #set(CMAKE_INSTALL_PREFIX "E:/Applications/Natron/Plugins/OFX/Natron")
 set(CMAKE_INSTALL_PREFIX "C:/Users/cedric/Documents/ofx")
@@ -53,8 +59,10 @@ if(NOT CMAKE_GENERATOR MATCHES "Xcode|Visual Studio")
 endif()
 
 include(FindOpenGL REQUIRED)
+find_package(LibRaw  REQUIRED)
+find_package(Eigen3 REQUIRED)
 
-set (CMAKE_CXX_STANDARD 11)
+add_subdirectory(RawLib)
 
 # Use -Ofast when applicable (implies -ffast-math)
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -130,6 +138,7 @@ FILE(GLOB CMS_SOURCES
   "CMSPattern/CMSPattern.cpp"
   "CMSBakeLut/CMSBakeLut.cpp"
   "CMSLogEncoding/CMSLogEncoding.cpp"
+  "CMSMLVReader/CMSMLVReader.cpp"
 )
 
 FILE(GLOB CMS_RESOURCES
@@ -137,7 +146,7 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
 )
 
-ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES})
+ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:mlvlib_static> $<TARGET_OBJECTS:rawlib_static>)
 SET_TARGET_PROPERTIES(CMS PROPERTIES PREFIX "")
 SET_TARGET_PROPERTIES(CMS PROPERTIES SUFFIX ".ofx")
 
@@ -154,8 +163,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD" OR ${CMAKE_SYSTEM_NAME} STREQUAL 
 endif()
 
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON OFX_EXTENSIONS_TUTTLE OFX_SUPPORTS_OPENGLRENDER NOMINMAX)
-#TARGET_LINK_LIBRARIES(CMS Support ${OPENGL_gl_LIBRARY})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY})
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html

@@ -25,9 +25,9 @@
 #include <climits>
 #include <cfloat>
 
+#include "ofxOpenGLRender.h"
 #include "CMSPattern.h"
 #include "../utils.h" 
-
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 

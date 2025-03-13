@@ -1,0 +1,66 @@
+#pragma once
+
+#include <string>
+
+struct mlv_imp;
+
+class Mlv_video
+{
+public:
+	struct RawInfo {
+		bool raw_tweak = true;
+		bool fix_focuspixels = true;
+		int32_t chroma_smooth = 0;
+		int32_t temperature = -1;
+		float headroom = 4.5;
+		int interpolation = 4;
+		int highlight = 3;
+		float crop_factor = 1.0f;
+		float focal_length = 35.0f;
+		std::string darkframe_file;
+		bool darkframe_enable = true;
+		bool darkframe_ok = false;
+		std::string darkframe_error;
+	};
+	mlv_imp* _imp = NULL;
+private:
+	RawInfo _rawinfo;
+	bool _valid = false;
+
+public:
+
+
+	Mlv_video(std::string filename);
+	~Mlv_video();
+
+	bool valid(){return _valid;}
+
+	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri) ;
+
+	uint32_t black_level();
+	uint32_t white_level();
+
+	float fps();
+	uint32_t frame_count();
+
+	uint32_t raw_resolution_x();
+	uint32_t raw_resolution_y();
+	std::string camera_name();
+	std::string lens_name();
+	std::string lens_name_by_id();
+	float focal_length();
+	float focal_dist();
+	float aperture();
+	float crop_factor();
+	float final_crop_factor();
+	uint32_t iso();
+	uint32_t shutter_speed();
+	int pixel_binning_x();
+    int pixel_binning_y();
+	int sampling_factor_x();
+    int sampling_factor_y();
+	int bpp();
+	void sensor_resolulion(int& x, int& y);
+
+	bool generate_darkframe(int in, int out);
+};
