@@ -12,9 +12,8 @@ extern "C"{
 
 struct mlv_imp
 {
-	mlvObject_t* mlv_object;
-	Dng_processor *dngc;
-	dngObject_t* dng_object;
+	mlvObject_t* mlv_object = NULL;
+	dngObject_t* dng_object = NULL;
 	mlv_wbal_hdr_t original_wbal;
 };
 
@@ -24,6 +23,7 @@ std::string get_map_name(mlvObject_t* mvl_object)
     snprintf(name, 1024, "%x_%ix%i.fpm", mvl_object->IDNT.cameraModel, mvl_object->RAWI.raw_info.width, mvl_object->RAWI.raw_info.height);
     return name;
 }
+
 
 Mlv_video::Mlv_video(std::string filename)
 {
@@ -46,11 +46,19 @@ Mlv_video::Mlv_video(std::string filename)
 	int par[4] = {1,1,1,1};
 	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
 
-	_imp->dngc = new Dng_processor;
-
 	memcpy(&_imp->original_wbal, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t));
 	_rawinfo.crop_factor = crop_factor();
 	_rawinfo.focal_length = focal_length();
+}
+
+void* Mlv_video::get_mlv_object()
+{
+	return (void*)_imp->mlv_object;
+}
+
+mlv_wbal_hdr_t Mlv_video::get_wb_object()
+{
+	return _imp->mlv_object->WBAL;
 }
 
 bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
@@ -183,7 +191,6 @@ bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
 Mlv_video::~Mlv_video()
 {
 	freeMlvObject(_imp->mlv_object);
-	delete _imp->dngc;
 	delete _imp;
 }
 
@@ -213,7 +220,7 @@ uint32_t Mlv_video::white_level()
 
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size)
 {
 	if (frame >= _imp->mlv_object->frames){
 		frame = _imp->mlv_object->frames - 1;
@@ -258,9 +265,8 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri)
 
 	uint8_t *buffer = getDngFrameBuffer(_imp->mlv_object, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
+	dng_size = size;
 	// Set debayer type
-	_imp->dngc->set_interpolation(_rawinfo.interpolation);
-	_imp->dngc->set_highlight(_rawinfo.highlight);
 
 	return (uint16_t*)buffer;
 }

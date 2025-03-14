@@ -1,22 +1,27 @@
 #include "dng_convert.h"
-#include "idt/dng_idt.h"
 #include <libraw.h>
 #include <sys/stat.h>
 #include <algorithm>
+extern "C"{
+#include <dng/dng.h>
+}
 
 struct Dng_processor::dngc_impl{
 	LibRaw* libraw;
+	libraw_processed_image_t* _image;
 };
 
 Dng_processor::Dng_processor() : _buffer(NULL)
 {
 	_imp = new dngc_impl;
 	_imp->libraw = new LibRaw;
+	_imp->_image = 0;
 	_w = _h = 0;
 }
 
 Dng_processor::~Dng_processor()
 {
+	free_buffer();
 	delete _imp->libraw;
 	delete _imp;
 }
@@ -35,7 +40,6 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 
 uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 {
-	libraw_processed_image_t* image;
 	_imp->libraw->recycle();
 
 	/*
@@ -50,32 +54,38 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	12 - Modified AHD intepolation (by Anton Petrusevich)
 	*/
 
-	unpack(buffer, buffersize);
-	if (!buffer){
-		printf("Dng_processor::get_processed_image : Nothing to unpack\n");
-		return NULL;
-	}
-	
+
 	// XYZ colorspace
-	_imp->libraw->imgdata.params.use_auto_wb = 0;
 	// output_color -> raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-	_imp->libraw->imgdata.params.output_color = 5;
+	_imp->libraw->imgdata.params.output_color = _colorspace;
 	_imp->libraw->imgdata.params.output_bps = 16;
 	_imp->libraw->imgdata.params.gamm[0] = 1.0;
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;
 	// See debayer method above
 	_imp->libraw->imgdata.params.user_qual = _interpolation_mode;
 	_imp->libraw->imgdata.params.use_camera_matrix = 1;
-	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
+	_imp->libraw->imgdata.params.use_auto_wb = 0;
 	// threshold-> Parameter for noise reduction through wavelet denoising.
 	_imp->libraw->imgdata.params.threshold = 1.; 
-	// _imp->libraw->imgdata.params.user_mul[0] = _imp->libraw->imgdata.color.cam_mul[0];
-	// _imp->libraw->imgdata.params.user_mul[1] = _imp->libraw->imgdata.color.cam_mul[1];
-	// _imp->libraw->imgdata.params.user_mul[2] = _imp->libraw->imgdata.color.cam_mul[2];
-	// _imp->libraw->imgdata.params.user_mul[3] = _imp->libraw->imgdata.color.cam_mul[3];
+	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
+	int32_t wbal[6];
+	uint32_t camid = 0;
+	if (!_camera_wb){
+		::get_white_balance(_wb_coeffs, wbal, camid);
+		_imp->libraw->imgdata.params.user_mul[0] = float(wbal[1]) / 1000000.;
+		_imp->libraw->imgdata.params.user_mul[1] = float(wbal[3]) / 1000000.;
+		_imp->libraw->imgdata.params.user_mul[2] = float(wbal[5]) / 1000000.;
+		_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
+	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
 	_imp->libraw->imgdata.params.no_interpolation= _interpolation_mode == 0;
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
+
+	unpack(buffer, buffersize);
+	if (!buffer){
+		printf("Dng_processor::get_processed_image : Nothing to unpack\n");
+		return NULL;
+	}
 
 	int err;
 	err = _imp->libraw->dcraw_process();
@@ -84,15 +94,15 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 		return NULL;
 	}
 
-	image = _imp->libraw->dcraw_make_mem_image(&err);
+	_imp->_image = _imp->libraw->dcraw_make_mem_image(&err);
 	
 	if (err != LIBRAW_SUCCESS){
 		printf("make mem image error\n");
 		return NULL;
 	}
 
-	_w = image->width;
-	_h = image->height;
+	_w = _imp->_image->width;
+	_h = _imp->_image->height;
 
 	// DNGIdt idt = DNGIdt(_imp->libraw->imgdata.rawdata);
 	// idt.getDNGIDTMatrix2(_idt.matrix);
@@ -106,13 +116,14 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	// 	}
 	// }
 
-	return (uint16_t*)&image->data;
+	return (uint16_t*)&_imp->_image->data;
 }
 
-void* Dng_processor::imgdata()
+void Dng_processor::free_buffer()
 {
-	if (_imp->libraw)
-		return (void*)&_imp->libraw->imgdata;
-	return NULL;
+	if (_imp->libraw){
+		free(_imp->_image);
+		_imp->_image = 0;
+	}
 }
 

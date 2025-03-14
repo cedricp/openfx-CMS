@@ -1,6 +1,7 @@
 #pragma once
-#include "mlv-lib/video_mlv.h"
 #include <string>
+#include <cstdint>
+#include "mlv_video.h"
 
 class Dng_processor
 {
@@ -15,7 +16,11 @@ public:
 	void set_interpolation(int i){_interpolation_mode = i;}
 	void set_highlight(int i){_highlight_mode = i;}
 	void set_camera_wb(bool wb){_camera_wb = wb;}
-	void* imgdata();
+	void set_colorspace(int c){_colorspace = c;}
+	void free_buffer();
+	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){
+		_wb_coeffs = wb_coeffs;
+	}
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;
@@ -24,4 +29,6 @@ private:
 	int _interpolation_mode = 3;
 	int _highlight_mode;
 	int _camera_wb;
+	int _colorspace = 0;
+	mlv_wbal_hdr_t _wb_coeffs;
 };

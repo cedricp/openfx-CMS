@@ -36,7 +36,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 #set(CMAKE_INSTALL_PREFIX "E:/Applications/Natron/Plugins/OFX/Natron")
-set(CMAKE_INSTALL_PREFIX "C:/Users/cedric/Documents/ofx")
+#set(CMAKE_INSTALL_PREFIX "C:/Users/cedric/Documents/ofx")
 
 # ========================== build platform ==========================
 
@@ -87,6 +87,8 @@ endif()
 # C++ Include directories
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/SupportExt)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/RawLib)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/RawLib/mlv-lib)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/include)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/include)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/Plugins/include)
@@ -146,7 +148,7 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
 )
 
-ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:mlvlib_static> $<TARGET_OBJECTS:rawlib_static>)
+ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
 SET_TARGET_PROPERTIES(CMS PROPERTIES PREFIX "")
 SET_TARGET_PROPERTIES(CMS PROPERTIES SUFFIX ".ofx")
 

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <string>
+#include <mlv.h>
 
 struct mlv_imp;
+
 
 class Mlv_video
 {
@@ -34,8 +36,11 @@ public:
 	~Mlv_video();
 
 	bool valid(){return _valid;}
+	void* get_mlv_object();
 
-	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri) ;
+	mlv_wbal_hdr_t get_wb_object();
+
+	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
 
 	uint32_t black_level();
 	uint32_t white_level();
