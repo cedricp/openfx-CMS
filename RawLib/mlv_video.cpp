@@ -15,6 +15,7 @@ struct mlv_imp
 	mlvObject_t* mlv_object = NULL;
 	dngObject_t* dng_object = NULL;
 	mlv_wbal_hdr_t original_wbal;
+	std::string mlvfilename;
 };
 
 std::string get_map_name(mlvObject_t* mvl_object)
@@ -28,6 +29,7 @@ std::string get_map_name(mlvObject_t* mvl_object)
 Mlv_video::Mlv_video(std::string filename)
 {
 	_imp = new mlv_imp;
+	_imp->mlvfilename = filename;
 
 	int err;
 	char err_mess[512];
@@ -59,6 +61,11 @@ void* Mlv_video::get_mlv_object()
 mlv_wbal_hdr_t Mlv_video::get_wb_object()
 {
 	return _imp->mlv_object->WBAL;
+}
+
+int Mlv_video::get_camid()
+{
+	return _imp->mlv_object->IDNT.cameraModel;
 }
 
 bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
@@ -222,26 +229,26 @@ uint32_t Mlv_video::white_level()
 
 uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size)
 {
-	if (frame >= _imp->mlv_object->frames){
-		frame = _imp->mlv_object->frames - 1;
+	mlvObject_t mlvob = *_imp->mlv_object;
+
+	if (frame >= mlvob.frames){
+		frame = mlvob.frames - 1;
 	}
 
-	memcpy(&_imp->mlv_object->WBAL, &_imp->original_wbal, sizeof(mlv_wbal_hdr_t));
-
-	if (ri.temperature != -1){
-		_imp->mlv_object->WBAL.wb_mode = WB_KELVIN;
-		_imp->mlv_object->WBAL.kelvin = ri.temperature;
+	if (ri.temperature > 0){
+		mlvob.WBAL.wb_mode = WB_KELVIN;
+		mlvob.WBAL.kelvin = ri.temperature;
 	}
 
-	llrpSetFixRawMode(_imp->mlv_object, 1);
-	llrpSetChromaSmoothMode(_imp->mlv_object, _rawinfo.chroma_smooth+1);
-	llrpResetDngBWLevels(_imp->mlv_object);
+	llrpSetFixRawMode(&mlvob, 1);
+	llrpSetChromaSmoothMode(&mlvob, _rawinfo.chroma_smooth+1);
+	llrpResetDngBWLevels(&mlvob);
 
 	char error_msg[128];
 	if (_rawinfo.darkframe_enable){
-		llrpSetDarkFrameMode(_imp->mlv_object, 1);
-		if( llrpValidateExtDarkFrame(_imp->mlv_object, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
-			llrpInitDarkFrameExtFileName(_imp->mlv_object, _rawinfo.darkframe_file.c_str());
+		llrpSetDarkFrameMode(&mlvob, 1);
+		if( llrpValidateExtDarkFrame(&mlvob, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
+			llrpInitDarkFrameExtFileName(&mlvob, _rawinfo.darkframe_file.c_str());
 			_rawinfo.darkframe_ok = true;
 			_rawinfo.darkframe_error = error_msg;
 		} else {
@@ -250,20 +257,20 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 			printf("%s\n", error_msg);
 		}
 	} else {
-		llrpSetDarkFrameMode(_imp->mlv_object, 0);
+		llrpSetDarkFrameMode(&mlvob, 0);
 		_rawinfo.darkframe_error.clear();        
 	}
 
 	if (ri.fix_focuspixels){
-		int focusDetect = llrpDetectFocusDotFixMode(_imp->mlv_object);
+		int focusDetect = llrpDetectFocusDotFixMode(&mlvob);
 		if( focusDetect != 0 ){
-			llrpSetFocusPixelMode(_imp->mlv_object, focusDetect);
+			llrpSetFocusPixelMode(&mlvob, focusDetect);
 		}
 	} else {
-		llrpSetFocusPixelMode(_imp->mlv_object, FP_OFF);
+		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
 
-	uint8_t *buffer = getDngFrameBuffer(_imp->mlv_object, _imp->dng_object, frame);
+	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
 	dng_size = size;
 	// Set debayer type

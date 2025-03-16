@@ -56,10 +56,17 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
     const double time = args.time;
-
+    
+    bool cam_wb = _cameraWhiteBalance->getValue();
+    
     int dng_size = 0;
-    _rawInfo.temperature = _colorTemperature->getValue();
-    uint16_t* raw_buffer = _mlv_video->get_dng_buffer((int)time, _rawInfo, dng_size);
+    Mlv_video::RawInfo rawInfo;
+    rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
+    
+    pthread_mutex_lock(&_mutex);
+    uint16_t* raw_buffer = _mlv_video->get_dng_buffer((int)time, rawInfo, dng_size);
+    pthread_mutex_unlock(&_mutex);
+
     if (raw_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
@@ -67,13 +74,15 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     int mlv_height = _mlv_video->raw_resolution_y();
     
     Dng_processor dng_processor;
-    if (_cameraWhiteBalance->getValue()){
-        dng_processor.set_camera_wb(true);
-    } else {
-        dng_processor.set_camera_wb(false);
-    }
+    dng_processor.set_interpolation(_debayerType->getValue());
+    dng_processor.set_camera_wb(cam_wb);
+    mlv_wbal_hdr_t wbobj = _mlv_video->get_wb_object();
+    wbobj.kelvin = rawInfo.temperature;
+    dng_processor.set_wb_coeffs(wbobj);
+    dng_processor.set_camid(_mlv_video->get_camid());
+
+
     dng_processor.set_colorspace(_colorSpaceFormat->getValue());
-    dng_processor.set_wb_coeffs(_mlv_video->get_wb_object());
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)raw_buffer, dng_size);
 
     free(raw_buffer);
@@ -97,11 +106,11 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     for(int y=0; y < height_img; y++) {
         uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
-        uint16_t *dstPix = (uint16_t*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
+        float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
         for(int x=0; x < width_img; x++) {
-            *dstPix++ = *srcPix++;
-            *dstPix++ = *srcPix++;
-            *dstPix++ = *srcPix++;
+            *dstPix++ = float(*srcPix++) / UINT16_MAX;
+            *dstPix++ = float(*srcPix++) / UINT16_MAX;
+            *dstPix++ = float(*srcPix++) / UINT16_MAX;
         }
     }
 }
@@ -127,6 +136,10 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
 {
     if (_mlv_video){
         delete _mlv_video;
+        _mlv_video = NULL;
+    }
+    if (file.empty()){
+        return;
     }
     _mlv_video = new Mlv_video(file);
     _mlvfilename = file;
@@ -164,7 +177,7 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     #ifdef OFX_EXTENSIONS_TUTTLE
     desc.addSupportedContext(OFX::eContextReader);
     #endif
-    desc.addSupportedBitDepth(OFX::eBitDepthUShort);
+    desc.addSupportedBitDepth(OFX::eBitDepthFloat);
     desc.setSingleInstance(false);
     desc.setHostFrameThreading(false);
     desc.setSupportsMultiResolution(kSupportsMultiResolution);
@@ -223,6 +236,24 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->setDefault("");
         param->setFilePathExists(true);
         param->setStringType(OFX::eStringTypeFilePath);
+        if (page)
+        {
+            page->addChild(*param);
+        }
+    }
+
+    { 
+        // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kDebayerType);
+        param->setLabel("Debayer");
+        param->appendOption("Linear", "", "linear");
+        param->appendOption("VNG", "", "vng");
+        param->appendOption("PPG", "", "ppg");
+        param->appendOption("AHD", "", "ahd");
+        param->appendOption("DCB", "", "dcb");
+        param->appendOption("DHT", "", "dht");
+        param->appendOption("Modifier AHD", "", "mahd");
+        param->setDefault(1);
         if (page)
         {
             page->addChild(*param);

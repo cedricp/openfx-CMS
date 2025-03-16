@@ -53,6 +53,7 @@ public:
 	std::string camera_name();
 	std::string lens_name();
 	std::string lens_name_by_id();
+	int get_camid();
 	float focal_length();
 	float focal_dist();
 	float aperture();

@@ -61,6 +61,8 @@ void setMlvLosslessBpp(mlvObject_t * video);
  ********* PRIVATE AREA *********
  ********************************/
 
+ FILE **load_all_chunks(const char *base_filename, int *entries);
+ 
 /* Gets a debayered frame; how is it different from getMlvRawFrameDebayered?... it doesn't get it from cache ever
  * also you must allocate it some temporary memory because that's how it works and you shouldnt be looking anyway */
 void get_mlv_raw_frame_debayered(mlvObject_t * video,

@@ -92,7 +92,7 @@ static int seek_to_next_known_block(FILE * in_file)
 }
 
 /* Spanned multichunk MLV file handling */
-static FILE **load_all_chunks(char *base_filename, int *entries)
+FILE **load_all_chunks(const char *base_filename, int *entries)
 {
     int seq_number = 0;
     int max_name_len = strlen(base_filename) + 16;

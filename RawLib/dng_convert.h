@@ -21,6 +21,7 @@ public:
 	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){
 		_wb_coeffs = wb_coeffs;
 	}
+	void set_camid(int cid){_camid = cid;}
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;
@@ -30,5 +31,7 @@ private:
 	int _highlight_mode;
 	int _camera_wb;
 	int _colorspace = 0;
+	int _interp = 0;
+	int _camid;
 	mlv_wbal_hdr_t _wb_coeffs;
 };

@@ -27,10 +27,11 @@
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
-#define kRenderThreadSafety eRenderInstanceSafe
+#define kRenderThreadSafety eRenderFullySafe
 
 #define kMLVfileParamter "MLVFilename"
 #define kColorSpaceFormat "ColorSpaceFormat"
+#define kDebayerType "DebayerType"
 #define kColorTemperature "ColorTemperature"
 #define kCameraWhiteBalance "CameraWhiteBalance"
 
@@ -54,11 +55,19 @@ public:
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
+        _debayerType = fetchChoiceParam(kDebayerType);
         _colorTemperature = fetchIntParam(kColorTemperature);
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue());
         }
+        pthread_mutex_init(&_mutex, NULL);
+        _pluginPath = getPluginFilePath();
+    }
+
+    ~CMSMLVReaderPlugin()
+    {
+        pthread_mutex_destroy(&_mutex);
     }
 
 private:
@@ -75,12 +84,14 @@ private:
 private:
     OFX::Clip* _outputClip;
     Mlv_video* _mlv_video;
-    Mlv_video::RawInfo _rawInfo;
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
     OFX::ChoiceParam* _colorSpaceFormat;
+    OFX::ChoiceParam* _debayerType;
     OFX::IntParam* _colorTemperature;
     OFX::BooleanParam* _cameraWhiteBalance;
+    pthread_mutex_t _mutex;
+    std::string _pluginPath;
 };
 
 mDeclarePluginFactory(CMSMLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
