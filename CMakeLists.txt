@@ -62,6 +62,8 @@ include(FindOpenGL REQUIRED)
 find_package(LibRaw  REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+message("Using libRAW ${LibRaw_LIBRARIES}")
+
 add_subdirectory(RawLib)
 
 # Use -Ofast when applicable (implies -ffast-math)

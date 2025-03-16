@@ -32,7 +32,8 @@ FIND_PATH(LibRaw_INCLUDE_DIR libraw.h
          )
 
 
-FIND_LIBRARY(LibRaw_LIBRARY_RELEASE NAMES raw
+FIND_LIBRARY(LibRaw_LIBRARY_RELEASE NAMES libraw.a
+             NO_DEFAULT_PATH   
              PATHS
              ${PC_LIBRAW_DIR}/libraw/lib
              ${PC_LIBRAW_LIBRARY_DIRS}
@@ -49,7 +50,7 @@ select_library_configurations(LibRaw)
 
 FIND_LIBRARY(LibRaw_r_LIBRARY_RELEASE NAMES raw_r
              PATHS
-             ${PC_LIBRAW_R_LIBDIR}
+             ${PC_LIBRAW_DIR}/libraw/lib
              ${PC_LIBRAW_R_LIBRARY_DIRS}
             )
 
@@ -84,7 +85,7 @@ ENDIF()
 
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibRaw
-                                  REQUIRED_VARS LibRaw_LIBRARIES LibRaw_INCLUDE_DIR
+                                  REQUIRED_VARS LibRaw_LIBRARIES LibRaw_r_LIBRARIES LibRaw_INCLUDE_DIR
                                   VERSION_VAR LibRaw_VERSION_STRING
                                  )
 
