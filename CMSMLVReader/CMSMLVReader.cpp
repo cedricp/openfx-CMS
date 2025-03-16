@@ -55,34 +55,37 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     if (_mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-    const double time = args.time;
+    const int time = floor(args.time+0.5);
     
     bool cam_wb = _cameraWhiteBalance->getValue();
     
     int dng_size = 0;
+
+    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
+    
+    pthread_mutex_lock(&_mlv_mutex);
     Mlv_video::RawInfo rawInfo;
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
+    uint16_t* raw_buffer = _mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    int mlv_width = _mlv_video->raw_resolution_x();
+    int mlv_height = _mlv_video->raw_resolution_y();
+    mlv_wbal_hdr_t wbobj = _mlv_video->get_wb_object();
+    int camid = _mlv_video->get_camid();
+    pthread_mutex_unlock(&_mlv_mutex);
     
-    pthread_mutex_lock(&_mutex);
-    uint16_t* raw_buffer = _mlv_video->get_dng_buffer((int)time, rawInfo, dng_size);
-    pthread_mutex_unlock(&_mutex);
-
     if (raw_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-    int mlv_width = _mlv_video->raw_resolution_x();
-    int mlv_height = _mlv_video->raw_resolution_y();
     
     Dng_processor dng_processor;
     dng_processor.set_interpolation(_debayerType->getValue());
     dng_processor.set_camera_wb(cam_wb);
-    mlv_wbal_hdr_t wbobj = _mlv_video->get_wb_object();
     wbobj.kelvin = rawInfo.temperature;
     dng_processor.set_wb_coeffs(wbobj);
-    dng_processor.set_camid(_mlv_video->get_camid());
-
-
+    dng_processor.set_camid(camid);
+    dng_processor.set_highlight(_highlightMode->getValue());
     dng_processor.set_colorspace(_colorSpaceFormat->getValue());
+
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)raw_buffer, dng_size);
 
     free(raw_buffer);
@@ -93,7 +96,6 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
-    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
 
     if (!dst)
     {
@@ -108,9 +110,9 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
         float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
         for(int x=0; x < width_img; x++) {
-            *dstPix++ = float(*srcPix++) / UINT16_MAX;
-            *dstPix++ = float(*srcPix++) / UINT16_MAX;
-            *dstPix++ = float(*srcPix++) / UINT16_MAX;
+            *dstPix++ = float(*srcPix++) / _maxValue;
+            *dstPix++ = float(*srcPix++) / _maxValue;
+            *dstPix++ = float(*srcPix++) / _maxValue;
         }
     }
 }
@@ -146,6 +148,8 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
     if (!_mlv_video->valid()){
         delete _mlv_video;
         _mlv_video = nullptr;
+    } else {
+        _maxValue = pow(2, _mlv_video->bpp());
     }
 }
 
@@ -273,6 +277,24 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("ACES AP0", "", "aces");
         param->appendOption("DCI-P3", "", "dcip3");
         param->appendOption("Rec.2020", "", "rec2020");
+        param->setDefault(1);
+        if (page)
+        {
+            page->addChild(*param);
+        }
+    }
+
+    { 
+        // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kHighlightMode);
+        param->setLabel("HIghlight processing");
+        param->appendOption("Clip", "", "clip");
+        param->appendOption("Unclip", "", "unclip");
+        param->appendOption("Blend", "", "blend");
+        param->appendOption("Rebuild - 1", "", "rebuild1");
+        param->appendOption("Rebuild - 2", "", "rebuild2");
+        param->appendOption("Rebuild - 3", "", "rebuild3");
+        param->appendOption("Rebuild - 4", "", "rebuild4");
         param->setDefault(1);
         if (page)
         {

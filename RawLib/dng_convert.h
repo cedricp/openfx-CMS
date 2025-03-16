@@ -28,7 +28,7 @@ private:
 	unsigned short *_buffer;
 	int _w, _h;
 	int _interpolation_mode = 3;
-	int _highlight_mode;
+	int _highlight_mode = 0;
 	int _camera_wb;
 	int _colorspace = 0;
 	int _interp = 0;

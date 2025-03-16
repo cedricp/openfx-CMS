@@ -40,7 +40,7 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 
 uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 {
-	_imp->libraw->recycle();
+	//_imp->libraw->recycle();
 
 	/*
 	# - Debayer method
@@ -67,18 +67,20 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_imp->libraw->imgdata.params.use_auto_wb = 0;
 	// threshold-> Parameter for noise reduction through wavelet denoising.
 	_imp->libraw->imgdata.params.threshold = 1.; 
+	_imp->libraw->imgdata.params.bright = 1.;
+	_imp->libraw->imgdata.params.no_auto_bright = 1.;
+	_imp->libraw->imgdata.params.half_size = 0;
 	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
-	int32_t wbal[6];
 	if (!_camera_wb){
+		int32_t wbal[6];
 		::get_white_balance(_wb_coeffs, wbal, _camid);
 		_imp->libraw->imgdata.params.user_mul[0] = float(wbal[1]) / 1000000.;
 		_imp->libraw->imgdata.params.user_mul[1] = float(wbal[3]) / 1000000.;
 		_imp->libraw->imgdata.params.user_mul[2] = float(wbal[5]) / 1000000.;
 		_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
-		printf("<<<< White %f %f %f\n", wbal[0], wbal[1], wbal[2]);
 	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
-	_imp->libraw->imgdata.params.no_interpolation= _interpolation_mode == 0;
+	_imp->libraw->imgdata.params.no_interpolation= 0;//_interpolation_mode == 0;
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
 
 	unpack(buffer, buffersize);

@@ -34,6 +34,7 @@
 #define kDebayerType "DebayerType"
 #define kColorTemperature "ColorTemperature"
 #define kCameraWhiteBalance "CameraWhiteBalance"
+#define kHighlightMode "HighlightMode"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -56,18 +57,19 @@ public:
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
+        _highlightMode = fetchChoiceParam(kHighlightMode);
         _colorTemperature = fetchIntParam(kColorTemperature);
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue());
         }
-        pthread_mutex_init(&_mutex, NULL);
+        pthread_mutex_init(&_mlv_mutex, NULL);
         _pluginPath = getPluginFilePath();
     }
 
     ~CMSMLVReaderPlugin()
     {
-        pthread_mutex_destroy(&_mutex);
+        pthread_mutex_destroy(&_mlv_mutex);
     }
 
 private:
@@ -88,10 +90,12 @@ private:
     OFX::StringParam* _mlvfilename_param;
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;
+    OFX::ChoiceParam* _highlightMode;
     OFX::IntParam* _colorTemperature;
     OFX::BooleanParam* _cameraWhiteBalance;
-    pthread_mutex_t _mutex;
+    pthread_mutex_t _mlv_mutex;
     std::string _pluginPath;
+    int _maxValue=0;
 };
 
 mDeclarePluginFactory(CMSMLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});

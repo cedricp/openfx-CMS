@@ -10,17 +10,15 @@ class Mlv_video
 {
 public:
 	struct RawInfo {
-		bool raw_tweak = true;
 		bool fix_focuspixels = true;
 		int32_t chroma_smooth = 0;
 		int32_t temperature = -1;
-		float headroom = 4.5;
 		int interpolation = 4;
 		int highlight = 3;
 		float crop_factor = 1.0f;
 		float focal_length = 35.0f;
 		std::string darkframe_file;
-		bool darkframe_enable = true;
+		bool darkframe_enable = false;
 		bool darkframe_ok = false;
 		std::string darkframe_error;
 	};
