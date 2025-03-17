@@ -17,7 +17,7 @@
 #define kPluginName "CMSMLVReader"
 #define kPluginGrouping "MagicLantern"
 #define kPluginDescription                                                                                                                                                                                                                                             \
-    "Magic lantern MLV reader plugin"
+"Magic lantern MLV reader plugin"
 
 #define kPluginIdentifier "net.sf.openfx.CMSMLVReader"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
@@ -38,7 +38,12 @@
 #define kHighlightMode "HighlightMode"
 #define kTimeRange "Timerange"
 
+#include <vector>
+
+OfxMultiThreadSuiteV1 *gThreadHost = 0;
+
 OFXS_NAMESPACE_ANONYMOUS_ENTER
+
 
 #define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
 
@@ -46,7 +51,6 @@ extern "C"
 {
     extern char FOCUSPIXELMAPFILE[256];
 }
-
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
 class CMSMLVReaderPlugin: public OFX::ImageEffect
@@ -55,7 +59,7 @@ public:
     /** @brief ctor */
     CMSMLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
-        _mlv_video = nullptr;
+        _mlv_video.clear();
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
@@ -64,6 +68,8 @@ public:
         _colorTemperature = fetchIntParam(kColorTemperature);
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
         _timeRange = fetchInt2DParam(kTimeRange);
+        gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
+        gThreadHost->multiThreadNumCPUs(&_numThreads);
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue());
         }
@@ -89,8 +95,8 @@ private:
     virtual bool isVideoStream(const std::string& filename){return true;};
 
 private:
+    unsigned int _numThreads;
     OFX::Clip* _outputClip;
-    Mlv_video* _mlv_video;
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
     OFX::ChoiceParam* _colorSpaceFormat;
@@ -102,6 +108,9 @@ private:
     pthread_mutex_t _mlv_mutex;
     std::string _pluginPath;
     int _maxValue=0;
+
+    std::vector<Mlv_video*> _mlv_video;
+    std::vector<int> _mlv_used;
 };
 
 mDeclarePluginFactory(CMSMLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});

@@ -38,23 +38,50 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
-    if (_mlv_video == nullptr){
+    if (_mlv_video[0] == nullptr){
         return false;
     }
 
     rod.x1 = 0;
-    rod.x2 = _mlv_video->raw_resolution_x();
+    rod.x2 = _mlv_video[0]->raw_resolution_x();
     rod.y1 = 0;
-    rod.y2 = _mlv_video->raw_resolution_y();
+    rod.y2 = _mlv_video[0]->raw_resolution_y();
     return true;
 }
 
 // the overridden render function
 void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
-    if (_mlv_video == nullptr){
+    // unsigned int thread_num=500;
+    // Sleep(15);
+    // if (gThreadHost->multiThreadIndex(&thread_num) != kOfxStatOK){
+    //     thread_num = 999;
+    // }
+    // printf("Thread #%d\n", thread_num);
+    // return;
+    if (_mlv_video.size() == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
+        return;
     }
+
+    int current_file_idx = -1;
+    pthread_mutex_lock(&_mlv_mutex);
+    Mlv_video *mlv_video = NULL;
+    for (int i = 0; i < _mlv_video.size(); ++i){
+        if (_mlv_used[i] == 0){
+            current_file_idx = i;
+            mlv_video = _mlv_video[i];
+            _mlv_used[i] = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&_mlv_mutex);
+
+    if (current_file_idx < 0){
+        OFX::throwSuiteStatusException(kOfxStatFailed);
+        return;
+    }
+
     const int time = floor(args.time+0.5);
     
     bool cam_wb = _cameraWhiteBalance->getValue();
@@ -63,14 +90,18 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
     
-    pthread_mutex_lock(&_mlv_mutex);
+    //pthread_mutex_lock(&_mlv_mutex);
     Mlv_video::RawInfo rawInfo;
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
-    uint16_t* dng_buffer = _mlv_video->get_dng_buffer(time, rawInfo, dng_size);
-    int mlv_width = _mlv_video->raw_resolution_x();
-    int mlv_height = _mlv_video->raw_resolution_y();
-    mlv_wbal_hdr_t wbobj = _mlv_video->get_wb_object();
-    int camid = _mlv_video->get_camid();
+    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    int mlv_width = mlv_video->raw_resolution_x();
+    int mlv_height = mlv_video->raw_resolution_y();
+    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+    int camid = mlv_video->get_camid();
+    //pthread_mutex_unlock(&_mlv_mutex);
+
+    pthread_mutex_lock(&_mlv_mutex);
+    _mlv_used[current_file_idx] = 0;
     pthread_mutex_unlock(&_mlv_mutex);
     
     if (dng_buffer == nullptr || dng_size == 0){
@@ -89,7 +120,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     if (_debayerType->getValue() == 0){
-        uint16_t* raw_buffer = dng_buffer + _mlv_video->get_dng_header_size();
+        uint16_t* raw_buffer = dng_buffer + mlv_video->get_dng_header_size();
 
         OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
         int width_img = (int)(rodd.x2 - rodd.x1);
@@ -105,6 +136,8 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
                 *dstPix++ = pixel_val;
             }
         }
+        free(dng_buffer);
+        free(raw_buffer);
         return;
     }
 
@@ -139,11 +172,11 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
 bool CMSMLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 {
-    if (_mlv_video == nullptr){
+    if (_mlv_video[0] == nullptr){
         return false;
     }
     range.min = 1;
-    range.max = _mlv_video->frame_count();
+    range.max = _mlv_video[0]->frame_count();
 
     return true;
 }
@@ -156,44 +189,51 @@ bool CMSMLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::C
 
 void CMSMLVReaderPlugin::setMlvFile(std::string file)
 {
-    if (_mlv_video){
-        delete _mlv_video;
-        _mlv_video = NULL;
+    for (Mlv_video* mlv : _mlv_video){
+        if (mlv){
+            delete mlv;
+        }
     }
-    if (file.empty()){
-        return;
-    }
-    _mlv_video = new Mlv_video(file);
-    _mlvfilename = file;
-    if (!_mlv_video->valid()){
-        delete _mlv_video;
-        _mlv_video = nullptr;
-    } else {
-        _maxValue = pow(2, _mlv_video->bpp());
-        OfxPointI tr;
-        tr.x = 0;
-        tr.y = _mlv_video->frame_count();
-        _timeRange->setValue(tr);
+
+    _mlv_video.clear();
+    _mlv_used.clear();
+
+    for (int i = 0; i < _numThreads; ++i){
+        Mlv_video* mlv_video = new Mlv_video(file);
+        _mlvfilename = file;
+        if (!mlv_video->valid()){
+            delete mlv_video;
+        } else {
+            if (i == 0){
+                _maxValue = pow(2, mlv_video->bpp());
+                OfxPointI tr;
+                tr.x = 0;
+                tr.y = mlv_video->frame_count();
+                _timeRange->setValue(tr);
+            }
+            _mlv_video.push_back(mlv_video);
+            _mlv_used.push_back(0);
+        }
     }
 }
 
 void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-    if (!_mlv_video || !_mlv_video->valid()){
+    clipPreferences.setOutputFrameVarying(true);
+    if (_mlv_video.size() == 0){
         return;
     }
     OfxRectI format;
     format.x1 = 0;
-    format.x2 = _mlv_video->raw_resolution_x();
+    format.x2 = _mlv_video[0]->raw_resolution_x();
     format.y1 = 0;
-    format.y2 = _mlv_video->raw_resolution_y();
+    format.y2 = _mlv_video[0]->raw_resolution_y();
 
     // output is continuous
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
     // MLV clip is a video stream
-    clipPreferences.setOutputFrameVarying(true);
 }
 
 void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -207,7 +247,7 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     #endif
     desc.addSupportedBitDepth(OFX::eBitDepthFloat);
     desc.setSingleInstance(false);
-    desc.setHostFrameThreading(false);
+    desc.setHostFrameThreading(true);
     desc.setSupportsMultiResolution(kSupportsMultiResolution);
     desc.setSupportsTiles(kSupportsTiles);
     desc.setTemporalClipAccess(false);
@@ -216,6 +256,7 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSupportsMultipleClipDepths(kSupportsMultipleClipDepths);
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
+    desc.setUsesMultiThreading(true);
     //desc.getPropertySet().propSetInt(kOfxImageEffectInstancePropSequentialRender, 2, false);
 #ifdef OFX_EXTENSIONS_NATRON
     desc.setChannelSelector(OFX::ePixelComponentRGB);
