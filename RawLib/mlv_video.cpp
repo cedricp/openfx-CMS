@@ -65,7 +65,12 @@ mlv_wbal_hdr_t Mlv_video::get_wb_object()
 
 uint32_t Mlv_video::get_dng_header_size()
 {
-	return DNG_HEADER_SIZE;
+	return _imp->dng_object->header_size;
+}
+
+uint16_t* Mlv_video::get_raw_image()
+{
+	return _imp->dng_object->image_buf;
 }
 
 int Mlv_video::get_camid()
@@ -203,6 +208,7 @@ bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
 Mlv_video::~Mlv_video()
 {
 	freeMlvObject(_imp->mlv_object);
+	freeDngObject(_imp->dng_object);
 	delete _imp;
 }
 
@@ -234,26 +240,26 @@ uint32_t Mlv_video::white_level()
 
 uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size)
 {
-	mlvObject_t *mlvob = _imp->mlv_object;
+	mlvObject_t mlvob = *_imp->mlv_object;
 
-	if (frame >= mlvob->frames){
-		frame = mlvob->frames - 1;
+	if (frame >= mlvob.frames){
+		frame = mlvob.frames - 1;
 	}
 
 	if (ri.temperature > 0){
-		mlvob->WBAL.wb_mode = WB_KELVIN;
-		mlvob->WBAL.kelvin = ri.temperature;
+		mlvob.WBAL.wb_mode = WB_KELVIN;
+		mlvob.WBAL.kelvin = ri.temperature;
 	}
 
-	llrpSetFixRawMode(mlvob, 1);
-	llrpSetChromaSmoothMode(mlvob, _rawinfo.chroma_smooth+1);
-	llrpResetDngBWLevels(mlvob);
+	llrpSetFixRawMode(&mlvob, 1);
+	llrpSetChromaSmoothMode(&mlvob, _rawinfo.chroma_smooth+1);
+	llrpResetDngBWLevels(&mlvob);
 
 	char error_msg[128];
 	if (_rawinfo.darkframe_enable){
-		llrpSetDarkFrameMode(mlvob, 1);
-		if( llrpValidateExtDarkFrame(mlvob, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
-			llrpInitDarkFrameExtFileName(mlvob, _rawinfo.darkframe_file.c_str());
+		llrpSetDarkFrameMode(&mlvob, 1);
+		if( llrpValidateExtDarkFrame(&mlvob, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
+			llrpInitDarkFrameExtFileName(&mlvob, _rawinfo.darkframe_file.c_str());
 			_rawinfo.darkframe_ok = true;
 			_rawinfo.darkframe_error = error_msg;
 		} else {
@@ -262,20 +268,20 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 			printf("%s\n", error_msg);
 		}
 	} else {
-		llrpSetDarkFrameMode(mlvob, 0);
+		llrpSetDarkFrameMode(&mlvob, 0);
 		_rawinfo.darkframe_error.clear();        
 	}
 
 	if (ri.fix_focuspixels){
-		int focusDetect = llrpDetectFocusDotFixMode(mlvob);
+		int focusDetect = llrpDetectFocusDotFixMode(&mlvob);
 		if( focusDetect != 0 ){
-			llrpSetFocusPixelMode(mlvob, focusDetect);
+			llrpSetFocusPixelMode(&mlvob, focusDetect);
 		}
 	} else {
-		llrpSetFocusPixelMode(mlvob, FP_OFF);
+		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
 
-	uint8_t *buffer = getDngFrameBuffer(mlvob, _imp->dng_object, frame);
+	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
 	dng_size = size;
 

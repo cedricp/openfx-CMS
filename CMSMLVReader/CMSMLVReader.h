@@ -68,7 +68,7 @@ public:
             setMlvFile(_mlvfilename_param->getValue());
         }
         _pluginPath = getPluginFilePath();
-        std::string focusPixelMap = _pluginPath + "/fpm";
+        std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
         pthread_mutex_init(&_mlv_mutex, NULL);
     }
