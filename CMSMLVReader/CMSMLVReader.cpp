@@ -87,24 +87,29 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
+    #define ROL16(v,a) ((v) << (a) | (v) >> (16-(a)))
 
     if (_debayerType->getValue() == 0){
-        uint16_t* raw_buffer = dng_buffer + _mlv_video->get_dng_header_size();
+        uint16_t* raw_buffer = _mlv_video->unpacked_buffer((uint16_t*)((uint8_t*)dng_buffer + _mlv_video->get_dng_header_size()));
 
         OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
         int width_img = (int)(rodd.x2 - rodd.x1);
         int height_img = (int)(rodd.y2 - rodd.y1);
     
         for(int y=0; y < height_img; y++) {
-            uint16_t* srcPix = raw_buffer + (height_img - 1 - y) * (mlv_width * 3);
+            uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
             float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
             for(int x=0; x < width_img; x++) {
-                float pixel_val = float(*srcPix++) / _maxValue;
+                uint16_t pix = ROL16(*srcPix, 8);
+                float pixel_val = float(pix) / _maxValue;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
+                srcPix++;
             }
         }
+        free(dng_buffer);
+        free(raw_buffer);
         return;
     }
 

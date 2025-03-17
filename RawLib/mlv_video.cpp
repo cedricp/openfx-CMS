@@ -282,6 +282,13 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	return (uint16_t*)buffer;
 }
 
+uint16_t* Mlv_video::unpacked_buffer(uint16_t* input_buffer)
+{
+	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y()*2);
+	dng_unpack_image_bits(out, input_buffer, raw_resolution_x(), raw_resolution_y(), bpp());
+	return out;
+}
+
 std::string Mlv_video::camera_name()
 {
 	return std::string((const char*)_imp->mlv_object->IDNT.cameraName);
