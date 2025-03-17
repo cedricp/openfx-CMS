@@ -85,7 +85,7 @@ ENDIF()
 
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibRaw
-                                  REQUIRED_VARS LibRaw_LIBRARIES LibRaw_r_LIBRARIES LibRaw_INCLUDE_DIR
+                                  REQUIRED_VARS LibRaw_LIBRARIES LibRaw_INCLUDE_DIR
                                   VERSION_VAR LibRaw_VERSION_STRING
                                  )
 

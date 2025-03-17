@@ -66,29 +66,16 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     pthread_mutex_lock(&_mlv_mutex);
     Mlv_video::RawInfo rawInfo;
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
-    uint16_t* raw_buffer = _mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    uint16_t* dng_buffer = _mlv_video->get_dng_buffer(time, rawInfo, dng_size);
     int mlv_width = _mlv_video->raw_resolution_x();
     int mlv_height = _mlv_video->raw_resolution_y();
     mlv_wbal_hdr_t wbobj = _mlv_video->get_wb_object();
     int camid = _mlv_video->get_camid();
     pthread_mutex_unlock(&_mlv_mutex);
     
-    if (raw_buffer == nullptr || dng_size == 0){
+    if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-    
-    Dng_processor dng_processor;
-    dng_processor.set_interpolation(_debayerType->getValue());
-    dng_processor.set_camera_wb(cam_wb);
-    wbobj.kelvin = rawInfo.temperature;
-    dng_processor.set_wb_coeffs(wbobj);
-    dng_processor.set_camid(camid);
-    dng_processor.set_highlight(_highlightMode->getValue());
-    dng_processor.set_colorspace(_colorSpaceFormat->getValue());
-
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)raw_buffer, dng_size);
-
-    free(raw_buffer);
 
     // instantiate the render code based on the pixel depth of the dst clip
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
@@ -96,11 +83,44 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
-
     if (!dst)
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
+
+    if (_debayerType->getValue() == 0){
+        uint16_t* raw_buffer = dng_buffer + _mlv_video->get_dng_header_size();
+
+        OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
+        int width_img = (int)(rodd.x2 - rodd.x1);
+        int height_img = (int)(rodd.y2 - rodd.y1);
+    
+        for(int y=0; y < height_img; y++) {
+            uint16_t* srcPix = raw_buffer + (height_img - 1 - y) * (mlv_width * 3);
+            float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
+            for(int x=0; x < width_img; x++) {
+                float pixel_val = float(*srcPix++) / _maxValue;
+                *dstPix++ = pixel_val;
+                *dstPix++ = pixel_val;
+                *dstPix++ = pixel_val;
+            }
+        }
+        return;
+    }
+
+    
+    Dng_processor dng_processor;
+    wbobj.kelvin = rawInfo.temperature;
+    dng_processor.set_interpolation(_debayerType->getValue()-1);
+    dng_processor.set_camera_wb(cam_wb);
+    dng_processor.set_wb_coeffs(wbobj);
+    dng_processor.set_camid(camid);
+    dng_processor.set_highlight(_highlightMode->getValue());
+    dng_processor.set_colorspace(_colorSpaceFormat->getValue());
+
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size);
+
+    free(dng_buffer);
 
     OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
     int width_img = (int)(rodd.x2 - rodd.x1);
@@ -150,6 +170,10 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
         _mlv_video = nullptr;
     } else {
         _maxValue = pow(2, _mlv_video->bpp());
+        OfxPointI tr;
+        tr.x = 0;
+        tr.y = _mlv_video->frame_count();
+        _timeRange->setValue(tr);
     }
 }
 
@@ -231,6 +255,21 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
     dstClip->setSupportsTiles(kSupportsTiles);
 
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
+    OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
+    OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
+
+    {
+        OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kTimeRange);
+        //desc.addClipPreferencesSlaveParam(*param);
+        param->setLabel("Time range");
+        param->setHint("The video time range");
+        param->setDefault(0, 0);
+        param->setEnabled(false);
+        if (page)
+        {
+            page->addChild(*param);
+        }
+    }
 
     {
         OFX::StringParamDescriptor *param = desc.defineStringParam(kMLVfileParamter);
@@ -247,9 +286,10 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
     }
 
     { 
-        // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+        // linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kDebayerType);
         param->setLabel("Debayer");
+        param->appendOption("Raw", "", "raw");
         param->appendOption("Linear", "", "linear");
         param->appendOption("VNG", "", "vng");
         param->appendOption("PPG", "", "ppg");
@@ -258,9 +298,9 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("DHT", "", "dht");
         param->appendOption("Modifier AHD", "", "mahd");
         param->setDefault(1);
-        if (page)
+        if (page_debayer)
         {
-            page->addChild(*param);
+            page_debayer->addChild(*param);
         }
     }
 
@@ -268,7 +308,8 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kColorSpaceFormat);
         param->setLabel("Color space");
-        param->appendOption("Raw", "", "raw");
+        param->appendOption("Raw", "", "linear");
+        param->appendOption("Linear", "", "raw");
         param->appendOption("sRGB", "", "srgb");
         param->appendOption("Adobe", "", "adobe");
         param->appendOption("Wide", "", "wide");
@@ -278,9 +319,9 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("DCI-P3", "", "dcip3");
         param->appendOption("Rec.2020", "", "rec2020");
         param->setDefault(1);
-        if (page)
+        if (page_colors)
         {
-            page->addChild(*param);
+            page_colors->addChild(*param);
         }
     }
 
@@ -296,9 +337,9 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("Rebuild - 3", "", "rebuild3");
         param->appendOption("Rebuild - 4", "", "rebuild4");
         param->setDefault(1);
-        if (page)
+        if (page_colors)
         {
-            page->addChild(*param);
+            page_colors->addChild(*param);
         }
     }
 
@@ -307,9 +348,9 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->setLabel("Camera white balance");
         param->setHint("Use camera white balance");
         param->setDefault(true);
-        if (page)
+        if (page_colors)
         {
-            page->addChild(*param);
+            page_colors->addChild(*param);
         }
     }
 
@@ -320,9 +361,9 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->setDisplayRange(800, 8500);
         param->setHint("Color temperature in Kelvin");
         param->setDefault(6500);
-        if (page)
+        if (page_colors)
         {
-            page->addChild(*param);
+            page_colors->addChild(*param);
         }
     }
 }

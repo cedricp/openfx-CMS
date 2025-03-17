@@ -39,6 +39,7 @@ public:
 	mlv_wbal_hdr_t get_wb_object();
 
 	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
+	uint32_t get_dng_header_size();
 
 	uint32_t black_level();
 	uint32_t white_level();

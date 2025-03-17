@@ -30,6 +30,8 @@
 #define UNCOMPRESSED_ORIG 2
 #define COMPRESSED_ORIG 3
 
+#define DNG_HEADER_SIZE 1536
+
 //MLV WB modes
 enum
 {

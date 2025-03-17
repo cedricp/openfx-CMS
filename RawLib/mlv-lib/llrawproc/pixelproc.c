@@ -32,6 +32,7 @@
 #include "raw.h"
 #include "pixelproc.h"
 
+char FOCUSPIXELMAPFILE[256];
 
 #define EV_RESOLUTION 65536
 
@@ -383,7 +384,7 @@ static int load_pixel_map(pixel_map * map, uint32_t camera_id, int raw_width, in
 
     char* directory = getenv("PIXELMAPSDIR");
     if (!directory){
-    	directory = "./";
+    	directory = FOCUSPIXELMAPFILE;
     }
     char file_name[1024];
     sprintf(file_name, "%s/%x_%ix%i%s", directory, camera_id, raw_width, raw_height, file_ext);

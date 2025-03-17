@@ -44,7 +44,6 @@
 #define RATIONAL_ENTRY(a,b,c,d) (d/2), add_array(a, b, c, d)
 #define RATIONAL_ENTRY2(a,b,c,d) 1, add_rational(a, b, c, d)
 #define ARRAY_ENTRY(a,b,c,d) d, add_array(a, b, c, d)
-#define HEADER_SIZE 1536
 #define COUNT(x) ((int)(sizeof(x)/sizeof((x)[0])))
 
 #define SOFTWARE_NAME "Chrowma"
@@ -444,7 +443,7 @@ static void dng_fill_header(mlvObject_t * mlv_data, dngObject_t * dng_data, uint
     size_t position = 0;
     if(header)
     {
-        memset(header, 0 , HEADER_SIZE);
+        memset(header, 0 , DNG_HEADER_SIZE);
         memcpy(header + position, tiff_header, sizeof(tiff_header));
         position += sizeof(tiff_header);
         
@@ -601,7 +600,7 @@ static void dng_fill_header(mlvObject_t * mlv_data, dngObject_t * dng_data, uint
             {tcFillOrder,                   ttShort,    1,      1},
             {tcMake,                        ttAscii,    STRING_ENTRY(make, header, &data_offset)},
             {tcModel,                       ttAscii,    STRING_ENTRY(model, header, &data_offset)},
-            {tcStripOffsets,                ttLong,     1,      (uint32_t)HEADER_SIZE},
+            {tcStripOffsets,                ttLong,     1,      (uint32_t)DNG_HEADER_SIZE},
             {tcOrientation,                 ttShort,    1,      1},
             {tcSamplesPerPixel,             ttShort,    1,      1},
             {tcRowsPerStrip,                ttShort,    1,      mlv_data->RAWI.yRes},
@@ -937,7 +936,7 @@ dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, i
     dng_data->raw_input_state = (mlv_data->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92) ? COMPRESSED_RAW : UNCOMPRESSED_RAW;
     dng_data->raw_output_state = (dng_data->raw_input_state && (raw_state == 2)) ? COMPRESSED_ORIG : raw_state;
 
-    dng_data->header_size = HEADER_SIZE;
+    dng_data->header_size = DNG_HEADER_SIZE;
     dng_data->header_buf = malloc(dng_data->header_size);
 
     dng_data->image_size = dng_get_image_size(mlv_data, IMG_SIZE_UNPACKED, 0);

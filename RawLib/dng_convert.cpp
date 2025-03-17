@@ -80,7 +80,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 		_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
 	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
-	_imp->libraw->imgdata.params.no_interpolation= 0;//_interpolation_mode == 0;
+	_imp->libraw->imgdata.params.no_interpolation= 0;
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
 
 	unpack(buffer, buffersize);

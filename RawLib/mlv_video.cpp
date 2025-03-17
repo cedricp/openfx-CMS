@@ -63,6 +63,11 @@ mlv_wbal_hdr_t Mlv_video::get_wb_object()
 	return _imp->mlv_object->WBAL;
 }
 
+uint32_t Mlv_video::get_dng_header_size()
+{
+	return DNG_HEADER_SIZE;
+}
+
 int Mlv_video::get_camid()
 {
 	return _imp->mlv_object->IDNT.cameraModel;
@@ -273,7 +278,6 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	uint8_t *buffer = getDngFrameBuffer(mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
 	dng_size = size;
-	// Set debayer type
 
 	return (uint16_t*)buffer;
 }

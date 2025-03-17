@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
 #include "ofxsGenerator.h"
@@ -35,14 +36,16 @@
 #define kColorTemperature "ColorTemperature"
 #define kCameraWhiteBalance "CameraWhiteBalance"
 #define kHighlightMode "HighlightMode"
+#define kTimeRange "Timerange"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
-#ifdef OFX_EXTENSIONS_NATRON
 #define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
-#else
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
-#endif
+
+extern "C"
+{
+    extern char FOCUSPIXELMAPFILE[256];
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
@@ -60,11 +63,14 @@ public:
         _highlightMode = fetchChoiceParam(kHighlightMode);
         _colorTemperature = fetchIntParam(kColorTemperature);
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
+        _timeRange = fetchInt2DParam(kTimeRange);
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue());
         }
-        pthread_mutex_init(&_mlv_mutex, NULL);
         _pluginPath = getPluginFilePath();
+        std::string focusPixelMap = _pluginPath + "/fpm";
+        strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
+        pthread_mutex_init(&_mlv_mutex, NULL);
     }
 
     ~CMSMLVReaderPlugin()
@@ -73,7 +79,6 @@ public:
     }
 
 private:
-    /* Override the render */
     virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     virtual void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
@@ -92,6 +97,7 @@ private:
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;
     OFX::IntParam* _colorTemperature;
+    OFX::Int2DParam* _timeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
     pthread_mutex_t _mlv_mutex;
     std::string _pluginPath;
