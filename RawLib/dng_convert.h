@@ -18,9 +18,7 @@ public:
 	void set_camera_wb(bool wb){_camera_wb = wb;}
 	void set_colorspace(int c){_colorspace = c;}
 	void free_buffer();
-	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){
-		_wb_coeffs = wb_coeffs;
-	}
+	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){_wb_coeffs = wb_coeffs;}
 	void set_camid(int cid){_camid = cid;}
 private:
 	struct dngc_impl;

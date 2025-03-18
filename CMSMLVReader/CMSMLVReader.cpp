@@ -65,9 +65,8 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     // }
 
     int current_file_idx = -1;
-    //pthread_mutex_lock(&_mlv_mutex);
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
-    Mlv_video *mlv_video = NULL;
+    Mlv_video *mlv_video = nullptr;
     for (int i = 0; i < _mlv_video.size(); ++i){
         if (_mlv_used[i] == 0){
             current_file_idx = i;
@@ -76,8 +75,6 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             break;
         }
     }
-    //pthread_mutex_unlock(&_mlv_mutex);
-    _gThreadHost->mutexUnLock(_videoMutex);
 
     if (mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -133,14 +130,12 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         }
         free(raw_buffer);
         free(dng_buffer);
+        _mlv_used[current_file_idx] = 0;
+        _gThreadHost->mutexUnLock(_videoMutex);
         return;
     }
-
-    //pthread_mutex_lock(&_mlv_mutex);
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     _mlv_used[current_file_idx] = 0;
     _gThreadHost->mutexUnLock(_videoMutex);
-    //pthread_mutex_unlock(&_mlv_mutex);
     
     Dng_processor dng_processor;
     wbobj.kelvin = rawInfo.temperature;
