@@ -29,8 +29,53 @@
 #include "CMSMLVReader.h"
 #include "../utils.h" 
 
+#include "idt/dng_idt.h"
+
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+const float xyzd50_rec709_d65[9] = {
+    3.2404542, -1.5371385, -0.4985314,
+    -0.9692660 , 1.8760108, 0.0415560,
+     0.0556434, -0.2040259, 1.0572252
+};
+
+const float xyzd50_ap1[9] = {
+    1.5926634, -0.3517857, -0.2228880,
+    -0.6759117 , 1.6392548 , 0.0151039,
+     0.0199671, -0.0225720, 1.2162925
+};
+
+const float xyzd50_ap0[9] = {
+    1.0158069, -0.0177408,  0.0464296,
+    -0.5078116,  1.3913055,  0.1191979,
+    0.0084755, -0.0140636,  1.2194102
+};
+
+inline float vectors_dot_prod(const float *x, const float *y, int n)
+{
+    double res = 0.0;
+    int i = 0;
+    for (; i <= n-3; i+=3)
+    {
+        res += (x[i] * y[i] +
+                x[i+1] * y[i+1] +
+                x[i+2] * y[i+2]);
+    }
+    for (; i < n; i++)
+    {
+        res += x[i] * y[i];
+    }
+    return res;
+}
+
+inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
+{
+    int i;
+    for (i = 0; i < rows; i++)
+    {
+        result[i] = vectors_dot_prod(&mat[i*cols], vec, cols);
+    }
+}
 
 bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
@@ -52,29 +97,16 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
 // the overridden render function
 void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
-    // unsigned int thread_num=500;
-    // Sleep(150);
-    // if (_gThreadHost->multiThreadIndex(&thread_num) != kOfxStatOK){
-    //     thread_num = 999;
-    // }
-    // printf("Thread #%d\n", thread_num);
-    // return;
-    // if (_mlv_video.empty()){
-    //     OFX::throwSuiteStatusException(kOfxStatFailed);
-    //     return;
-    // }
-
-    int current_file_idx = -1;
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     Mlv_video *mlv_video = nullptr;
     for (int i = 0; i < _mlv_video.size(); ++i){
-        if (_mlv_used[i] == 0){
-            current_file_idx = i;
+        if (!_mlv_video[i]->locked()){
             mlv_video = _mlv_video[i];
-            _mlv_used[i] = 1;
+            _mlv_video[i]->lock();
             break;
         }
     }
+    _gThreadHost->mutexUnLock(_videoMutex);
 
     if (mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -111,12 +143,13 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
+    OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
+    int width_img = (int)(rodd.x2 - rodd.x1);
+    int height_img = (int)(rodd.y2 - rodd.y1);
+
     if (_debayerType->getValue() == 0){
         uint16_t* raw_buffer = mlv_video->unpacked_buffer(mlv_video->get_raw_image());
 
-        OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
-        int width_img = (int)(rodd.x2 - rodd.x1);
-        int height_img = (int)(rodd.y2 - rodd.y1);
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -130,11 +163,14 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         }
         free(raw_buffer);
         free(dng_buffer);
-        _mlv_used[current_file_idx] = 0;
+
+        // Release MLV reader
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        mlv_video->unlock();
         _gThreadHost->mutexUnLock(_videoMutex);
         return;
     }
-    _mlv_used[current_file_idx] = 0;
+    mlv_video->unlock();
     _gThreadHost->mutexUnLock(_videoMutex);
     
     Dng_processor dng_processor;
@@ -144,23 +180,31 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     dng_processor.set_wb_coeffs(wbobj);
     dng_processor.set_camid(camid);
     dng_processor.set_highlight(_highlightMode->getValue());
-    dng_processor.set_colorspace(_colorSpaceFormat->getValue());
+    //dng_processor.set_colorspace(_colorSpaceFormat->getValue());
 
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size);
 
-    free(dng_buffer);
+    DNGIdt::DNGIdt idt(dng_processor.get_raw_data_struct());
+    float matrix[9];
+    idt.getDNGIDTMatrix2(matrix);
+    float *pre_mul = dng_processor.get_raw_premul();
+    // Fix WB scale
+    float ratio = ( *(std::max_element ( pre_mul, pre_mul+3)) / *(std::min_element ( pre_mul, pre_mul+3)) );
+	for(int i=0; i < 9; ++i){
+		matrix[i] *= ratio;
+	}
 
-    OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
-    int width_img = (int)(rodd.x2 - rodd.x1);
-    int height_img = (int)(rodd.y2 - rodd.y1);
+    free(dng_buffer);
 
     for(int y=0; y < height_img; y++) {
         uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
         float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
         for(int x=0; x < width_img; x++) {
-            *dstPix++ = float(*srcPix++) / _maxValue;
-            *dstPix++ = float(*srcPix++) / _maxValue;
-            *dstPix++ = float(*srcPix++) / _maxValue;
+            float in[3];
+            in[0] = float(*srcPix++) / _maxValue;
+            in[1] = float(*srcPix++) / _maxValue;
+            in[2] = float(*srcPix++) / _maxValue;
+            matrix_vector_mult(matrix, in, dstPix, 3, 3);
         }
     }
 }
@@ -191,7 +235,6 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
     }
 
     _mlv_video.clear();
-    _mlv_used.clear();
 
     for (int i = 0; i < _numThreads; ++i){
         Mlv_video* mlv_video = new Mlv_video(file);
@@ -207,7 +250,6 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
                 _timeRange->setValue(tr);
             }
             _mlv_video.push_back(mlv_video);
-            _mlv_used.push_back(0);
         }
     }
 }
@@ -351,7 +393,7 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("Adobe", "", "adobe");
         param->appendOption("Wide", "", "wide");
         param->appendOption("ProPhoto", "", "prophoto");
-        param->appendOption("XYZ", "", "xyz");
+        param->appendOption("XYZ-D50", "", "xyz");
         param->appendOption("ACES AP0", "", "aces");
         param->appendOption("DCI-P3", "", "dcip3");
         param->appendOption("Rec.2020", "", "rec2020");

@@ -38,6 +38,16 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	}
 }
 
+void* Dng_processor::get_raw_data_struct()
+{
+	return (void*)&(_imp->libraw->imgdata);
+}
+
+float* Dng_processor::get_raw_premul()
+{
+	return _imp->libraw->imgdata.color.pre_mul;
+}
+
 uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 {
 	//_imp->libraw->recycle();
@@ -54,10 +64,8 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	12 - Modified AHD intepolation (by Anton Petrusevich)
 	*/
 
-
-	// XYZ colorspace
-	// output_color -> raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-	_imp->libraw->imgdata.params.output_color = _colorspace;
+// output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+	_imp->libraw->imgdata.params.output_color = 5;// XYZ _colorspace;
 	_imp->libraw->imgdata.params.output_bps = 16;
 	_imp->libraw->imgdata.params.gamm[0] = 1.0;
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;
@@ -71,14 +79,14 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_imp->libraw->imgdata.params.no_auto_bright = 1.;
 	_imp->libraw->imgdata.params.half_size = 0;
 	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
-	if (!_camera_wb){
-		int32_t wbal[6];
-		::get_white_balance(_wb_coeffs, wbal, _camid);
-		_imp->libraw->imgdata.params.user_mul[0] = float(wbal[1]) / 1000000.;
-		_imp->libraw->imgdata.params.user_mul[1] = float(wbal[3]) / 1000000.;
-		_imp->libraw->imgdata.params.user_mul[2] = float(wbal[5]) / 1000000.;
-		_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
-	}
+	// if (!_camera_wb){
+	// 	int32_t wbal[6];
+	// 	::get_white_balance(_wb_coeffs, wbal, _camid);
+	// 	_imp->libraw->imgdata.params.user_mul[0] = float(wbal[1]) / 1000000.;
+	// 	_imp->libraw->imgdata.params.user_mul[1] = float(wbal[3]) / 1000000.;
+	// 	_imp->libraw->imgdata.params.user_mul[2] = float(wbal[5]) / 1000000.;
+	// 	_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
+	// }
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
 	_imp->libraw->imgdata.params.no_interpolation= 0;
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;

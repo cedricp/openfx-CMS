@@ -24,12 +24,17 @@ public:
 private:
 	RawInfo _rawinfo;
 	bool _valid = false;
+	bool _locked = false;
 
 public:
 
 
 	Mlv_video(std::string filename);
 	~Mlv_video();
+
+	void lock(){_locked = true;}
+	void unlock(){_locked = false;}
+	bool locked(){return _locked;}
 
 	bool valid(){return _valid;}
 	void* get_mlv_object();

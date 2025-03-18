@@ -1,10 +1,12 @@
-#include "dng_idt.h"
 
 #include <cmath>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Core>
+#define GLOG_USE_GLOG_EXPORT
 #include <ceres/ceres.h>
+#include <libraw_types.h>
+#include "dng_idt.h"
 
 /*
  * Code borrowed from rawtoaces
@@ -12,7 +14,7 @@
  */
 
 using namespace std;
-
+namespace DNGIdt{
 // Roberson UV Table
 static const double Robertson_uvtTable[][3] = {
     { 0.18006,  0.26352,  -0.24341 },
@@ -458,7 +460,7 @@ DNGIdt::DNGIdt() {
 	_baseExpo              = 1.0;
 }
 
-DNGIdt::DNGIdt ( libraw_rawdata_t R ) {
+DNGIdt::DNGIdt ( void* R ) {
 	_cameraCalibration1DNG = vector < double > ( 9, 1.0 );
 	_cameraCalibration2DNG = vector < double > ( 9, 1.0 );
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
@@ -469,19 +471,20 @@ DNGIdt::DNGIdt ( libraw_rawdata_t R ) {
 	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
 	_calibrateIllum        = vector < double > ( 2, 1.0 );
 
-	_baseExpo = static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( R.color.dng_color[0].illuminant );
-	_calibrateIllum[1] = static_cast < double > ( R.color.dng_color[1].illuminant );
+    // TODO : check baseline exposure
+	_baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
+	_calibrateIllum[0] = static_cast < double > ( ((libraw_rawdata_t*)R)->color.dng_color[0].illuminant );
+	_calibrateIllum[1] = static_cast < double > ( ((libraw_rawdata_t*)R)->color.dng_color[1].illuminant );
 
 	FORI(3) {
-		_neutralRGBDNG[i] = 1.0 / static_cast < double > ( R.color.cam_mul[i] );
+		_neutralRGBDNG[i] = 1.0 / static_cast < double > ( ((libraw_rawdata_t*)R)->color.cam_mul[i] );
 	}
 
 	FORIJ ( 3, 3 ) {
-		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( (R.color.dng_color[0].colormatrix)[i][j] );
-		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( (R.color.dng_color[1].colormatrix)[i][j] );
-		_cameraCalibration1DNG[i*3+j] = static_cast < double > ( (R.color.dng_color[0].calibration)[i][j] );
-		_cameraCalibration2DNG[i*3+j] = static_cast < double > ( (R.color.dng_color[1].calibration)[i][j] );
+		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[0].colormatrix)[i][j] );
+		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[1].colormatrix)[i][j] );
+		_cameraCalibration1DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[0].calibration)[i][j] );
+		_cameraCalibration2DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[1].calibration)[i][j] );
 	}
 }
 
@@ -745,4 +748,5 @@ void DNGIdt::getDNGIDTMatrix2 (float* mat)
 	assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
 
 	FORI(9) mat[i] = matrix[i];
+}
 }

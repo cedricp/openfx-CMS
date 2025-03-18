@@ -20,6 +20,8 @@ public:
 	void free_buffer();
 	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){_wb_coeffs = wb_coeffs;}
 	void set_camid(int cid){_camid = cid;}
+	void* get_raw_data_struct();
+	float* get_raw_premul();
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;

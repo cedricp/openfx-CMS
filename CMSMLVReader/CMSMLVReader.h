@@ -124,7 +124,6 @@ private:
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;
-    std::vector<int> _mlv_used;
 };
 
 mDeclarePluginFactory(CMSMLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
