@@ -251,8 +251,24 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 		mlvob.WBAL.kelvin = ri.temperature;
 	}
 
+	int cs = 0;
+	switch (_rawinfo.chroma_smooth){
+        case 1:
+        cs = 1;
+        break;
+        case 2:
+        cs = 2;
+        break;
+        case 3:
+        cs = 5;
+        break;
+        case 0:
+        default:
+        cs = 0;
+    }
+
 	llrpSetFixRawMode(&mlvob, 1);
-	llrpSetChromaSmoothMode(&mlvob, _rawinfo.chroma_smooth+1);
+	llrpSetChromaSmoothMode(&mlvob, cs);
 	llrpResetDngBWLevels(&mlvob);
 
 	char error_msg[128];

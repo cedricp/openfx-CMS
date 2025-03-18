@@ -36,11 +36,12 @@
 #define kColorTemperature "ColorTemperature"
 #define kCameraWhiteBalance "CameraWhiteBalance"
 #define kHighlightMode "HighlightMode"
-#define kTimeRange "Timerange"
+#define kFrameRange "Framerange"
+#define kChromaSmooth "ChromaSmooth"
+#define kFixFocusPixel "FixFocusPixel"
 
 #include <vector>
 
-OfxMultiThreadSuiteV1 *gThreadHost = 0;
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -59,29 +60,37 @@ public:
     /** @brief ctor */
     CMSMLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
-        _mlv_video.clear();
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
         _highlightMode = fetchChoiceParam(kHighlightMode);
+        _chromaSmooth = fetchChoiceParam(kChromaSmooth);
         _colorTemperature = fetchIntParam(kColorTemperature);
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
-        _timeRange = fetchInt2DParam(kTimeRange);
-        gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
-        gThreadHost->multiThreadNumCPUs(&_numThreads);
+        _timeRange = fetchInt2DParam(kFrameRange);
+        _fixFocusPixel = fetchBooleanParam(kFixFocusPixel);
+        _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
+        _gThreadHost->multiThreadNumCPUs(&_numThreads);
+        _gThreadHost->mutexCreate(&_videoMutex, 0);
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue());
         }
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
-        pthread_mutex_init(&_mlv_mutex, NULL);
+        //pthread_mutex_init(&_mlv_mutex, NULL);
     }
 
     ~CMSMLVReaderPlugin()
     {
-        pthread_mutex_destroy(&_mlv_mutex);
+        for (Mlv_video* mlv : _mlv_video){
+            if (mlv){
+                delete mlv;
+            }
+        }
+        //pthread_mutex_destroy(&_mlv_mutex);
+        _gThreadHost->mutexDestroy(_videoMutex);
     }
 
 private:
@@ -95,6 +104,10 @@ private:
     virtual bool isVideoStream(const std::string& filename){return true;};
 
 private:
+    OfxMultiThreadSuiteV1 *_gThreadHost = 0;
+    OfxMutexHandle _videoMutex;
+    //pthread_mutex_t _mlv_mutex;
+
     unsigned int _numThreads;
     OFX::Clip* _outputClip;
     std::string _mlvfilename;
@@ -102,10 +115,11 @@ private:
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;
+    OFX::ChoiceParam* _chromaSmooth;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
-    pthread_mutex_t _mlv_mutex;
+    OFX::BooleanParam* _fixFocusPixel;
     std::string _pluginPath;
     int _maxValue=0;
 

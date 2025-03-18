@@ -38,7 +38,7 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
-    if (_mlv_video[0] == nullptr){
+    if (_mlv_video.empty()){
         return false;
     }
 
@@ -53,19 +53,20 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
 void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
     // unsigned int thread_num=500;
-    // Sleep(15);
-    // if (gThreadHost->multiThreadIndex(&thread_num) != kOfxStatOK){
+    // Sleep(150);
+    // if (_gThreadHost->multiThreadIndex(&thread_num) != kOfxStatOK){
     //     thread_num = 999;
     // }
     // printf("Thread #%d\n", thread_num);
     // return;
-    if (_mlv_video.size() == 0){
-        OFX::throwSuiteStatusException(kOfxStatFailed);
-        return;
-    }
+    // if (_mlv_video.empty()){
+    //     OFX::throwSuiteStatusException(kOfxStatFailed);
+    //     return;
+    // }
 
     int current_file_idx = -1;
-    pthread_mutex_lock(&_mlv_mutex);
+    //pthread_mutex_lock(&_mlv_mutex);
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     Mlv_video *mlv_video = NULL;
     for (int i = 0; i < _mlv_video.size(); ++i){
         if (_mlv_used[i] == 0){
@@ -75,55 +76,46 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             break;
         }
     }
-    pthread_mutex_unlock(&_mlv_mutex);
+    //pthread_mutex_unlock(&_mlv_mutex);
+    _gThreadHost->mutexUnLock(_videoMutex);
 
-    if (current_file_idx < 0){
+    if (mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
     }
-
-    const int time = floor(args.time+0.5);
+    
     
     bool cam_wb = _cameraWhiteBalance->getValue();
-    
+    const int time = floor(args.time+0.5);
     int dng_size = 0;
 
-    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
-    
-    //pthread_mutex_lock(&_mlv_mutex);
     Mlv_video::RawInfo rawInfo;
+    rawInfo.chroma_smooth = _chromaSmooth->getValue();
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
     int mlv_width = mlv_video->raw_resolution_x();
     int mlv_height = mlv_video->raw_resolution_y();
     mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
     int camid = mlv_video->get_camid();
-    //pthread_mutex_unlock(&_mlv_mutex);
 
-    pthread_mutex_lock(&_mlv_mutex);
-    _mlv_used[current_file_idx] = 0;
-    pthread_mutex_unlock(&_mlv_mutex);
     
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-
-    // instantiate the render code based on the pixel depth of the dst clip
+    
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
-
     assert(OFX_COMPONENTS_OK(dstComponents));
+
+    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
 
     if (!dst)
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-    #define ROL16(v,a) ((v) << (a) | (v) >> (16-(a)))
 
     if (_debayerType->getValue() == 0){
-        pthread_mutex_lock(&_mlv_mutex);
-        uint16_t* raw_buffer = _mlv_video->unpacked_buffer(_mlv_video->get_raw_image());
-        pthread_mutex_unlock(&_mlv_mutex);
+        uint16_t* raw_buffer = mlv_video->unpacked_buffer(mlv_video->get_raw_image());
 
         OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
         int width_img = (int)(rodd.x2 - rodd.x1);
@@ -133,7 +125,6 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
             float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
             for(int x=0; x < width_img; x++) {
-                //uint16_t pix = ROL16(*srcPix, 8);
                 float pixel_val = float(*srcPix++) / _maxValue;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
@@ -145,6 +136,11 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         return;
     }
 
+    //pthread_mutex_lock(&_mlv_mutex);
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+    _mlv_used[current_file_idx] = 0;
+    _gThreadHost->mutexUnLock(_videoMutex);
+    //pthread_mutex_unlock(&_mlv_mutex);
     
     Dng_processor dng_processor;
     wbobj.kelvin = rawInfo.temperature;
@@ -176,7 +172,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
 bool CMSMLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 {
-    if (_mlv_video[0] == nullptr){
+    if (_mlv_video.empty()){
         return false;
     }
     range.min = 1;
@@ -299,15 +295,16 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
     dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
     dstClip->setSupportsTiles(kSupportsTiles);
 
+    OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
     OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
     OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
 
     {
-        OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kTimeRange);
+        OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kFrameRange);
         //desc.addClipPreferencesSlaveParam(*param);
-        param->setLabel("Time range");
-        param->setHint("The video time range");
+        param->setLabel("Frame range");
+        param->setHint("The video frame range");
         param->setDefault(0, 0);
         param->setEnabled(false);
         if (page)
@@ -409,6 +406,32 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         if (page_colors)
         {
             page_colors->addChild(*param);
+        }
+    }
+
+    { 
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kChromaSmooth);
+        param->setLabel("Chroma smoothing");
+        param->appendOption("None", "", "none");
+        param->appendOption("2x2", "2x2 filtering", "cs22");
+        param->appendOption("3x3", "3x3 filtering", "cs33");
+        param->appendOption("5x5", "3x3 filtering", "cs44");
+        param->setDefault(0);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
+    
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kFixFocusPixel);
+        param->setLabel("Fix focus pixels");
+        param->setHint("Fix focus pixels");
+        param->setDefault(true);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
         }
     }
 }
