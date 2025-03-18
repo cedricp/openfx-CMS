@@ -121,7 +121,9 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     #define ROL16(v,a) ((v) << (a) | (v) >> (16-(a)))
 
     if (_debayerType->getValue() == 0){
-        uint16_t* raw_buffer = mlv_video->unpacked_buffer((uint16_t*)((uint8_t*)dng_buffer + mlv_video->get_dng_header_size()));
+        pthread_mutex_lock(&_mlv_mutex);
+        uint16_t* raw_buffer = _mlv_video->unpacked_buffer(_mlv_video->get_raw_image());
+        pthread_mutex_unlock(&_mlv_mutex);
 
         OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
         int width_img = (int)(rodd.x2 - rodd.x1);
@@ -131,16 +133,15 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
             float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
             for(int x=0; x < width_img; x++) {
-                uint16_t pix = ROL16(*srcPix, 8);
-                float pixel_val = float(pix) / _maxValue;
+                //uint16_t pix = ROL16(*srcPix, 8);
+                float pixel_val = float(*srcPix++) / _maxValue;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
-                srcPix++;
             }
         }
-        free(dng_buffer);
         free(raw_buffer);
+        free(dng_buffer);
         return;
     }
 

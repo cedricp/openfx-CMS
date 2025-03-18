@@ -66,7 +66,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_imp->libraw->imgdata.params.use_camera_matrix = 1;
 	_imp->libraw->imgdata.params.use_auto_wb = 0;
 	// threshold-> Parameter for noise reduction through wavelet denoising.
-	_imp->libraw->imgdata.params.threshold = 1.; 
+	_imp->libraw->imgdata.params.threshold = 0.; 
 	_imp->libraw->imgdata.params.bright = 1.;
 	_imp->libraw->imgdata.params.no_auto_bright = 1.;
 	_imp->libraw->imgdata.params.half_size = 0;
