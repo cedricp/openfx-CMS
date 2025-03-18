@@ -2,6 +2,7 @@
 #include <libraw.h>
 #include <sys/stat.h>
 #include <algorithm>
+#include "idt/dng_idt.h"
 extern "C"{
 #include <dng/dng.h>
 }
@@ -36,16 +37,6 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	if(_imp->libraw->unpack() != LIBRAW_SUCCESS){
 		printf("Unpack error\n");
 	}
-}
-
-void* Dng_processor::get_raw_data_struct()
-{
-	return (void*)&(_imp->libraw->imgdata);
-}
-
-float* Dng_processor::get_raw_premul()
-{
-	return _imp->libraw->imgdata.color.pre_mul;
 }
 
 uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
@@ -114,17 +105,17 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_w = _imp->_image->width;
 	_h = _imp->_image->height;
 
-	// DNGIdt idt = DNGIdt(_imp->libraw->imgdata.rawdata);
-	// idt.getDNGIDTMatrix2(_idt.matrix);
+	DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
+	idt.getDNGIDTMatrix2(_idt_matrix);
 
-	// if(_highlight_mode > 0){
-	// 	// Fix WB scale
-	// 	float ratio = ( *(std::max_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) /
-	// 					*(std::min_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) );
-	// 	for(int i=0; i < 9; ++i){
-	// 		_idt.matrix[i] *= ratio;
-	// 	}
-	// }
+	if(_highlight_mode > 0){
+		// Fix WB scale
+		float ratio = ( *(std::max_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) /
+						*(std::min_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) );
+		for(int i=0; i < 9; ++i){
+			_idt_matrix[i] *= ratio;
+		}
+	}
 
 	return (uint16_t*)&_imp->_image->data;
 }

@@ -7,7 +7,7 @@ namespace DNGIdt{
 	class DNGIdt {
 		public:
 			DNGIdt();
-			DNGIdt ( void *rawdata_type);
+			DNGIdt (libraw_rawdata_t* rawdata_type);
 			virtual ~DNGIdt();
 
 			double ccttoMired ( const double cct ) const;

@@ -460,7 +460,7 @@ DNGIdt::DNGIdt() {
 	_baseExpo              = 1.0;
 }
 
-DNGIdt::DNGIdt ( void* R ) {
+DNGIdt::DNGIdt ( libraw_rawdata_t* R ) {
 	_cameraCalibration1DNG = vector < double > ( 9, 1.0 );
 	_cameraCalibration2DNG = vector < double > ( 9, 1.0 );
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
@@ -473,18 +473,18 @@ DNGIdt::DNGIdt ( void* R ) {
 
     // TODO : check baseline exposure
 	_baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( ((libraw_rawdata_t*)R)->color.dng_color[0].illuminant );
-	_calibrateIllum[1] = static_cast < double > ( ((libraw_rawdata_t*)R)->color.dng_color[1].illuminant );
+	_calibrateIllum[0] = static_cast < double > ( R->color.dng_color[0].illuminant );
+	_calibrateIllum[1] = static_cast < double > ( R->color.dng_color[1].illuminant );
 
 	FORI(3) {
-		_neutralRGBDNG[i] = 1.0 / static_cast < double > ( ((libraw_rawdata_t*)R)->color.cam_mul[i] );
+		_neutralRGBDNG[i] = 1.0 / static_cast < double > ( R->color.cam_mul[i] );
 	}
 
 	FORIJ ( 3, 3 ) {
-		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[0].colormatrix)[i][j] );
-		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[1].colormatrix)[i][j] );
-		_cameraCalibration1DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[0].calibration)[i][j] );
-		_cameraCalibration2DNG[i*3+j] = static_cast < double > ( (((libraw_rawdata_t*)R)->color.dng_color[1].calibration)[i][j] );
+		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( R->color.dng_color[0].colormatrix[i][j] );
+		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( R->color.dng_color[1].colormatrix[i][j] );
+		_cameraCalibration1DNG[i*3+j] = static_cast < double > ( R->color.dng_color[0].calibration[i][j] );
+		_cameraCalibration2DNG[i*3+j] = static_cast < double > ( R->color.dng_color[1].calibration[i][j] );
 	}
 }
 

@@ -59,8 +59,10 @@ if(NOT CMAKE_GENERATOR MATCHES "Xcode|Visual Studio")
 endif()
 
 include(FindOpenGL REQUIRED)
-find_package(LibRaw  REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+set(LibRaw_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/include)
+set(LibRaw_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/lib/libraw.a)
 
 message("Using libRAW ${LibRaw_LIBRARIES}")
 

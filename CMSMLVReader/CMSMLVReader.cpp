@@ -29,7 +29,6 @@
 #include "CMSMLVReader.h"
 #include "../utils.h" 
 
-#include "idt/dng_idt.h"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -127,7 +126,6 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
     int camid = mlv_video->get_camid();
 
-    
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
@@ -165,13 +163,10 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
         free(dng_buffer);
 
         // Release MLV reader
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
         mlv_video->unlock();
-        _gThreadHost->mutexUnLock(_videoMutex);
         return;
     }
     mlv_video->unlock();
-    _gThreadHost->mutexUnLock(_videoMutex);
     
     Dng_processor dng_processor;
     wbobj.kelvin = rawInfo.temperature;
@@ -183,16 +178,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     //dng_processor.set_colorspace(_colorSpaceFormat->getValue());
 
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size);
-
-    DNGIdt::DNGIdt idt(dng_processor.get_raw_data_struct());
-    float matrix[9];
-    idt.getDNGIDTMatrix2(matrix);
-    float *pre_mul = dng_processor.get_raw_premul();
-    // Fix WB scale
-    float ratio = ( *(std::max_element ( pre_mul, pre_mul+3)) / *(std::min_element ( pre_mul, pre_mul+3)) );
-	for(int i=0; i < 9; ++i){
-		matrix[i] *= ratio;
-	}
+    float *idt_matrix = dng_processor.get_idt_matrix();
 
     free(dng_buffer);
 
@@ -204,7 +190,8 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             in[0] = float(*srcPix++) / _maxValue;
             in[1] = float(*srcPix++) / _maxValue;
             in[2] = float(*srcPix++) / _maxValue;
-            matrix_vector_mult(matrix, in, dstPix, 3, 3);
+            matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+            dstPix+=3;
         }
     }
 }
@@ -224,7 +211,6 @@ bool CMSMLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::C
 {
     return false;
 }
-
 
 void CMSMLVReaderPlugin::setMlvFile(std::string file)
 {
