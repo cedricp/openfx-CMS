@@ -60,6 +60,7 @@ endif()
 
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Ceres REQUIRED)
 
 set(LibRaw_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/include)
 set(LibRaw_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/lib/libraw.a)
@@ -150,6 +151,8 @@ FILE(GLOB CMS_SOURCES
 FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
+  "CMSMLVReader/net.sf.openfx.CMSMLVReader.svg"
+  "CMSMLVReader/net.sf.openfx.CMSMLVReader.png"
 )
 
 ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
