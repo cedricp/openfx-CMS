@@ -95,11 +95,11 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
             sample.r = srcPix[0];
             sample.g = srcPix[1];
             sample.b = srcPix[2];
-            if (isLog){
-                sample.r = encoder.apply(sample.r);
-                sample.g = encoder.apply(sample.g);
-                sample.b = encoder.apply(sample.b);
-            }
+            // if (isLog){
+            //     sample.r = encoder.apply(sample.r);
+            //     sample.g = encoder.apply(sample.g);
+            //     sample.b = encoder.apply(sample.b);
+            // }
             _lut[sample_count] = sample;
             dstPix[0] = sample.r;
             dstPix[1] = sample.g;
@@ -126,14 +126,35 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
     {
         std::string filename = _outputLutFile->getValue();
         FILE *file = fopen(filename.c_str(), "w");
+        const int lut1dsize = _lut1dsize->getValue();
+
         if (file == NULL) {
             printf("Error opening file %s\n", filename.c_str());
             return;
         }
-        fprintf(file, "# Generated LUT with openfx-CMS\n");
-        fprintf(file, "LUT_3D_SIZE %i\n\n", _lutSize);
-        fprintf(file, "DOMAIN_MIN 0.0 0.0 0.0\n");
-        fprintf(file, "DOMAIN_MAX 1.0 1.0 1.0\n\n");
+
+        bool isLog = _logScale->getValue();
+        if (isLog){
+            double logmin, logmax;
+            _logminmax->getValue(logmin, logmax);
+            logEncode encoder(logmin, logmax);
+            float min_value = powf(2.0, logmin);
+            float max_value = powf(2.0, logmax);
+
+            fprintf(file, "# Generated LUT with openfx-CMS\n");
+            fprintf(file, "LUT_1D_SIZE %i\n", lut1dsize);
+            fprintf(file, "LUT_1D_INPUT_RANGE %f %f\n\n", min_value, max_value);
+            //fprintf(file, "DOMAIN_MIN %f %f %f\n", min_value, min_value, min_value);
+            //fprintf(file, "DOMAIN_MAX  %f %f %f\n\n", max_value, max_value, max_value);
+            for (int i = 0; i < lut1dsize; ++i){
+                float val = encoder.apply(float(i) / float(lut1dsize) * max_value);
+                fprintf(file, "%f %f %f\n", val, val, val);
+            }
+            fprintf(file, "\n\n");
+        }
+
+
+        fprintf(file, "LUT_3D_SIZE %d\n", _lutSize);
         for (int i = 0; i < _lut.size(); i++) {
             fprintf(file, "%f %f %f\n", _lut[i].r, _lut[i].g, _lut[i].b);
         }
@@ -222,6 +243,17 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
             param->setLabel("Log2 Min Max values");
             param->setHint("Min and max exposure values");
             param->setDefault(-8, 4);
+            if (page) {
+                page->addChild(*param);
+            }
+        }
+
+        {
+            OFX::IntParamDescriptor * param = desc.defineIntParam("lut1dsize");
+            param->setLabel("1D LUT size");
+            param->setHint("The size of the 1D LUT");
+            param->setDefault(1024);
+            param->setRange(16, 8192);
             if (page) {
                 page->addChild(*param);
             }

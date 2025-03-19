@@ -57,6 +57,7 @@ public:
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
         _logScale = fetchBooleanParam("log2 encode");
         _logminmax = fetchDouble2DParam("log2 min max");
+        _lut1dsize = fetchIntParam("lut1dsize");
     }
 
 private:
@@ -73,6 +74,7 @@ private:
     std::vector<Color> _lut;
     OFX::BooleanParam *_logScale;
     OFX::Double2DParam *_logminmax;
+    OFX::IntParam *_lut1dsize;
 };
 
 mDeclarePluginFactory(CMSBakeLutPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
