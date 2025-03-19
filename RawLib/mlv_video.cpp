@@ -252,7 +252,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	}
 
 	int cs = 0;
-	switch (_rawinfo.chroma_smooth){
+	switch (ri.chroma_smooth){
         case 1:
         cs = 1;
         break;

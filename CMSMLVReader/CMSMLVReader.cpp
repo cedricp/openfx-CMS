@@ -32,6 +32,13 @@
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+enum ColorSpaceFormat {
+        ACES_RAW2ACES,
+        ACES_AP1,
+        REC709,
+        XYZ
+};
+
 const float xyzd50_rec709_d65[9] = {
     3.2404542, -1.5371385, -0.4985314,
     -0.9692660 , 1.8760108, 0.0415560,
@@ -39,9 +46,9 @@ const float xyzd50_rec709_d65[9] = {
 };
 
 const float xyzd50_ap1[9] = {
-    1.5926634, -0.3517857, -0.2228880,
-    -0.6759117 , 1.6392548 , 0.0151039,
-     0.0199671, -0.0225720, 1.2162925
+    1.64102338, -0.32480329, -0.2364247,
+    -0.66366286,  1.61533159,  0.01675635,
+    0.01172189, -0.00828444,  0.98839486
 };
 
 const float xyzd50_ap0[9] = {
@@ -50,29 +57,16 @@ const float xyzd50_ap0[9] = {
     0.0084755, -0.0140636,  1.2194102
 };
 
-inline float vectors_dot_prod(const float *x, const float *y, int n)
-{
-    double res = 0.0;
-    int i = 0;
-    for (; i <= n-3; i+=3)
-    {
-        res += (x[i] * y[i] +
-                x[i+1] * y[i+1] +
-                x[i+2] * y[i+2]);
-    }
-    for (; i < n; i++)
-    {
-        res += x[i] * y[i];
-    }
-    return res;
-}
-
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
 {
-    int i;
-    for (i = 0; i < rows; i++)
+    for (int i = 0; i < rows; i++)
     {
-        result[i] = vectors_dot_prod(&mat[i*cols], vec, cols);
+        float res = 0.0;
+        for (int j = 0; j < cols; j++)
+        {
+            res += mat[i*cols+j] * vec[j];
+        }
+        result[i] = res;
     }
 }
 
@@ -119,6 +113,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     Mlv_video::RawInfo rawInfo;
     rawInfo.chroma_smooth = _chromaSmooth->getValue();
+    rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
     int mlv_width = mlv_video->raw_resolution_x();
@@ -168,6 +163,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
     mlv_video->unlock();
     
+    // Libraw needs to be compiled with threading support
     Dng_processor dng_processor;
     wbobj.kelvin = rawInfo.temperature;
     dng_processor.set_interpolation(_debayerType->getValue()-1);
@@ -175,10 +171,27 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     dng_processor.set_wb_coeffs(wbobj);
     dng_processor.set_camid(camid);
     dng_processor.set_highlight(_highlightMode->getValue());
-    //dng_processor.set_colorspace(_colorSpaceFormat->getValue());
+    bool apply_wb = _colorSpaceFormat->getValue() != ACES_RAW2ACES;
 
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size);
-    float *idt_matrix = dng_processor.get_idt_matrix();
+    // Get raw buffer in XYZ-D50 colorspace
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
+
+    // Compute colorspace matrix and adjust white balance parameters
+    float idt_matrix[9] = {0};
+    float use_matrix = true;
+    float ratio = dng_processor.get_wbratio();
+    if(_colorSpaceFormat->getValue() == ACES_RAW2ACES){
+        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+    } else if (_colorSpaceFormat->getValue() == ACES_AP1){
+        memcpy(idt_matrix, xyzd50_ap1, 9*sizeof(float));
+        for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
+    } else if (_colorSpaceFormat->getValue() == REC709){
+        memcpy(idt_matrix, xyzd50_rec709_d65, 9*sizeof(float));
+        for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
+    } else {
+        use_matrix = false;
+        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
+    }
 
     free(dng_buffer);
 
@@ -190,7 +203,13 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
             in[0] = float(*srcPix++) / _maxValue;
             in[1] = float(*srcPix++) / _maxValue;
             in[2] = float(*srcPix++) / _maxValue;
-            matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+            if (use_matrix){
+                matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+            } else {
+                dstPix[0]=in[0];
+                dstPix[1]=in[1];
+                dstPix[2]=in[2];
+            }
             dstPix+=3;
         }
     }
@@ -222,6 +241,9 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
 
     _mlv_video.clear();
 
+    // As mlv-lib does not support multi threading
+    // because of file operations, I just create
+    // multiples instances
     for (int i = 0; i < _numThreads; ++i){
         Mlv_video* mlv_video = new Mlv_video(file);
         _mlvfilename = file;
@@ -252,7 +274,6 @@ void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPref
     format.y1 = 0;
     format.y2 = _mlv_video[0]->raw_resolution_y();
 
-    // output is continuous
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
@@ -307,7 +328,7 @@ void CMSMLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, cons
 void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     OFX::ContextEnum context)
 {
-    // there has to be an input clip
+    // There has to be an input clip
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
 
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
@@ -318,11 +339,13 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
     dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
     dstClip->setSupportsTiles(kSupportsTiles);
 
-    OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
+    // Create pages
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
+    OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
     OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
     OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
 
+    // Create parameters
     {
         OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kFrameRange);
         //desc.addClipPreferencesSlaveParam(*param);
@@ -338,12 +361,12 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
 
     {
         OFX::StringParamDescriptor *param = desc.defineStringParam(kMLVfileParamter);
-        //desc.addClipPreferencesSlaveParam(*param);
         param->setLabel("Filename");
         param->setHint("Name of the MLV file");
         param->setDefault("");
         param->setFilePathExists(true);
         param->setStringType(OFX::eStringTypeFilePath);
+        desc.addClipPreferencesSlaveParam(*param);
         if (page)
         {
             page->addChild(*param);
@@ -360,8 +383,8 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         param->appendOption("PPG", "", "ppg");
         param->appendOption("AHD", "", "ahd");
         param->appendOption("DCB", "", "dcb");
-        param->appendOption("DHT", "", "dht");
-        param->appendOption("Modifier AHD", "", "mahd");
+        //param->appendOption("DHT", "", "dht");
+        //param->appendOption("Modifier AHD", "", "mahd");
         param->setDefault(1);
         if (page_debayer)
         {
@@ -373,17 +396,12 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kColorSpaceFormat);
         param->setLabel("Color space");
-        param->appendOption("Raw", "", "linear");
-        param->appendOption("Linear", "", "raw");
-        param->appendOption("sRGB", "", "srgb");
-        param->appendOption("Adobe", "", "adobe");
-        param->appendOption("Wide", "", "wide");
-        param->appendOption("ProPhoto", "", "prophoto");
+        param->setHint("Output colorspace (output is always linear)");
+        param->appendOption("ACES AP0 - Raw2Aces", "", "aces");
+        param->appendOption("ACES AP1", "", "acesap1");
+        param->appendOption("Rec.709", "", "rec709");
         param->appendOption("XYZ-D50", "", "xyz");
-        param->appendOption("ACES AP0", "", "aces");
-        param->appendOption("DCI-P3", "", "dcip3");
-        param->appendOption("Rec.2020", "", "rec2020");
-        param->setDefault(1);
+        param->setDefault(0);
         if (page_colors)
         {
             page_colors->addChild(*param);
@@ -411,7 +429,7 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
     {
         OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kCameraWhiteBalance);
         param->setLabel("Camera white balance");
-        param->setHint("Use camera white balance");
+        param->setHint("Use camera white balance (if disabled, use the color temperature slider)");
         param->setDefault(true);
         if (page_colors)
         {

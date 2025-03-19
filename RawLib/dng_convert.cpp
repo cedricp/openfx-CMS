@@ -39,7 +39,7 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	}
 }
 
-uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
+uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, bool apply_wb_coeffs)
 {
 	//_imp->libraw->recycle();
 
@@ -56,7 +56,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	*/
 
 // output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-	_imp->libraw->imgdata.params.output_color = 5;// XYZ _colorspace;
+	_imp->libraw->imgdata.params.output_color = 5; // XYZ;
 	_imp->libraw->imgdata.params.output_bps = 16;
 	_imp->libraw->imgdata.params.gamm[0] = 1.0;
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;
@@ -70,14 +70,19 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_imp->libraw->imgdata.params.no_auto_bright = 1.;
 	_imp->libraw->imgdata.params.half_size = 0;
 	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
-	// if (!_camera_wb){
-	// 	int32_t wbal[6];
-	// 	::get_white_balance(_wb_coeffs, wbal, _camid);
-	// 	_imp->libraw->imgdata.params.user_mul[0] = float(wbal[1]) / 1000000.;
-	// 	_imp->libraw->imgdata.params.user_mul[1] = float(wbal[3]) / 1000000.;
-	// 	_imp->libraw->imgdata.params.user_mul[2] = float(wbal[5]) / 1000000.;
-	// 	_imp->libraw->imgdata.params.user_mul[3] = float(wbal[3]) / 1000000.;
-	// }
+	_ratio = 1;
+	if (!_camera_wb && apply_wb_coeffs){
+		int32_t wbal[6];
+		::get_white_balance(_wb_coeffs, wbal, _camid);
+		float wbrgb[3] = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
+		if(_highlight_mode > 0){
+			_ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
+		}
+		_imp->libraw->imgdata.params.user_mul[0] = wbrgb[0];
+		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
+		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
+		_imp->libraw->imgdata.params.user_mul[3] = wbrgb[1];
+	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
 	_imp->libraw->imgdata.params.no_interpolation= 0;
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
@@ -105,15 +110,17 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_w = _imp->_image->width;
 	_h = _imp->_image->height;
 
-	DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
-	idt.getDNGIDTMatrix2(_idt_matrix);
+	if (!apply_wb_coeffs){
+		DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
+		idt.getDNGIDTMatrix2(_idt_matrix);
 
-	if(_highlight_mode > 0){
-		// Fix WB scale
-		float ratio = ( *(std::max_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) /
-						*(std::min_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) );
-		for(int i=0; i < 9; ++i){
-			_idt_matrix[i] *= ratio;
+		if(_highlight_mode > 0){
+			// Fix WB scale
+			float ratio = ( *(std::max_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) /
+							*(std::min_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) );
+			for(int i=0; i < 9; ++i){
+				_idt_matrix[i] *= ratio;
+			}
 		}
 	}
 

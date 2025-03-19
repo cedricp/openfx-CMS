@@ -1,9 +1,9 @@
 
+#define GLOG_USE_GLOG_EXPORT
 #include <cmath>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Core>
-#define GLOG_USE_GLOG_EXPORT
 #include <ceres/ceres.h>
 #include <libraw_types.h>
 #include "dng_idt.h"
