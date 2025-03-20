@@ -236,13 +236,3 @@ ELSE()
     DESTINATION CMS.ofx.bundle/Contents
   )
 ENDIF()
-
-IF("${OFX_ARCH}" EQUAL "Win32" OR "${OFX_ARCH}" EQUAL "Win64")
-INSTALL(
-  FILES 
-  libglog-2.dll
-  libgflags.dll
-  libunwind.dll
-  DESTINATION CMS.ofx.bundle/Contents/${OFX_ARCH_NAME}
-)
-ENDIF()
