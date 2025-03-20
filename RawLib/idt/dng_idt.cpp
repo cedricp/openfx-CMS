@@ -401,7 +401,6 @@ vector < vector<T> > solveVM ( const vector < vector < T > > & vct1,
 
     Eigen::JacobiSVD< Eigen::Matrix <T, Eigen::Dynamic, Eigen::Dynamic> > svd(m1, Eigen::ComputeThinU | Eigen::ComputeThinV);
     m3 = svd.solve(m2);
-    //m3 = m1.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m2);
 
     vector < vector <T> > vct3 (m3.rows(), vector <T>(m3.cols()));
     FORIJ(m3.rows(), m3.cols()) vct3[i][j] = m3(i, j);
@@ -719,7 +718,7 @@ vector < vector < double > > DNGIdt::getDNGCATMatrix ( ) {
 
 vector < vector < double > > DNGIdt::getDNGIDTMatrix ( ) {
 	vector < vector < double > > chadMtx = getDNGCATMatrix ( );
-	vector < double > XYZ_acesrgb (9), CAT (9), ap0toap1(9);
+	vector < double > XYZ_acesrgb (9), CAT (9);
 	FORIJ ( 3, 3 ) {
 		XYZ_acesrgb[i*3+j] = XYZ_acesrgb_3[i][j];
 		CAT[i*3+j] = chadMtx[i][j];
@@ -734,21 +733,32 @@ vector < vector < double > > DNGIdt::getDNGIDTMatrix ( ) {
 	return DNGIDTMatrix;
 }
 
-void DNGIdt::getDNGIDTMatrix2 (float* mat)
+void DNGIdt::getDNGIDTMatrix2 (float* mat, bool AP1)
 {
 	vector < vector < double > > chadMtx = getDNGCATMatrix ( );
 	vector < double > XYZ_acesrgb (9), CAT (9);
+
 	FORIJ ( 3, 3 ) {
 		XYZ_acesrgb[i*3+j] = XYZ_acesrgb_3[i][j];
 		CAT[i*3+j] = chadMtx[i][j];
 	}
 
-	vector < double > matrix = mulVector ( XYZ_acesrgb, CAT, 3 );
-	vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
-	FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrix[i*3+j];
+	vector < double > matrixAP0 = mulVector ( XYZ_acesrgb, CAT, 3 );
+    vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
+    if(AP1){
+        vector < double > ap0toap1(9);
+        FORIJ ( 3, 3 ) ap0toap1[i*3+j] = AP0toAP1[i][j];
 
-	assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
+        vector< double > matrixAP1 = mulVector ( ap0toap1, matrixAP0, 3 );
+        // assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
+        // FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrixAP1[i*3+j];
+        FORI(9) mat[i] = matrixAP1[i];
+    } else {
+        // FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrixAP0[i*3+j];
+        // assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
+        FORI(9) mat[i] = matrixAP0[i];
+    }
 
-	FORI(9) mat[i] = matrix[i];
+
 }
 }

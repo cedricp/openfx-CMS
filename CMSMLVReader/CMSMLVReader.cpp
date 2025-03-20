@@ -33,7 +33,7 @@
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 enum ColorSpaceFormat {
-        ACES_RAW2ACES,
+        ACES_AP0,
         ACES_AP1,
         REC709,
         XYZ
@@ -164,6 +164,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     mlv_video->unlock();
     
     // Libraw needs to be compiled with threading support
+    int colorspace = _colorSpaceFormat->getValue();
     Dng_processor dng_processor;
     wbobj.kelvin = rawInfo.temperature;
     dng_processor.set_interpolation(_debayerType->getValue()-1);
@@ -171,7 +172,8 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     dng_processor.set_wb_coeffs(wbobj);
     dng_processor.set_camid(camid);
     dng_processor.set_highlight(_highlightMode->getValue());
-    bool apply_wb = _colorSpaceFormat->getValue() != ACES_RAW2ACES;
+    dng_processor.setAP1IDT(colorspace == ACES_AP1);
+    bool apply_wb = colorspace > ACES_AP1;
 
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
@@ -180,12 +182,11 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     float idt_matrix[9] = {0};
     float use_matrix = true;
     float ratio = dng_processor.get_wbratio();
-    if(_colorSpaceFormat->getValue() == ACES_RAW2ACES){
+    if(colorspace == ACES_AP0){
         memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-    } else if (_colorSpaceFormat->getValue() == ACES_AP1){
-        memcpy(idt_matrix, xyzd50_ap1, 9*sizeof(float));
-        for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
-    } else if (_colorSpaceFormat->getValue() == REC709){
+    } else if (colorspace == ACES_AP1){
+        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+    } else if (colorspace == REC709){
         memcpy(idt_matrix, xyzd50_rec709_d65, 9*sizeof(float));
         for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
     } else {
@@ -264,6 +265,7 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
 
 void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+    // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
     if (_mlv_video.size() == 0){
         return;
@@ -277,7 +279,6 @@ void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPref
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
-    // MLV clip is a video stream
 }
 
 void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -304,8 +305,6 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 #ifdef OFX_EXTENSIONS_NATRON
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
-
-    //OFX::generatorDescribe(desc);
 }
 
 void CMSMLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
@@ -396,8 +395,8 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kColorSpaceFormat);
         param->setLabel("Color space");
         param->setHint("Output colorspace (output is always linear)");
-        param->appendOption("ACES AP0 - Raw2Aces", "", "aces");
-        param->appendOption("ACES AP1", "", "acesap1");
+        param->appendOption("ACES AP0 - Raw2Aces IDT", "", "aces");
+        param->appendOption("ACES AP1 - Raw2Aces IDT", "", "acesap1");
         param->appendOption("Rec.709", "", "rec709");
         param->appendOption("XYZ-D50", "", "xyz");
         param->setDefault(0);

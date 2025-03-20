@@ -112,7 +112,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 
 	if (!apply_wb_coeffs){
 		DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
-		idt.getDNGIDTMatrix2(_idt_matrix);
+		idt.getDNGIDTMatrix2(_idt_matrix, _ap1_matrix);
 
 		if(_highlight_mode > 0){
 			// Fix WB scale
