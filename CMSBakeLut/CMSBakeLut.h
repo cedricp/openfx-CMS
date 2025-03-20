@@ -2,7 +2,7 @@
 
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
-#include "ofxsGenerator.h"
+#include "ofxsImageEffect.h"
 #include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
@@ -46,18 +46,19 @@ struct Color
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSBakeLutPlugin: public GeneratorPlugin
+class CMSBakeLutPlugin: public OFX::ImageEffect
 {
 public:
     /** @brief ctor */
-    CMSBakeLutPlugin(OfxImageEffectHandle handle)
-        : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
+    CMSBakeLutPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
+        _dstClip = fetchClip(kOfxImageEffectOutputClipName);
+
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        _logScale = fetchBooleanParam("log2 encode");
+        _logScale = fetchBooleanParam("enable_shaper_lut");
         _logminmax = fetchDouble2DParam("log2 min max");
-        _lut1dsize = fetchIntParam("lut1dsize");
+        _lut1dsize = fetchChoiceParam("lut1dsize");
     }
 
 private:
@@ -70,11 +71,12 @@ private:
 private:
     int _lutSize;
     OFX::StringParam* _outputLutFile;
-    OFX::Clip* _inputClip;
     std::vector<Color> _lut;
     OFX::BooleanParam *_logScale;
     OFX::Double2DParam *_logminmax;
-    OFX::IntParam *_lut1dsize;
+    OFX::ChoiceParam *_lut1dsize;
+    OFX::Clip * _dstClip;
+    OFX::Clip* _inputClip;
 };
 
 mDeclarePluginFactory(CMSBakeLutPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});

@@ -1,10 +1,11 @@
 
-#define GLOG_USE_GLOG_EXPORT
 #include <cmath>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Core>
-#include <ceres/ceres.h>
+#include <Eigen/SVD>
+#include <Eigen/LU>
+
 #include <libraw_types.h>
 #include "dng_idt.h"
 
@@ -388,7 +389,7 @@ vector < vector < T > > diagVM ( const vector < T > & vct ) {
 template<typename T>
 vector < vector<T> > solveVM ( const vector < vector < T > > & vct1,
                                const vector < vector < T > > & vct2 ) {
-
+    
     Eigen::Matrix <T, Eigen::Dynamic, Eigen::Dynamic> m1, m2, m3;
     m1.resize(vct1.size(), vct1[0].size());
     m2.resize(vct2.size(), vct2[0].size());
@@ -398,8 +399,9 @@ vector < vector<T> > solveVM ( const vector < vector < T > > & vct1,
     FORIJ (vct2.size(), vct2[0].size())
         m2(i, j) = vct2[i][j];
 
-    // colPivHouseholderQr()
-    m3 = m1.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m2);
+    Eigen::JacobiSVD< Eigen::Matrix <T, Eigen::Dynamic, Eigen::Dynamic> > svd(m1, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    m3 = svd.solve(m2);
+    //m3 = m1.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m2);
 
     vector < vector <T> > vct3 (m3.rows(), vector <T>(m3.cols()));
     FORIJ(m3.rows(), m3.cols()) vct3[i][j] = m3(i, j);

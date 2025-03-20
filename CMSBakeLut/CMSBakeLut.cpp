@@ -41,8 +41,6 @@ bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
     }
 
     rod = _inputClip->getRegionOfDefinition(args.time, args.view);
-    // rod.x2 = rod.x1 + ((rod.x2 - rod.x1) / 7);
-    // rod.y2 = rod.y1 + ((rod.y2 - rod.y1) / 7);
 
     return true;
 }
@@ -57,7 +55,7 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
-    checkComponents(dstBitDepth, dstComponents);
+    //checkComponents(dstBitDepth, dstComponents);
     
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
     OFX::auto_ptr<OFX::Image> src(_inputClip->fetchImage(args.time));
@@ -68,11 +66,6 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     }
     OfxRectD rodd = _dstClip->getRegionOfDefinition(time, args.renderView);
     OfxRectD rods = _inputClip->getRegionOfDefinition(time, args.renderView);
-
-    bool isLog = _logScale->getValue();
-    double logmin, logmax;
-    _logminmax->getValue(logmin, logmax);
-    logEncode encoder(logmin, logmax);
 
 
     int width_img = (int)(rods.x2 - rods.x1);
@@ -95,11 +88,7 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
             sample.r = srcPix[0];
             sample.g = srcPix[1];
             sample.b = srcPix[2];
-            // if (isLog){
-            //     sample.r = encoder.apply(sample.r);
-            //     sample.g = encoder.apply(sample.g);
-            //     sample.b = encoder.apply(sample.b);
-            // }
+
             _lut[sample_count] = sample;
             dstPix[0] = sample.r;
             dstPix[1] = sample.g;
@@ -114,10 +103,17 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 
 void CMSBakeLutPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+    if (!_inputClip->isConnected()){
+        return;
+    }
+    OfxRectI format;
+    _inputClip->getFormat(format);
+    double par = 1.;
+    clipPreferences.setPixelAspectRatio(*_dstClip, par);
+    clipPreferences.setOutputFormat(format);
+
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
-
-    GeneratorPlugin::getClipPreferences(clipPreferences);
 }
 
 void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
@@ -126,7 +122,11 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
     {
         std::string filename = _outputLutFile->getValue();
         FILE *file = fopen(filename.c_str(), "w");
-        const int lut1dsize = _lut1dsize->getValue();
+        const int lut1dsize_choice = _lut1dsize->getValue();
+        int lut1dsize = 512;
+        if (lut1dsize_choice == 1) lut1dsize = 1024;
+        if (lut1dsize_choice == 2) lut1dsize = 2048;
+        if (lut1dsize_choice == 3) lut1dsize = 4096;
 
         if (file == NULL) {
             printf("Error opening file %s\n", filename.c_str());
@@ -147,7 +147,7 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
             //fprintf(file, "DOMAIN_MIN %f %f %f\n", min_value, min_value, min_value);
             //fprintf(file, "DOMAIN_MAX  %f %f %f\n\n", max_value, max_value, max_value);
             for (int i = 0; i < lut1dsize; ++i){
-                float val = encoder.apply(float(i) / float(lut1dsize) * max_value);
+                float val = encoder.apply(float(i) / float(lut1dsize-1) * max_value);
                 fprintf(file, "%f %f %f\n", val, val, val);
             }
             fprintf(file, "\n\n");
@@ -160,6 +160,13 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
         }
         fclose(file);
     }
+
+    if (paramName == "enable_shaper_lut")
+    {
+        bool isEnabled = _logScale->getValue();
+        _logminmax->setEnabled(isEnabled);
+        _lut1dsize->setEnabled(isEnabled);
+    }
 }
 
 void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -167,7 +174,6 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setLabel(kPluginName);
     desc.setPluginDescription(kPluginDescription);
     desc.setPluginGrouping(kPluginGrouping);
-    desc.addSupportedContext(OFX::eContextGenerator);
     desc.addSupportedContext(OFX::eContextGeneral);
     desc.addSupportedBitDepth(OFX::eBitDepthFloat);
     desc.setSingleInstance(false);
@@ -184,27 +190,22 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
 
-    OFX::generatorDescribe(desc);
 }
 
 
 void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
                                                 OFX::ContextEnum context)
 {
-    // there has to be an input clip, even for generators
+    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->setSupportsTiles(kSupportsTiles);
+    
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
-
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(false);
 
-    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
-    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
-    dstClip->setSupportsTiles(kSupportsTiles);
-
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
-
-    generatorDescribeInContext(page, desc, *dstClip, eGeneratorExtentDefault, OFX::ePixelComponentRGBA, true, context);
 
     {
         {
@@ -229,9 +230,10 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("log2 encode");
-            param->setLabel("Log2 Encode");
-            param->setHint("Log2 encode input samples");
+            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("enable_shaper_lut");
+            param->setLabel("LOG shaper LUT");
+            param->setHint("Add a log shaper LUT");
+            param->setEnabled(true);
             param->setDefault(false);
             if (page) {
                 page->addChild(*param);
@@ -241,19 +243,23 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         {
             OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
             param->setLabel("Log2 Min Max values");
-            param->setHint("Min and max exposure values");
+            param->setHint("Shaper LUT Min and max exposure values");
             param->setDefault(-8, 4);
+            param->setEnabled(false);
             if (page) {
                 page->addChild(*param);
             }
         }
 
         {
-            OFX::IntParamDescriptor * param = desc.defineIntParam("lut1dsize");
-            param->setLabel("1D LUT size");
-            param->setHint("The size of the 1D LUT");
-            param->setDefault(1024);
-            param->setRange(16, 8192);
+            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam("lut1dsize");
+            param->setLabel("Shaper LUT size");
+            param->setHint("The size of the Shaper 1D LUT");
+            param->appendOption("512");
+            param->appendOption("1024");
+            param->appendOption("2048");
+            param->appendOption("4096");
+            param->setEnabled(false);
             if (page) {
                 page->addChild(*param);
             }
@@ -271,4 +277,4 @@ CMSBakeLutPluginFactory::createInstance(OfxImageEffectHandle handle,
 static CMSBakeLutPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
 mRegisterPluginFactoryInstance(p)
 
-    OFXS_NAMESPACE_ANONYMOUS_EXIT
+OFXS_NAMESPACE_ANONYMOUS_EXIT

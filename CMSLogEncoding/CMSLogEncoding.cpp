@@ -148,21 +148,21 @@ void CMSLogEncodingPlugin::render(const OFX::RenderArguments &args)
 {
     // instantiate the render code based on the pixel depth of the dst clip
     const double time = args.time;
-    OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
-    OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
+    OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
+    OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
-    checkComponents(dstBitDepth, dstComponents);
+    //checkComponents(dstBitDepth, dstComponents);
 
-    OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
+    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(time));
     OFX::auto_ptr<OFX::Image> src(_inputClip->fetchImage(args.time));
     if (!src.get())
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
     }
-    OfxRectD rodd = _dstClip->getRegionOfDefinition(time, args.renderView);
+    OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
     OfxRectD rods = _inputClip->getRegionOfDefinition(time, args.renderView);
 
     bool isAntiLog = _isAntiLog->getValue();
@@ -178,10 +178,17 @@ void CMSLogEncodingPlugin::render(const OFX::RenderArguments &args)
 
 void CMSLogEncodingPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+    if (!_inputClip->isConnected()){
+        return;
+    }
+    OfxRectI format;
+    _inputClip->getFormat(format);
+    double par = 1.;
+    clipPreferences.setPixelAspectRatio(*_outputClip, par);
+    clipPreferences.setOutputFormat(format);
+
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
-
-    GeneratorPlugin::getClipPreferences(clipPreferences);
 }
 
 void CMSLogEncodingPlugin::changedParam(const OFX::InstanceChangedArgs &args, const std::string &paramName)
@@ -211,7 +218,6 @@ void CMSLogEncodingPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
 
-    OFX::generatorDescribe(desc);
 }
 
 bool
@@ -245,8 +251,6 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     dstClip->setSupportsTiles(kSupportsTiles);
 
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
-
-    generatorDescribeInContext(page, desc, *dstClip, eGeneratorExtentDefault, OFX::ePixelComponentRGBA, true, context);
 
     {
         {

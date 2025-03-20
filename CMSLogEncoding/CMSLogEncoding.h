@@ -2,7 +2,7 @@
 
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
-#include "ofxsGenerator.h"
+#include "ofxsImageEffect.h"
 #include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
@@ -41,12 +41,11 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSLogEncodingPlugin: public GeneratorPlugin
+class CMSLogEncodingPlugin: public OFX::ImageEffect
 {
 public:
     /** @brief ctor */
-    CMSLogEncodingPlugin(OfxImageEffectHandle handle)
-        : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
+    CMSLogEncodingPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);

@@ -301,12 +301,11 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
     desc.setUsesMultiThreading(true);
-    //desc.getPropertySet().propSetInt(kOfxImageEffectInstancePropSequentialRender, 2, false);
 #ifdef OFX_EXTENSIONS_NATRON
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
 
-    OFX::generatorDescribe(desc);
+    //OFX::generatorDescribe(desc);
 }
 
 void CMSMLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)

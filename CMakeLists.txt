@@ -1,6 +1,5 @@
 # ***** BEGIN LICENSE BLOCK *****
-# This file is part of openfx-CMS <https://github.com/NatronGitHub/openfx-CMS>,
-# Copyright (C) 2013-2018 INRIA
+# This file is part of openfx-CMS,
 #
 # openfx-CMS is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,9 +34,6 @@ endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
-#set(CMAKE_INSTALL_PREFIX "E:/Applications/Natron/Plugins/OFX/Natron")
-#set(CMAKE_INSTALL_PREFIX "C:/Users/cedric/Documents/ofx")
-
 # ========================== build platform ==========================
 
 MESSAGE (STATUS "  Platform:")
@@ -60,7 +56,7 @@ endif()
 
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Ceres REQUIRED)
+#find_package(Ceres REQUIRED)
 
 set(LibRaw_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/include)
 set(LibRaw_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/lib/libraw.a)
@@ -172,7 +168,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD" OR ${CMAKE_SYSTEM_NAME} STREQUAL 
 endif()
 
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON OFX_EXTENSIONS_TUTTLE OFX_SUPPORTS_OPENGLRENDER NOMINMAX OFX_SUPPORTS_MULTITHREAD)
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32 glog) 
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html
@@ -239,4 +235,14 @@ ELSE()
   INSTALL(FILES Info.plist
     DESTINATION CMS.ofx.bundle/Contents
   )
+ENDIF()
+
+IF("${OFX_ARCH}" EQUAL "Win32" OR "${OFX_ARCH}" EQUAL "Win64")
+INSTALL(
+  FILES 
+  libglog-2.dll
+  libgflags.dll
+  libunwind.dll
+  DESTINATION CMS.ofx.bundle/Contents/${OFX_ARCH_NAME}
+)
 ENDIF()
