@@ -26,7 +26,7 @@
 #include <cfloat>
 
 #include "ofxOpenGLRender.h"
-#include "CMSMLVReader.h"
+#include "MLVReader.h"
 #include "../utils.h" 
 
 
