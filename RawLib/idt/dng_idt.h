@@ -26,7 +26,7 @@ namespace DNGIdt{
 
 			std::vector < std::vector < double > > getDNGCATMatrix ( );
 			std::vector < std::vector < double > > getDNGIDTMatrix ( );
-			void getDNGIDTMatrix2 ( float* );
+			void getDNGIDTMatrix2 ( float* out_matrix, bool AP1 );
 			void getCameraXYZMtxAndWhitePoint ( );
 
 		private:

@@ -19,6 +19,7 @@ public:
 	void free_buffer();
 	void set_wb_coeffs(mlv_wbal_hdr_t wb_coeffs){_wb_coeffs = wb_coeffs;}
 	void set_camid(int cid){_camid = cid;}
+	void setAP1IDT(bool a){_ap1_matrix = a;}
 	float* get_idt_matrix(){return _idt_matrix;}
 	float get_wbratio(){return _ratio;}
 private:
@@ -33,5 +34,6 @@ private:
 	int _camid;
 	float _ratio = 1;
 	float _idt_matrix[9];
+	bool _ap1_matrix = false;
 	mlv_wbal_hdr_t _wb_coeffs;
 };

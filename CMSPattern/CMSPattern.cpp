@@ -92,9 +92,9 @@ private:
                     float curr_green = float((curr_pos / _lutsize) % _lutsize) / (_lutsize - 1);
                     float curr_blue = float((curr_pos / _lutsize / _lutsize) % _lutsize) / (_lutsize - 1);
                     if (_logencoder){
-                        curr_red = _logencoder->apply_backward(curr_red);
-                        curr_green = _logencoder->apply_backward(curr_green);
-                        curr_blue = _logencoder->apply_backward(curr_blue);
+                        curr_red    = _logencoder->apply_backward(curr_red);
+                        curr_green  = _logencoder->apply_backward(curr_green);
+                        curr_blue   = _logencoder->apply_backward(curr_blue);
                     }
                     *dstPix++ = curr_red;
                     *dstPix++ = curr_green;  
@@ -205,13 +205,11 @@ void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     format.y1 = 0;
     format.y2 = res.y;
 
-    // output is continuous
-    clipPreferences.setOutputHasContinuousSamples(true);
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_dstClip, par);
     clipPreferences.setOutputFormat(format);
-
-    //GeneratorPlugin::getClipPreferences(clipPreferences);
+    // output is continuous
+    clipPreferences.setOutputHasContinuousSamples(true);
 }
 
 void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -262,8 +260,8 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         param->setLabel(kParamBarIntensityLabel);
         param->setHint(kParamBarIntensityHint);
         param->setDefault(kParamBarIntensityDefault);
-        param->setRange(0., 33);
-        param->setDisplayRange(0., 33);
+        param->setRange(8, 33);
+        param->setDisplayRange(8, 33);
         if (page)
         {
             page->addChild(*param);
