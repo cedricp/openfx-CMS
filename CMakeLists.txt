@@ -141,7 +141,7 @@ FILE(GLOB CMS_SOURCES
   "CMSPattern/CMSPattern.cpp"
   "CMSBakeLut/CMSBakeLut.cpp"
   "CMSLogEncoding/CMSLogEncoding.cpp"
-  "CMSMLVReader/CMSMLVReader.cpp"
+  "MLVReader/MLVReader.cpp"
 )
 
 FILE(GLOB CMS_RESOURCES
