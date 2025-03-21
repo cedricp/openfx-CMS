@@ -9,9 +9,7 @@ Just install the package in an OpenFX plugin path (or in [NatronAppDir]/Plugin/O
 # Dependencies
 
 * libraw (supplied in the source tree, because it needs specific build)
-* Ceres
 * Eigen3
-* Glog
 
 # Build on Windows
 
@@ -19,7 +17,7 @@ Use standard CMake build and install method with msys2/mingw64
 
 # Build on Linux
 
-I will fix the build system later, but it should be nearly OK
+I will fix the build system later for linux, but it should be nearly OK, though
 
 # Focus pixel maps
 

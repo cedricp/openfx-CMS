@@ -39,7 +39,7 @@ enum ColorSpaceFormat {
         XYZ
 };
 
-const float xyzd50_rec709_d65[9] = {
+const float xyzD50_rec709D65[9] = {
     3.2404542, -1.5371385, -0.4985314,
     -0.9692660 , 1.8760108, 0.0415560,
      0.0556434, -0.2040259, 1.0572252
@@ -80,16 +80,19 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
 // the overridden render function
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     Mlv_video *mlv_video = nullptr;
-    for (int i = 0; i < _mlv_video.size(); ++i){
-        if (!_mlv_video[i]->locked()){
-            mlv_video = _mlv_video[i];
-            _mlv_video[i]->lock();
-            break;
+
+    {
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        for (int i = 0; i < _mlv_video.size(); ++i){
+            if (!_mlv_video[i]->locked()){
+                mlv_video = _mlv_video[i];
+                _mlv_video[i]->lock();
+                break;
+            }
         }
+        _gThreadHost->mutexUnLock(_videoMutex);
     }
-    _gThreadHost->mutexUnLock(_videoMutex);
 
     if (mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -139,7 +142,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     if (_debayerType->getValue() == 0){
         uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
-
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -151,12 +153,14 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                 *dstPix++ = pixel_val;
             }
         }
+
         free(raw_buffer);
         free(dng_buffer);
+
         // Release MLV reader
         mlv_video->unlock();
     } else {
-        // mlv_video not accessed anymore
+        // Release MLV reader
         mlv_video->unlock();
 
         // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
@@ -183,7 +187,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         } else if (colorspace == ACES_AP1){
             memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
         } else if (colorspace == REC709){
-            memcpy(idt_matrix, xyzd50_rec709_d65, 9*sizeof(float));
+            memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
             for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
         } else {
             use_matrix = false;
@@ -215,11 +219,12 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 {
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
+
     if (_mlv_video.empty()){
         return false;
     }
 
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
     range.min = 1;
     range.max = _mlv_video[0]->frame_count();
     _gThreadHost->mutexUnLock(_videoMutex);
@@ -239,11 +244,10 @@ void MLVReaderPlugin::setMlvFile(std::string file)
         if (mlv){
             // Wait for the videostream to be released by renderer
             while (mlv->locked()){Sleep(10);}
+            // Now we're sure no one is using the stream
             delete mlv;
         }
     }
-
-    // Now we're sure no one is using the stream
     
     _mlv_video.clear();
     
@@ -274,6 +278,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
 {
     // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
+
     if (_mlv_video.size() == 0){
         return;
     }
@@ -287,6 +292,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+
     _gThreadHost->mutexUnLock(_videoMutex);
 }
 
@@ -329,6 +335,13 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
 
     if (paramName == kCameraWhiteBalance){
         _colorTemperature->setEnabled(_cameraWhiteBalance->getValue() == false);
+    }
+
+    if (paramName == kDualIso){
+        bool enabled = _dualIsoMode->getValue() > 0;
+        _dualIsoAliasMap->setEnabled(enabled);
+        _dualIsoAveragingMethod->setEnabled(enabled);
+        _dualIsoFullresBlending->setEnabled(enabled);
     }
 }
 
