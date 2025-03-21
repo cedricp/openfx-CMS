@@ -14,12 +14,12 @@
 #include <mlv_video.h>
 #include <dng_convert.h>
 
-#define kPluginName "CMSMLVReader"
+#define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
 #define kPluginDescription                                                                                                                                                                                                                                             \
 "Magic lantern MLV reader plugin"
 
-#define kPluginIdentifier "net.sf.openfx.CMSMLVReader"
+#define kPluginIdentifier "net.sf.openfx.MLVReader"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
 
@@ -54,11 +54,11 @@ extern "C"
 }
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSMLVReaderPlugin: public OFX::ImageEffect
+class MLVReaderPlugin: public OFX::ImageEffect
 {
 public:
     /** @brief ctor */
-    CMSMLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
+    MLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
@@ -82,7 +82,7 @@ public:
         //pthread_mutex_init(&_mlv_mutex, NULL);
     }
 
-    ~CMSMLVReaderPlugin()
+    ~MLVReaderPlugin()
     {
         for (Mlv_video* mlv : _mlv_video){
             if (mlv){
@@ -126,6 +126,6 @@ private:
     std::vector<Mlv_video*> _mlv_video;
 };
 
-mDeclarePluginFactory(CMSMLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+mDeclarePluginFactory(MLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

@@ -147,8 +147,7 @@ FILE(GLOB CMS_SOURCES
 FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
-  "CMSMLVReader/net.sf.openfx.CMSMLVReader.svg"
-  "CMSMLVReader/net.sf.openfx.CMSMLVReader.png"
+  "CMSMLVReader/net.sf.openfx.MLVReader.png"
 )
 
 ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)

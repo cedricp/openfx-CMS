@@ -70,7 +70,7 @@ inline void matrix_vector_mult(const float *mat, const float *vec, float *result
     }
 }
 
-bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
+bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
     if (!kSupportsRenderScale && ((args.renderScale.x != 1.) || (args.renderScale.y != 1.))) {
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -88,7 +88,7 @@ bool CMSMLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgu
 }
 
 // the overridden render function
-void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
+void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     Mlv_video *mlv_video = nullptr;
@@ -216,7 +216,7 @@ void CMSMLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 }
 
-bool CMSMLVReaderPlugin::getTimeDomain(OfxRangeD& range)
+bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 {
     if (_mlv_video.empty()){
         return false;
@@ -227,12 +227,12 @@ bool CMSMLVReaderPlugin::getTimeDomain(OfxRangeD& range)
     return true;
 }
 
-bool CMSMLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
+bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
 {
     return false;
 }
 
-void CMSMLVReaderPlugin::setMlvFile(std::string file)
+void MLVReaderPlugin::setMlvFile(std::string file)
 {
     for (Mlv_video* mlv : _mlv_video){
         if (mlv){
@@ -263,7 +263,7 @@ void CMSMLVReaderPlugin::setMlvFile(std::string file)
     }
 }
 
-void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
+void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
     // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
@@ -281,7 +281,7 @@ void CMSMLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPref
     clipPreferences.setOutputFormat(format);
 }
 
-void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
+void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 {
     desc.setLabel(kPluginName);
     desc.setPluginDescription(kPluginDescription);
@@ -307,7 +307,7 @@ void CMSMLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 #endif
 }
 
-void CMSMLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
+void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
 {
     if (paramName == kMLVfileParamter)
     {
@@ -323,7 +323,7 @@ void CMSMLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, cons
     }
 }
 
-void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
+void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     OFX::ContextEnum context)
 {
     // There has to be an input clip
@@ -476,13 +476,13 @@ void CMSMLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &de
 }
 
 OFX::ImageEffect *
-CMSMLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
+MLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
     OFX::ContextEnum /*context*/)
 {
-    return new CMSMLVReaderPlugin(handle);
+    return new MLVReaderPlugin(handle);
 }
 
-static CMSMLVReaderPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
+static MLVReaderPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
 mRegisterPluginFactoryInstance(p)
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
