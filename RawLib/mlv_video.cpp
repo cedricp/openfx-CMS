@@ -266,11 +266,11 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
         default:
         cs = 0;
     }
-	
+
 	llrpSetDualIsoMode(&mlvob, ri.dual_iso_mode);
 	llrpSetDualIsoAliasMapMode(&mlvob, (int)ri.dualiso_aliasmap);
 	llrpSetDualIsoFullResBlendingMode(&mlvob, (int)ri.dualiso_fullres_blending);
-	llrpSetDualIsoInterpolationMethod(&mlvob, 1);
+	llrpSetDualIsoInterpolationMethod(&mlvob, ri.dualisointerpolation);
 
 	llrpSetFixRawMode(&mlvob, 1);
 	llrpSetChromaSmoothMode(&mlvob, cs);

@@ -105,6 +105,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     rawInfo.dual_iso_mode = _dualIsoMode->getValue();
     rawInfo.chroma_smooth = _chromaSmooth->getValue();
     rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
+    rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
     rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
@@ -131,9 +132,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     float maxval = _maxValue;
-    if(rawInfo.dual_iso_mode){
-        maxval = powf(2, 16);
-    }
 
     OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
     int width_img = (int)(rodd.x2 - rodd.x1);
@@ -155,62 +153,62 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         }
         free(raw_buffer);
         free(dng_buffer);
-
         // Release MLV reader
         mlv_video->unlock();
-        return;
-    }
-    mlv_video->unlock();
-    
-    // Libraw needs to be compiled with threading support
-    int colorspace = _colorSpaceFormat->getValue();
-    Dng_processor dng_processor;
-    wbobj.kelvin = rawInfo.temperature;
-    dng_processor.set_interpolation(_debayerType->getValue()-1);
-    dng_processor.set_camera_wb(cam_wb);
-    dng_processor.set_wb_coeffs(wbobj);
-    dng_processor.set_camid(camid);
-    dng_processor.set_highlight(_highlightMode->getValue());
-    dng_processor.setAP1IDT(colorspace == ACES_AP1);
-    bool apply_wb = colorspace > ACES_AP1;
-
-    // Get raw buffer in XYZ-D50 colorspace
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
-
-    // Compute colorspace matrix and adjust white balance parameters
-    float idt_matrix[9] = {0};
-    float use_matrix = true;
-    float ratio = dng_processor.get_wbratio();
-    if(colorspace == ACES_AP0){
-        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-    } else if (colorspace == ACES_AP1){
-        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-    } else if (colorspace == REC709){
-        memcpy(idt_matrix, xyzd50_rec709_d65, 9*sizeof(float));
-        for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
     } else {
-        use_matrix = false;
-        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
-    }
+        // mlv_video not accessed anymore
+        mlv_video->unlock();
 
-    free(dng_buffer);
+        // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
+        int colorspace = _colorSpaceFormat->getValue();
+        Dng_processor dng_processor;
+        wbobj.kelvin = rawInfo.temperature;
+        dng_processor.set_interpolation(_debayerType->getValue()-1);
+        dng_processor.set_camera_wb(cam_wb);
+        dng_processor.set_wb_coeffs(wbobj);
+        dng_processor.set_camid(camid);
+        dng_processor.set_highlight(_highlightMode->getValue());
+        dng_processor.setAP1IDT(colorspace == ACES_AP1);
+        bool apply_wb = colorspace > ACES_AP1;
 
-    for(int y=0; y < height_img; y++) {
-        uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
-        float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
-        for(int x=0; x < width_img; x++) {
-            float in[3];
-            in[0] = float(*srcPix++) / _maxValue;
-            in[1] = float(*srcPix++) / _maxValue;
-            in[2] = float(*srcPix++) / _maxValue;
-            if (use_matrix){
-                matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
-            } else {
-                dstPix[0]=in[0];
-                dstPix[1]=in[1];
-                dstPix[2]=in[2];
+        // Get raw buffer in XYZ-D50 colorspace
+        uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
+
+        // Compute colorspace matrix and adjust white balance parameters
+        float idt_matrix[9] = {0};
+        float use_matrix = true;
+        float ratio = dng_processor.get_wbratio();
+        if(colorspace == ACES_AP0){
+            memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+        } else if (colorspace == ACES_AP1){
+            memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+        } else if (colorspace == REC709){
+            memcpy(idt_matrix, xyzd50_rec709_d65, 9*sizeof(float));
+            for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
+        } else {
+            use_matrix = false;
+            idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
+        }
+
+        free(dng_buffer);
+
+        for(int y=0; y < height_img; y++) {
+            uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
+            float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
+            for(int x=0; x < width_img; x++) {
+                float in[3];
+                in[0] = float(*srcPix++) / _maxValue;
+                in[1] = float(*srcPix++) / _maxValue;
+                in[2] = float(*srcPix++) / _maxValue;
+                if (use_matrix){
+                    matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+                } else {
+                    dstPix[0]=in[0];
+                    dstPix[1]=in[1];
+                    dstPix[2]=in[2];
+                }
+                dstPix+=3;
             }
-            dstPix+=3;
         }
     }
 }
@@ -529,6 +527,19 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setLabel("Alias map");
         param->setHint("Alias Map switching on/off");
         param->setDefault(false);
+        if (page_dualiso)
+        {
+            page_dualiso->addChild(*param);
+        }
+    }
+
+    { 
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kDualIsoAveragingMethod);
+        param->setLabel("Averaging method");
+        param->appendOption("Disable", "", "none");
+        param->appendOption("Amaze", "Amaze interpolation", "amaze");
+        param->appendOption("Mean-23", "Mean 23 interpolation", "mean");
+        param->setDefault(1);
         if (page_dualiso)
         {
             page_dualiso->addChild(*param);

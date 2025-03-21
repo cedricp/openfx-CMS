@@ -4,6 +4,8 @@ This is a collection of plugin I made to :
 * Create 3D luts with a set of 2 plugins (CMSPattern and CMSBakeLut)
 * Read Magic Lantern MLV files natively (CMSMLVReader)
 
+Just install the package in an OpenFX plugin path (or in [NatronAppDir]/Plugin/OFX/Natron directory)
+
 # Dependencies
 
 * libraw (supplied in the source tree, because it needs specific build)

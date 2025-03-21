@@ -12,8 +12,9 @@ public:
 	struct RawInfo {
 		bool dualiso_fullres_blending = false;
 		bool dualiso_aliasmap = false;
+		int dual_iso_mode = false;
+		int dualisointerpolation;
 		bool fix_focuspixels = true;
-		bool dual_iso_mode = false;
 		int32_t chroma_smooth = 0;
 		int32_t temperature = -1;
 		float crop_factor = 1.0f;

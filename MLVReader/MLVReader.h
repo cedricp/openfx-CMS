@@ -43,6 +43,7 @@
 #define kDualIso "MlvDualIso"
 #define kDualIsoAliasMap "dualIsoAliasMap"
 #define kDualIsoFullresBlending "dualIsoFullResBlending"
+#define kDualIsoAveragingMethod "dualIsoAveragingMethod"
 #include <vector>
 
 
@@ -77,6 +78,7 @@ public:
         _dualIsoMode = fetchChoiceParam(kDualIso);
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
+        _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
         _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -125,6 +127,7 @@ private:
     OFX::ChoiceParam* _highlightMode;
     OFX::ChoiceParam* _chromaSmooth;
     OFX::ChoiceParam* _dualIsoMode;
+    OFX::ChoiceParam* _dualIsoAveragingMethod;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
