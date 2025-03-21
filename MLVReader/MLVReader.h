@@ -39,7 +39,10 @@
 #define kFrameRange "Framerange"
 #define kChromaSmooth "ChromaSmooth"
 #define kFixFocusPixel "FixFocusPixel"
-
+#define kMlvFps "MlvFps"
+#define kDualIso "MlvDualIso"
+#define kDualIsoAliasMap "dualIsoAliasMap"
+#define kDualIsoFullresBlending "dualIsoFullResBlending"
 #include <vector>
 
 
@@ -70,6 +73,10 @@ public:
         _cameraWhiteBalance = fetchBooleanParam(kCameraWhiteBalance);
         _timeRange = fetchInt2DParam(kFrameRange);
         _fixFocusPixel = fetchBooleanParam(kFixFocusPixel);
+        _mlv_fps = fetchDoubleParam(kMlvFps);
+        _dualIsoMode = fetchChoiceParam(kDualIso);
+        _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
+        _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -112,14 +119,18 @@ private:
     OFX::Clip* _outputClip;
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
+    OFX::DoubleParam* _mlv_fps;
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;
     OFX::ChoiceParam* _chromaSmooth;
+    OFX::ChoiceParam* _dualIsoMode;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
     OFX::BooleanParam* _fixFocusPixel;
+    OFX::BooleanParam* _dualIsoFullresBlending;
+    OFX::BooleanParam* _dualIsoAliasMap;
     std::string _pluginPath;
     int _maxValue=0;
 

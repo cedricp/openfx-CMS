@@ -19,3 +19,6 @@ Use standard CMake build and install method with msys2/mingw64
 
 I will fix the build system later, but it should be nearly OK
 
+# Focus pixel maps
+
+Create a "fpm" directory in the /Content folder of the plugin and install the maps inthere.

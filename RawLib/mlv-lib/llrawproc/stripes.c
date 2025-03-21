@@ -375,7 +375,6 @@ void fix_vertical_stripes(stripes_correction * correction,
         {
             method = "UNNEEDED";
         }
-
         printf("\nVertical stripes correction: '%s'\n", method);
         for (int j = 0; j < 8; j++)
         {

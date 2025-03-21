@@ -266,6 +266,11 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
         default:
         cs = 0;
     }
+	
+	llrpSetDualIsoMode(&mlvob, ri.dual_iso_mode);
+	llrpSetDualIsoAliasMapMode(&mlvob, (int)ri.dualiso_aliasmap);
+	llrpSetDualIsoFullResBlendingMode(&mlvob, (int)ri.dualiso_fullres_blending);
+	llrpSetDualIsoInterpolationMethod(&mlvob, 1);
 
 	llrpSetFixRawMode(&mlvob, 1);
 	llrpSetChromaSmoothMode(&mlvob, cs);
@@ -297,6 +302,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
 
+
 	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
 	dng_size = size;
@@ -304,10 +310,11 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::unpacked_buffer(uint16_t* input_buffer)
+uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer, bool rgb)
 {
-	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y()*2);
-	dng_unpack_image_bits(out, input_buffer, raw_resolution_x(), raw_resolution_y(), bpp());
+	int mul = rgb ? 3 : 1;
+	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y() * mul);
+	dng_unpack_image_bits(out, input_buffer, raw_resolution_x() * mul, raw_resolution_y(), bpp());
 	return out;
 }
 

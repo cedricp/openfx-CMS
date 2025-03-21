@@ -45,18 +45,6 @@ const float xyzd50_rec709_d65[9] = {
      0.0556434, -0.2040259, 1.0572252
 };
 
-const float xyzd50_ap1[9] = {
-    1.64102338, -0.32480329, -0.2364247,
-    -0.66366286,  1.61533159,  0.01675635,
-    0.01172189, -0.00828444,  0.98839486
-};
-
-const float xyzd50_ap0[9] = {
-    1.0158069, -0.0177408,  0.0464296,
-    -0.5078116,  1.3913055,  0.1191979,
-    0.0084755, -0.0140636,  1.2194102
-};
-
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
 {
     for (int i = 0; i < rows; i++)
@@ -80,10 +68,12 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
         return false;
     }
 
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
     rod.x1 = 0;
     rod.x2 = _mlv_video[0]->raw_resolution_x();
     rod.y1 = 0;
     rod.y2 = _mlv_video[0]->raw_resolution_y();
+    _gThreadHost->mutexUnLock(_videoMutex);
     return true;
 }
 
@@ -112,10 +102,14 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     int dng_size = 0;
 
     Mlv_video::RawInfo rawInfo;
+    rawInfo.dual_iso_mode = _dualIsoMode->getValue();
     rawInfo.chroma_smooth = _chromaSmooth->getValue();
     rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
+    rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
+    rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+
     int mlv_width = mlv_video->raw_resolution_x();
     int mlv_height = mlv_video->raw_resolution_y();
     mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
@@ -136,19 +130,24 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
+    float maxval = _maxValue;
+    if(rawInfo.dual_iso_mode){
+        maxval = powf(2, 16);
+    }
+
     OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
     int width_img = (int)(rodd.x2 - rodd.x1);
     int height_img = (int)(rodd.y2 - rodd.y1);
 
     if (_debayerType->getValue() == 0){
-        uint16_t* raw_buffer = mlv_video->unpacked_buffer(mlv_video->get_raw_image());
+        uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
 
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
             float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
             for(int x=0; x < width_img; x++) {
-                float pixel_val = float(*srcPix++) / _maxValue;
+                float pixel_val = float(*srcPix++) / maxval;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
@@ -221,8 +220,11 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
     if (_mlv_video.empty()){
         return false;
     }
+
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
     range.min = 1;
     range.max = _mlv_video[0]->frame_count();
+    _gThreadHost->mutexUnLock(_videoMutex);
 
     return true;
 }
@@ -234,14 +236,19 @@ bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip
 
 void MLVReaderPlugin::setMlvFile(std::string file)
 {
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     for (Mlv_video* mlv : _mlv_video){
         if (mlv){
+            // Wait for the videostream to be released by renderer
+            while (mlv->locked()){Sleep(10);}
             delete mlv;
         }
     }
 
+    // Now we're sure no one is using the stream
+    
     _mlv_video.clear();
-
+    
     // As mlv-lib does not support multi threading
     // because of file operations, I just create
     // multiples instances
@@ -257,10 +264,12 @@ void MLVReaderPlugin::setMlvFile(std::string file)
                 tr.x = 0;
                 tr.y = mlv_video->frame_count();
                 _timeRange->setValue(tr);
+                _mlv_fps->setValue(mlv_video->fps());
             }
             _mlv_video.push_back(mlv_video);
         }
     }
+    _gThreadHost->mutexUnLock(_videoMutex);
 }
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
@@ -270,6 +279,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     if (_mlv_video.size() == 0){
         return;
     }
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
     OfxRectI format;
     format.x1 = 0;
     format.x2 = _mlv_video[0]->raw_resolution_x();
@@ -279,6 +289,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     double par = 1.;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+    _gThreadHost->mutexUnLock(_videoMutex);
 }
 
 void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -340,6 +351,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     // Create pages
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
     OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
+    OFX::PageParamDescriptor *page_dualiso = desc.definePageParam("Dual iso");
     OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
     OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
 
@@ -356,6 +368,20 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
             page->addChild(*param);
         }
     }
+
+    {
+        OFX::DoubleParamDescriptor *param = desc.defineDoubleParam(kMlvFps);
+        //desc.addClipPreferencesSlaveParam(*param);
+        param->setLabel("FPS");
+        param->setHint("The video frame rate in frame per seconds");
+        param->setDefault(0);
+        param->setEnabled(false);
+        if (page)
+        {
+            page->addChild(*param);
+        }
+    }
+
 
     {
         OFX::StringParamDescriptor *param = desc.defineStringParam(kMLVfileParamter);
@@ -471,6 +497,41 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         if (page_raw)
         {
             page_raw->addChild(*param);
+        }
+    }
+
+    { 
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kDualIso);
+        param->setLabel("Dual ISO mode");
+        param->appendOption("Disable", "", "none");
+        param->appendOption("High Quality 20bits", "HQ 20bits processing dual ISO", "HQ");
+        param->appendOption("Fast preview mode", "Low quality mode for preview", "LQ");
+        param->setDefault(0);
+        if (page_dualiso)
+        {
+            page_dualiso->addChild(*param);
+        }
+    }
+
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kDualIsoFullresBlending);
+        param->setLabel("Full resolution blending");
+        param->setHint("Full resolution Blending switching on/off");
+        param->setDefault(true);
+        if (page_dualiso)
+        {
+            page_dualiso->addChild(*param);
+        }
+    }
+
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kDualIsoAliasMap);
+        param->setLabel("Alias map");
+        param->setHint("Alias Map switching on/off");
+        param->setDefault(false);
+        if (page_dualiso)
+        {
+            page_dualiso->addChild(*param);
         }
     }
 }

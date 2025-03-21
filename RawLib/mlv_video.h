@@ -10,7 +10,10 @@ class Mlv_video
 {
 public:
 	struct RawInfo {
+		bool dualiso_fullres_blending = false;
+		bool dualiso_aliasmap = false;
 		bool fix_focuspixels = true;
+		bool dual_iso_mode = false;
 		int32_t chroma_smooth = 0;
 		int32_t temperature = -1;
 		float crop_factor = 1.0f;
@@ -44,7 +47,7 @@ public:
 	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
 	uint32_t get_dng_header_size();
 	uint16_t* get_raw_image();
-	uint16_t* unpacked_buffer(uint16_t* input_buffer);
+	uint16_t* unpacked_raw_buffer(uint16_t* input_buffer, bool rgb = false);
 
 	uint32_t black_level();
 	uint32_t white_level();
