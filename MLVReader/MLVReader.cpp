@@ -222,6 +222,7 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
 
     if (_mlv_video.empty()){
+        _gThreadHost->mutexUnLock(_videoMutex);
         return false;
     }
 
