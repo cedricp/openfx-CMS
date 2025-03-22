@@ -3,6 +3,7 @@ extern "C"{
 	#include "video_mlv.h"
 	#include "dng/dng.h"
 	#include "llrawproc/llrawproc.h"
+	#include "audio_mlv.h"
 }
 #include <string.h>
 #include "mlv_video.h"
@@ -267,14 +268,15 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
         cs = 0;
     }
 
+	
+	llrpSetFixRawMode(&mlvob, 1);
+	llrpSetChromaSmoothMode(&mlvob, cs);
+	llrpResetDngBWLevels(&mlvob);
+
 	llrpSetDualIsoMode(&mlvob, ri.dual_iso_mode);
 	llrpSetDualIsoAliasMapMode(&mlvob, (int)ri.dualiso_aliasmap);
 	llrpSetDualIsoFullResBlendingMode(&mlvob, (int)ri.dualiso_fullres_blending);
 	llrpSetDualIsoInterpolationMethod(&mlvob, ri.dualisointerpolation);
-
-	llrpSetFixRawMode(&mlvob, 1);
-	llrpSetChromaSmoothMode(&mlvob, cs);
-	llrpResetDngBWLevels(&mlvob);
 
 	char error_msg[128];
 	if (_rawinfo.darkframe_enable){
@@ -412,4 +414,10 @@ int Mlv_video::sampling_factor_x()
 int Mlv_video::sampling_factor_y()
 {
 	return _imp->mlv_object->RAWC.binning_y + _imp->mlv_object->RAWC.skipping_y;
+}
+
+bool Mlv_video::write_audio(std::string path)
+{
+	::readMlvAudioData(_imp->mlv_object);
+	::writeMlvAudioToWave(_imp->mlv_object, path.c_str());
 }

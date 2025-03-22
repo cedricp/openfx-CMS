@@ -77,4 +77,6 @@ public:
 	void sensor_resolulion(int& x, int& y);
 
 	bool generate_darkframe(int in, int out);
+
+	bool write_audio(std::string path);
 };

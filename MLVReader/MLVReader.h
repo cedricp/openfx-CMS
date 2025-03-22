@@ -44,6 +44,8 @@
 #define kDualIsoAliasMap "dualIsoAliasMap"
 #define kDualIsoFullresBlending "dualIsoFullResBlending"
 #define kDualIsoAveragingMethod "dualIsoAveragingMethod"
+#define kAudioFilename "audioFilename"
+#define kAudioExport "audioExport"
 #include <vector>
 
 
@@ -65,6 +67,8 @@ public:
     MLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
+        _mlv_audiofilename = fetchStringParam(kAudioFilename);
+        _audioExportButton = fetchPushButtonParam(kAudioExport);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
@@ -121,6 +125,8 @@ private:
     OFX::Clip* _outputClip;
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
+    OFX::StringParam* _mlv_audiofilename;
+    OFX::PushButtonParam* _audioExportButton;
     OFX::DoubleParam* _mlv_fps;
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;

@@ -290,7 +290,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     format.y1 = 0;
     format.y2 = _mlv_video[0]->raw_resolution_y();
 
-    double par = 1.;
+    double par = 1;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
 
@@ -328,6 +328,14 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kMLVfileParamter)
     {
         std::string filename = _mlvfilename_param->getValue();
+        std::string upperfn = filename;
+        std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
+        if (upperfn.find(".MLV") == std::string::npos){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
+            OFX::throwSuiteStatusException(kOfxStatFailed);
+            return;
+        }
+        clearPersistentMessage();
         if (filename != _mlvfilename){
             setMlvFile(filename);
             _mlvfilename = filename;
@@ -344,7 +352,24 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         _dualIsoAveragingMethod->setEnabled(enabled);
         _dualIsoFullresBlending->setEnabled(enabled);
     }
+
+    if (paramName == kAudioExport){
+        std::string filename = _mlv_audiofilename->getValue();
+        if (filename.empty()) return;
+        if (_mlv_video.empty()) return;
+        
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        Mlv_video  *mlv_video = nullptr;
+        for(auto mlv: _mlv_video){
+            if (!mlv->locked()){
+                mlv_video = mlv;
+            }
+        }
+        if (mlv_video) mlv_video->write_audio(filename);
+        _gThreadHost->mutexUnLock(_videoMutex);
+    }
 }
+
 
 void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     OFX::ContextEnum context)
@@ -363,9 +388,10 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     // Create pages
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
     OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
-    OFX::PageParamDescriptor *page_dualiso = desc.definePageParam("Dual iso");
     OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
     OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
+    OFX::PageParamDescriptor *page_dualiso = desc.definePageParam("Dual iso");
+    OFX::PageParamDescriptor *page_audio = desc.definePageParam("Audio");
 
     // Create parameters
     {
@@ -557,6 +583,29 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         if (page_dualiso)
         {
             page_dualiso->addChild(*param);
+        }
+    }
+
+    {
+        OFX::StringParamDescriptor *param = desc.defineStringParam(kAudioFilename);
+        param->setLabel("Audio Filename");
+        param->setHint("Name of the output audio .wav file");
+        param->setDefault("audio.wav");
+        param->setFilePathExists(true);
+        param->setStringType(OFX::eStringTypeFilePath);
+        if (page_audio)
+        {
+            page_audio->addChild(*param);
+        }
+    }
+
+    {
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kAudioExport);
+        param->setLabel("Export...");
+        param->setHint("Export audio file");
+        if (page_audio)
+        {
+            page_audio->addChild(*param);
         }
     }
 }
