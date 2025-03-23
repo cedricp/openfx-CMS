@@ -92,7 +92,6 @@ public:
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
-        //pthread_mutex_init(&_mlv_mutex, NULL);
     }
 
     ~MLVReaderPlugin()
@@ -102,7 +101,6 @@ public:
                 delete mlv;
             }
         }
-        //pthread_mutex_destroy(&_mlv_mutex);
         _gThreadHost->mutexDestroy(_videoMutex);
     }
 
@@ -119,7 +117,6 @@ private:
 private:
     OfxMultiThreadSuiteV1 *_gThreadHost = 0;
     OfxMutexHandle _videoMutex;
-    //pthread_mutex_t _mlv_mutex;
 
     unsigned int _numThreads;
     OFX::Clip* _outputClip;
