@@ -213,6 +213,14 @@ Mlv_video::~Mlv_video()
 	delete _imp;
 }
 
+void Mlv_video::write_audio(std::string path)
+{
+	mlvObject_t* mlv = _imp->mlv_object;
+	const char* wave_path = path.c_str();
+	readMlvAudioData(mlv);
+	writeMlvAudioToWave(mlv, wave_path);
+}
+
 uint32_t Mlv_video::raw_resolution_x()
 {
 	return getMlvWidth(_imp->mlv_object);
@@ -416,8 +424,3 @@ int Mlv_video::sampling_factor_y()
 	return _imp->mlv_object->RAWC.binning_y + _imp->mlv_object->RAWC.skipping_y;
 }
 
-bool Mlv_video::write_audio(std::string path)
-{
-	::readMlvAudioData(_imp->mlv_object);
-	::writeMlvAudioToWave(_imp->mlv_object, path.c_str());
-}

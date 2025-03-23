@@ -360,9 +360,10 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         
         if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
         Mlv_video  *mlv_video = nullptr;
-        for(auto mlv: _mlv_video){
+        for(Mlv_video *mlv: _mlv_video){
             if (!mlv->locked()){
                 mlv_video = mlv;
+                break;
             }
         }
         if (mlv_video) mlv_video->write_audio(filename);

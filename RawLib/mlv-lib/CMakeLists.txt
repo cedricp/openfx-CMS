@@ -1,5 +1,4 @@
-FILE(GLOB MLV_HEADERS *.h)
-FILE(GLOB MLV_SOURCES *.c)
+FILE(GLOB MLV_SOURCES video_mlv.c audio_mlv.c)
 FILE(GLOB LJ92_SOURCES liblj92/lj92.c)
 FILE(GLOB CAMID_SOURCES camid/camera_id.c)
 FILE(GLOB DNG_SOURCES dng/dng.c)

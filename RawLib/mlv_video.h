@@ -13,7 +13,7 @@ public:
 		bool dualiso_fullres_blending = false;
 		bool dualiso_aliasmap = false;
 		int dual_iso_mode = false;
-		int dualisointerpolation;
+		int dualisointerpolation = 0;
 		bool fix_focuspixels = true;
 		int32_t chroma_smooth = 0;
 		int32_t temperature = -1;
@@ -78,5 +78,5 @@ public:
 
 	bool generate_darkframe(int in, int out);
 
-	bool write_audio(std::string path);
+	void write_audio(std::string path);
 };
