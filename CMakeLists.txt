@@ -144,6 +144,8 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
   "CMSMLVReader/net.sf.openfx.MLVReader.png"
+  "debayer_vng.cl"
+  "debayer_ppg.cl"
 )
 
 ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
