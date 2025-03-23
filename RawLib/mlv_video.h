@@ -48,7 +48,7 @@ public:
 	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
 	uint32_t get_dng_header_size();
 	uint16_t* get_raw_image();
-	uint16_t* unpacked_raw_buffer(uint16_t* input_buffer, bool rgb = false);
+	uint16_t* unpacked_raw_buffer(uint16_t* input_buffer);
 
 	uint32_t black_level();
 	uint32_t white_level();

@@ -320,11 +320,10 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer, bool rgb)
+uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer)
 {
-	int mul = rgb ? 3 : 1;
-	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y() * mul);
-	dng_unpack_image_bits(out, input_buffer, raw_resolution_x() * mul, raw_resolution_y(), bpp());
+	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y() * sizeof(uint16_t));
+	dng_unpack_image_bits(out, input_buffer, raw_resolution_x(), raw_resolution_y(), bpp());
 	return out;
 }
 
