@@ -46,6 +46,9 @@
 #define kDualIsoAveragingMethod "dualIsoAveragingMethod"
 #define kAudioFilename "audioFilename"
 #define kAudioExport "audioExport"
+#define kDarkframefilename "darkframeFilename"
+#define kDarkFrameButon "darkFrameButton"
+#define kDarkframeRange "darkframeRange"
 #include <vector>
 
 
@@ -66,6 +69,9 @@ public:
     /** @brief ctor */
     MLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
+        _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
+        _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
+        _darkframeRange = fetchInt2DParam(kDarkframeRange);
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _mlv_audiofilename = fetchStringParam(kAudioFilename);
         _audioExportButton = fetchPushButtonParam(kAudioExport);
@@ -123,7 +129,9 @@ private:
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
     OFX::StringParam* _mlv_audiofilename;
+    OFX::StringParam* _mlv_darkframefilename;
     OFX::PushButtonParam* _audioExportButton;
+    OFX::PushButtonParam* _darkFrameButton;
     OFX::DoubleParam* _mlv_fps;
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;
@@ -133,6 +141,7 @@ private:
     OFX::ChoiceParam* _dualIsoAveragingMethod;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
+    OFX::Int2DParam* _darkframeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
     OFX::BooleanParam* _fixFocusPixel;
     OFX::BooleanParam* _dualIsoFullresBlending;

@@ -50,8 +50,6 @@ Mlv_video::Mlv_video(std::string filename)
 	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
 
 	memcpy(&_imp->original_wbal, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t));
-	_rawinfo.crop_factor = crop_factor();
-	_rawinfo.focal_length = focal_length();
 }
 
 void* Mlv_video::get_mlv_object()
@@ -79,11 +77,11 @@ int Mlv_video::get_camid()
 	return _imp->mlv_object->IDNT.cameraModel;
 }
 
-bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
+bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
 {
 
 	char error_message[256] = { 0 };
-	FILE* mlv_file = fopen(_rawinfo.darkframe_file.c_str(), "wb");
+	FILE* mlv_file = fopen(path, "wb");
 	mlvObject_t* video = _imp->mlv_object;
 
  	uint64_t* avg_buf = (uint64_t *)calloc( video->RAWI.xRes * video->RAWI.yRes * sizeof( uint64_t ), 1 );
@@ -247,7 +245,7 @@ uint32_t Mlv_video::white_level()
 
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
 
@@ -287,20 +285,19 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	llrpSetDualIsoInterpolationMethod(&mlvob, ri.dualisointerpolation);
 
 	char error_msg[128];
-	if (_rawinfo.darkframe_enable){
+	if (ri.darkframe_enable){
 		llrpSetDarkFrameMode(&mlvob, 1);
-		if( llrpValidateExtDarkFrame(&mlvob, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
-			llrpInitDarkFrameExtFileName(&mlvob, _rawinfo.darkframe_file.c_str());
-			_rawinfo.darkframe_ok = true;
-			_rawinfo.darkframe_error = error_msg;
+		if( llrpValidateExtDarkFrame(&mlvob, ri.darkframe_file.c_str(), error_msg) == 0 ){
+			llrpInitDarkFrameExtFileName(&mlvob, ri.darkframe_file.c_str());
+			ri.darkframe_ok = true;
+			ri.darkframe_error = error_msg;
 		} else {
-			_rawinfo.darkframe_ok = false;
-			_rawinfo.darkframe_error.clear();
-			printf("%s\n", error_msg);
+			ri.darkframe_ok = false;
+			ri.darkframe_error.clear();
 		}
 	} else {
 		llrpSetDarkFrameMode(&mlvob, 0);
-		_rawinfo.darkframe_error.clear();        
+		ri.darkframe_error.clear();        
 	}
 
 	if (ri.fix_focuspixels){
@@ -322,9 +319,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 
 uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer)
 {
-	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y() * sizeof(uint16_t));
-	dng_unpack_image_bits(out, input_buffer, raw_resolution_x(), raw_resolution_y(), bpp());
-	return out;
+	return _imp->dng_object->image_buf_unpacked;
 }
 
 std::string Mlv_video::camera_name()

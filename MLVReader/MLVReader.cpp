@@ -24,6 +24,8 @@
 #include <cmath>
 #include <climits>
 #include <cfloat>
+#include <filesystem>
+#include <CL/opencl.hpp>
 
 #include "ofxOpenGLRender.h"
 #include "MLVReader.h"
@@ -112,6 +114,8 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
+    rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
+    rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
 
     int mlv_width = mlv_video->raw_resolution_x();
@@ -154,7 +158,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             }
         }
 
-        free(raw_buffer);
         free(dng_buffer);
 
         // Release MLV reader
@@ -367,6 +370,26 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
             }
         }
         if (mlv_video) mlv_video->write_audio(filename);
+        _gThreadHost->mutexUnLock(_videoMutex);
+    }
+
+    if (paramName == kDarkFrameButon){
+        int sf = _darkframeRange->getValue().x;
+        int ef = _darkframeRange->getValue().y;
+        if (sf >= ef) return;
+        std::string filename = _mlv_darkframefilename->getValue();
+        if (filename.empty()) return;
+        if (_mlv_video.empty()) return;
+        
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        Mlv_video  *mlv_video = nullptr;
+        for(Mlv_video *mlv: _mlv_video){
+            if (!mlv->locked()){
+                mlv_video = mlv;
+                break;
+            }
+        }
+        if (mlv_video) mlv_video->generate_darkframe(filename.c_str(), sf, ef);
         _gThreadHost->mutexUnLock(_videoMutex);
     }
 }
@@ -609,12 +632,53 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
             page_audio->addChild(*param);
         }
     }
+
+    {
+        OFX::StringParamDescriptor *param = desc.defineStringParam(kDarkframefilename);
+        param->setLabel("Darkframe Filename");
+        param->setHint("Name of the .mlv darkframe file");
+        param->setDefault("darkframe.mlv");
+        param->setFilePathExists(true);
+        param->setStringType(OFX::eStringTypeFilePath);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+    
+    {
+        OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kDarkframeRange);
+        param->setLabel("Darkframe frame range");
+        param->setHint("Darkframe export frame range");
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+    
+    {
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kDarkFrameButon);
+        param->setLabel("Generate darkframe");
+        param->setHint("Lauch darkframe generation");
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
 }
 
 OFX::ImageEffect *
 MLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
     OFX::ContextEnum /*context*/)
 {
+    std::vector<cl::Platform> platforms;
+    std::vector<cl::Device> devices;
+    cl::Platform::get(&platforms);
+    for (size_t i=0; i < platforms.size(); i++){
+        std::vector<cl::Device> platformDevices;
+        platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
+        printf("Platform %d %s\n", i, platforms[i].getInfo<CL_PLATFORM_NAME>().c_str());
+    }
     return new MLVReaderPlugin(handle);
 }
 

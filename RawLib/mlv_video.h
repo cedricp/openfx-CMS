@@ -26,7 +26,6 @@ public:
 	};
 	mlv_imp* _imp = NULL;
 private:
-	RawInfo _rawinfo;
 	bool _valid = false;
 	bool _locked = false;
 
@@ -45,7 +44,7 @@ public:
 
 	mlv_wbal_hdr_t get_wb_object();
 
-	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
+	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size);
 	uint32_t get_dng_header_size();
 	uint16_t* get_raw_image();
 	uint16_t* unpacked_raw_buffer(uint16_t* input_buffer);
@@ -76,7 +75,6 @@ public:
 	int bpp();
 	void sensor_resolulion(int& x, int& y);
 
-	bool generate_darkframe(int in, int out);
-
+	bool generate_darkframe(const char* path, int in, int out);
 	void write_audio(std::string path);
 };
