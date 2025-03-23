@@ -25,7 +25,8 @@
 #include <climits>
 #include <cfloat>
 #include <filesystem>
-#include <CL/opencl.hpp>
+#include <fstream>
+#include <stddef.h>
 
 #include "ofxOpenGLRender.h"
 #include "MLVReader.h"
@@ -33,6 +34,8 @@
 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
+
+static std::vector<cl::Device> g_cldevices;
 
 enum ColorSpaceFormat {
         ACES_AP0,
@@ -155,6 +158,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
+                *dstPix++ = 1.f;
             }
         }
 
@@ -162,6 +166,52 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
         // Release MLV reader
         mlv_video->unlock();
+    } else if (_useOpenCL->getValue()){
+        uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
+        
+        float* fltbuff = (float*)malloc(sizeof(float)*width_img*height_img);
+        for(int y=0; y < height_img; y++) {
+            uint16_t* srcPix = raw_buffer + (y) * (mlv_width);
+            float *dstPix = fltbuff + (y) * (mlv_width);
+            for(int x=0; x < width_img; x++) {
+                float pixel_val = float(*srcPix++) / maxval;
+                *dstPix++ = pixel_val;
+            }
+        }
+        // Release MLV reader
+        mlv_video->unlock();
+        
+        int cl_dev = _openCLDevices->getValue();
+        cl::Device& device = g_cldevices[cl_dev];
+        cl::ImageFormat format(CL_RGBA, CL_FLOAT);
+        cl::ImageFormat formatin(CL_R, CL_FLOAT);
+        cl::Image2D in(_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, formatin, width_img, height_img, 0, fltbuff);
+        cl::Image2D out(_context, CL_MEM_WRITE_ONLY, format, width_img, height_img, 0, NULL);
+
+        cl::Kernel kernel(_program, "ppg_demosaic_green");
+        kernel.setArg(0, in);
+        kernel.setArg(1, out);
+        kernel.setArg(2, width_img);
+        kernel.setArg(3, height_img);
+
+        // Render
+
+        cl::Event timer;
+        cl::size_t<3> origin;
+        cl::size_t<3> size;
+        origin[0] = 0;
+        origin[1] = 0;
+        origin[2] = 0;
+        size[0] = width_img;
+        size[1] = height_img;
+        size[2] = 1;
+    
+        cl::CommandQueue queue = cl::CommandQueue(_context, device);
+        queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width_img, height_img), cl::NullRange, NULL, &timer);
+        timer.wait();
+        queue.enqueueReadImage(out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
+        queue.finish();
+        free(dng_buffer);
     } else {
         // Release MLV reader
         mlv_video->unlock();
@@ -213,8 +263,9 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                     dstPix[0]=in[0];
                     dstPix[1]=in[1];
                     dstPix[2]=in[2];
+                    dstPix[3]=1.f;
                 }
-                dstPix+=3;
+                dstPix+=4;
             }
         }
     }
@@ -392,8 +443,56 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         if (mlv_video) mlv_video->generate_darkframe(filename.c_str(), sf, ef);
         _gThreadHost->mutexUnLock(_videoMutex);
     }
+
+    bool use_opencl = _useOpenCL->getValue();
+    if (paramName == kUseOpenCL || paramName == kOpenCLDevice){
+        _openCLDevices->setEnabled(use_opencl);
+        if (use_opencl){
+            std::string programpath = getPluginFilePath() + "/Contents/Resources/debayer_vng.cl";
+            std::ifstream f;
+            f.open(programpath.c_str());
+            std::ostringstream s;
+            s << f.rdbuf();
+            f.close();
+            if (setupOpenCL(s.str()))
+            {
+            }
+        }
+    }
 }
 
+bool MLVReaderPlugin::setupOpenCL(std::string program)
+{
+    if (g_cldevices.empty()){
+        return false;
+    }
+
+    int cl_dev = _openCLDevices->getValue();
+    cl::Platform platform(g_cldevices[cl_dev].getInfo<CL_DEVICE_PLATFORM>());
+    cl_context_properties properties[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
+    _context = cl::Context(CL_DEVICE_TYPE_ALL, properties);
+
+    cl_int err;
+    _program = cl::Program(_context, program, true, &err);
+    _program.build(g_cldevices, "-cl-fast-relaxed-math");
+    if (err != CL_SUCCESS){
+        std::string errlog = _program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(g_cldevices[cl_dev]);
+        printf("OpenCL Error :\n%s\n", errlog.c_str());
+        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to create program");
+        return false;
+    }
+    clearPersistentMessage();
+    // std::string buildOptions;
+
+    // std::vector<cl::Device> platformDevices = _context.getInfo<CL_CONTEXT_DEVICES>();
+    // if(_program.build(platformDevices, buildOptions.c_str()) == CL_BUILD_PROGRAM_FAILURE){
+    //     setPersistentMessage(OFX::Message::eMessageError, "", "Failed to build kernel, see terminal for log");
+    //     printf("OpenCL Error :\n%s\n", _program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(g_cldevices[cl_dev]));
+    //     return false;
+    // }
+
+    return true;
+}
 
 void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     OFX::ContextEnum context)
@@ -406,7 +505,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     srcClip->setOptional(true);
 
     OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
-    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     dstClip->setSupportsTiles(kSupportsTiles);
 
     // Create pages
@@ -472,6 +571,31 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         //param->appendOption("DHT", "", "dht");
         //param->appendOption("Modifier AHD", "", "mahd");
         param->setDefault(1);
+        if (page_debayer)
+        {
+            page_debayer->addChild(*param);
+        }
+    }
+
+    { 
+        OFX::BooleanParamDescriptor* param = desc.defineBooleanParam(kUseOpenCL);
+        param->setLabel("OpenCL acceleration");
+        param->setDefault(0);
+        if (page_debayer)
+        {
+            page_debayer->addChild(*param);
+        }
+    }
+
+    { 
+        // linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kOpenCLDevice);
+        param->setLabel("OpenCL device");
+        for (auto cldev : g_cldevices){
+            param->appendOption(cldev.getInfo<CL_DEVICE_NAME>(), "", cldev.getInfo<CL_DEVICE_NAME>());
+        }
+        param->setDefault(0);
+        param->setEnabled(false);
         if (page_debayer)
         {
             page_debayer->addChild(*param);
@@ -671,15 +795,23 @@ OFX::ImageEffect *
 MLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
     OFX::ContextEnum /*context*/)
 {
+    return new MLVReaderPlugin(handle);
+}
+
+void loadPlugin()
+{
+    OFX::ofxsThreadSuiteCheck();
+
+    g_cldevices.clear();
     std::vector<cl::Platform> platforms;
-    std::vector<cl::Device> devices;
     cl::Platform::get(&platforms);
     for (size_t i=0; i < platforms.size(); i++){
         std::vector<cl::Device> platformDevices;
         platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
-        printf("Platform %d %s\n", i, platforms[i].getInfo<CL_PLATFORM_NAME>().c_str());
+        for (size_t i=0; i < platformDevices.size(); i++) {
+            g_cldevices.push_back(platformDevices[i]);
+        }
     }
-    return new MLVReaderPlugin(handle);
 }
 
 static MLVReaderPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);

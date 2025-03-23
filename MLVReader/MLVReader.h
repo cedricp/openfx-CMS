@@ -13,6 +13,8 @@
 
 #include <mlv_video.h>
 #include <dng_convert.h>
+#define CL_HPP_ENABLE_SIZE_T_COMPATIBILITY 1
+#include <CL/opencl.hpp>
 
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
@@ -49,6 +51,8 @@
 #define kDarkframefilename "darkframeFilename"
 #define kDarkFrameButon "darkFrameButton"
 #define kDarkframeRange "darkframeRange"
+#define kUseOpenCL "UseOpenCL"
+#define kOpenCLDevice "OpenCLDevice"
 #include <vector>
 
 
@@ -61,6 +65,9 @@ extern "C"
 {
     extern char FOCUSPIXELMAPFILE[256];
 }
+
+void loadPlugin();
+
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
 class MLVReaderPlugin: public OFX::ImageEffect
@@ -89,6 +96,8 @@ public:
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
+        _openCLDevices = fetchChoiceParam(kOpenCLDevice);
+        _useOpenCL = fetchBooleanParam(kUseOpenCL);
         _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -120,6 +129,8 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
 
+    bool setupOpenCL(std::string program);
+
 private:
     OfxMultiThreadSuiteV1 *_gThreadHost = 0;
     OfxMutexHandle _videoMutex;
@@ -139,6 +150,7 @@ private:
     OFX::ChoiceParam* _chromaSmooth;
     OFX::ChoiceParam* _dualIsoMode;
     OFX::ChoiceParam* _dualIsoAveragingMethod;
+    OFX::ChoiceParam* _openCLDevices;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
     OFX::Int2DParam* _darkframeRange;
@@ -146,12 +158,15 @@ private:
     OFX::BooleanParam* _fixFocusPixel;
     OFX::BooleanParam* _dualIsoFullresBlending;
     OFX::BooleanParam* _dualIsoAliasMap;
+    OFX::BooleanParam* _useOpenCL;
     std::string _pluginPath;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;
+    cl::Context _context;
+    cl::Program _program;
 };
 
-mDeclarePluginFactory(MLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+mDeclarePluginFactory(MLVReaderPluginFactory, { loadPlugin(); }, {});
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
