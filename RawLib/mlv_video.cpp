@@ -317,7 +317,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer)
+uint16_t* Mlv_video::get_unpacked_raw_buffer()
 {
 	return _imp->dng_object->image_buf_unpacked;
 }

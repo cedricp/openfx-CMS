@@ -32,7 +32,7 @@
 #include "MLVReader.h"
 #include "../utils.h" 
 
-#define CL_TESTING 1
+//#define CL_TESTING 1
 
 
 #define CLAMP(A, L, H) ((A) > (L) ? ((A) < (H) ? (A) : (H)) : (L))
@@ -215,10 +215,10 @@ void MLVReaderPlugin::renderCLTest(OFX::Image* dst, int width, int height)
     }
     clearPersistentMessage();
 
-    cl::Device device = g_cldevices[cl_dev];
-    cl::Image2D out(_context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    _current_cldevice = g_cldevices[cl_dev];
+    cl::Image2D out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
 
-    cl::Kernel kernel(_program, "test_pattern");
+    cl::Kernel kernel(_current_clprogram, "test_pattern");
     kernel.setArg(0, out);
 
     cl::Event timer;
@@ -226,7 +226,7 @@ void MLVReaderPlugin::renderCLTest(OFX::Image* dst, int width, int height)
     cl::array<size_t, 3> size = {(size_t)width, (size_t)height, 1};
     
     // Render
-    cl::CommandQueue queue = cl::CommandQueue(_context, device);
+    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
     queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height), cl::NullRange, NULL, &timer);
     timer.wait();
     queue.enqueueReadImage(out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
@@ -241,21 +241,22 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, float* buffer, int width, int he
         return;
     }
 
-    cl::Device& device = g_cldevices[cl_dev];
-    cl::Image2D img_in(_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_FLOAT), width, height, 0, buffer);
-    cl::Image2D img_out(_context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
-    cl::Image2D img_tmp(_context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    _current_cldevice = g_cldevices[cl_dev];
+    cl::Image2D img_in(_current_clcontext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_FLOAT), width, height, 0, buffer);
+    cl::Image2D img_out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_tmp(_current_clcontext, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
     
     cl::Event timer;
-    cl::CommandQueue queue = cl::CommandQueue(_context, device);
+    cl::NDRange offset( 0, 0, 0 );
+    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
     {
         // Process green channel
         opencl_local_buffer_t locopt
         = (opencl_local_buffer_t){  .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
                                     .cellsize = sizeof(float) * 1, .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
-        cl::Kernel kernel_demosaic_green(_program, "ppg_demosaic_green");
-        if (!opencl_local_buffer_opt(device, kernel_demosaic_green, &locopt)){
+        cl::Kernel kernel_demosaic_green(_current_clprogram, "ppg_demosaic_green");
+        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_green, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (green)"));
             return;
         }
@@ -270,7 +271,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, float* buffer, int width, int he
         kernel_demosaic_green.setArg(4, 0);
         kernel_demosaic_green.setArg(5, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
         
-        queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
+        queue.enqueueNDRangeKernel(kernel_demosaic_green, offset, sizes, local, NULL, &timer);
         timer.wait();
     }
 
@@ -280,8 +281,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, float* buffer, int width, int he
         = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
                                     .cellsize = 4 * sizeof(float), .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
-        cl::Kernel kernel_demosaic_redblue(_program, "ppg_demosaic_redblue");
-        if (!opencl_local_buffer_opt(device, kernel_demosaic_redblue, &locopt)){
+        cl::Kernel kernel_demosaic_redblue(_current_clprogram, "ppg_demosaic_redblue");
+        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_redblue, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
             return;
         }
@@ -298,7 +299,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, float* buffer, int width, int he
         kernel_demosaic_redblue.setArg(4, 0);
         kernel_demosaic_redblue.setArg(5, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
-        queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
+        queue.enqueueNDRangeKernel(kernel_demosaic_redblue, offset, sizes, local, NULL, &timer);
         timer.wait();
     }
 
@@ -364,7 +365,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
-        uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
+        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -380,20 +381,20 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         // Release MLV reader
         mlv_video->unlock();
     } else if (_useOpenCL->getValue()){
-        uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
+        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
         mlv_video->unlock();
         
-        float* fltbuff = (float*)malloc(sizeof(float)*width_img*height_img);
+        float* fltbuff = (float*)malloc(sizeof(float)*mlv_width*mlv_height);
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (y) * (mlv_width);
             float *dstPix = fltbuff + (y) * (mlv_width);
             for(int x=0; x < width_img; x++) {
-                float pixel_val = float(*srcPix++) / maxval;
-                *dstPix++ = pixel_val;
+                *dstPix++ = float(*srcPix++) / maxval;
             }
         }
         // Release MLV reader
-        renderCL(dst.get(), fltbuff, width_img, height_img);
+        //renderCL(dst.get(), fltbuff, width_img, height_img);
+        renderCLTest(dst.get(), mlv_width, mlv_height);
         free(fltbuff);
     } else {
         Mlv_video::RawInfo rawInfo;
@@ -596,19 +597,19 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
 {
     if (paramName == kMLVfileParamter)
     {
-        // std::string filename = _mlvfilename_param->getValue();
-        // std::string upperfn = filename;
-        // std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
-        // if (upperfn.find(".MLV") == std::string::npos){
-        //     setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
-        //     OFX::throwSuiteStatusException(kOfxStatFailed);
-        //     return;
-        // }
-        // clearPersistentMessage();
-        // if (filename != _mlvfilename){
-        //     setMlvFile(filename);
-        //     _mlvfilename = filename;
-        // }
+        std::string filename = _mlvfilename_param->getValue();
+        std::string upperfn = filename;
+        std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
+        if (upperfn.find(".MLV") == std::string::npos){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
+            OFX::throwSuiteStatusException(kOfxStatFailed);
+            return;
+        }
+        clearPersistentMessage();
+        if (filename != _mlvfilename){
+            setMlvFile(filename);
+            _mlvfilename = filename;
+        }
     }
 
     if (paramName == kCameraWhiteBalance){
@@ -663,7 +664,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kUseOpenCL || paramName == kOpenCLDevice){
         _openCLDevices->setEnabled(use_opencl);
         if (use_opencl){
-
+            setupOpenCL();
         }
     }
 }
@@ -689,29 +690,23 @@ bool MLVReaderPlugin::setupOpenCL()
     clearPersistentMessage();
 
     int cl_dev = _openCLDevices->getValue();
-    cl::Platform platform(g_cldevices[cl_dev].getInfo<CL_DEVICE_PLATFORM>());
-    cl_context_properties properties[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
-    _context = cl::Context(CL_DEVICE_TYPE_ALL, properties);
+    _current_cldevice = g_cldevices[cl_dev];
+
+    cl::Platform platform(_current_cldevice.getInfo<CL_DEVICE_PLATFORM>());
+    _current_clcontext = cl::Context(_current_cldevice);
 
     cl_int err;
-    _program = cl::Program(_context, programtext.str(), true, &err);
-    _program.build(g_cldevices, "-cl-fast-relaxed-math");
+    _current_clprogram = cl::Program(_current_clcontext, programtext.str(), true, &err);
     if (err != CL_SUCCESS){
-        std::string errlog = _program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(g_cldevices[cl_dev]);
+        std::string errlog = _current_clprogram.getBuildInfo<CL_PROGRAM_BUILD_LOG>(_current_cldevice);
         printf("OpenCL Error :\n%s\n", errlog.c_str());
         setPersistentMessage(OFX::Message::eMessageError, "", "Failed to create program");
         return false;
     }
-    std::string buildOptions;
 
-    std::vector<cl::Device> platformDevices = _context.getInfo<CL_CONTEXT_DEVICES>();
-    if(_program.build(platformDevices, buildOptions.c_str()) == CL_BUILD_PROGRAM_FAILURE){
-        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to build kernel, see terminal for log");
-        printf("OpenCL Error :\n%s\n", _program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(g_cldevices[cl_dev]));
-        return false;
-    }
+    clearPersistentMessage();
 
-    printf("OpenCL OK !\n");
+    printf("OpenCL OK!\n");
 
     return true;
 }

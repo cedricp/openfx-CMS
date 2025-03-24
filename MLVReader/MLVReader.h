@@ -166,8 +166,9 @@ private:
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;
-    cl::Context _context;
-    cl::Program _program;
+    cl::Device _current_cldevice;
+    cl::Context _current_clcontext;
+    cl::Program _current_clprogram;
 };
 
 mDeclarePluginFactory(MLVReaderPluginFactory, { loadPlugin(); }, {});
