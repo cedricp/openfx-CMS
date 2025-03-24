@@ -107,6 +107,7 @@ public:
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
+        setupOpenCL();
     }
 
     ~MLVReaderPlugin()
@@ -129,7 +130,9 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
 
-    bool setupOpenCL(std::string program);
+    bool setupOpenCL();
+    void renderCL(OFX::Image* destimg, float* buffer, int width, int height);
+    void renderCLTest(OFX::Image* destimg, int width, int height);
 
 private:
     OfxMultiThreadSuiteV1 *_gThreadHost = 0;
