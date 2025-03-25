@@ -49,6 +49,7 @@ public:
 	uint16_t* get_raw_image();
 	uint16_t* get_unpacked_raw_buffer();
 
+
 	uint32_t black_level();
 	uint32_t white_level();
 
@@ -57,6 +58,10 @@ public:
 
 	uint32_t raw_resolution_x();
 	uint32_t raw_resolution_y();
+
+	uint32_t raw_black_level();
+	uint32_t raw_white_level();
+
 	std::string camera_name();
 	std::string lens_name();
 	std::string lens_name_by_id();

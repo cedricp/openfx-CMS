@@ -79,10 +79,6 @@ typedef struct {
     /* Dark frame info */
     uint64_t dark_frame_offset;
 
-    /* Black and white level copy for resseting to the original */
-    uint16_t original_black_level;
-    uint16_t original_white_level;
-
     /* Video info */
     double      real_frame_rate; /* ...Because framerate is not explicitly stored in the file */
     double      frame_rate;      /* User may want to override it */

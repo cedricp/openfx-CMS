@@ -131,7 +131,7 @@ private:
     virtual bool isVideoStream(const std::string& filename){return true;};
 
     bool setupOpenCL();
-    void renderCL(OFX::Image* destimg, float* buffer, int width, int height);
+    void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
 
 private:

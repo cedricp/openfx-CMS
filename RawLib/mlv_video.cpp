@@ -229,6 +229,16 @@ uint32_t Mlv_video::raw_resolution_y()
 	return getMlvHeight(_imp->mlv_object);
 }
 
+uint32_t Mlv_video::raw_black_level()
+{
+	return _imp->mlv_object->RAWI.raw_info.black_level;
+}
+
+uint32_t Mlv_video::raw_white_level()
+{
+	return _imp->mlv_object->RAWI.raw_info.white_level;
+}
+
 float Mlv_video::fps()
 {
 	return getMlvFramerateOrig(_imp->mlv_object);
@@ -308,7 +318,6 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
 	} else {
 		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
-
 
 	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;

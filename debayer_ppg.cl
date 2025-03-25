@@ -59,7 +59,6 @@ test_pattern (write_only image2d_t out)
 
   color.x = x/w;
   color.y = y/h;
-  color.w = 1.0f;
 
   write_imagef (out, (int2)(x, y), color);
 }
@@ -70,7 +69,8 @@ test_pattern (write_only image2d_t out)
  */
 kernel void
 ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
-                    const unsigned int filters, local float *buffer)
+                    const unsigned int filters, const unsigned int black_level, const unsigned int white_level,
+                    local float *buffer)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -102,7 +102,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
     if(bufidx >= maxbuf) continue;
     const int xx = xul + bufidx % stride;
     const int yy = yul + bufidx / stride;
-    buffer[bufidx] = read_imagef(in, sampleri, (int2)(xx, yy)).x;
+    buffer[bufidx] = (float)(read_imageui(in, sampleri, (int2)(xx, yy)).x - black_level) / (float)(white_level - black_level);
   }
 
   // center buffer around current x,y-Pixel
@@ -175,7 +175,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
  */
 kernel void
 ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
-                      const unsigned int filters, local float4 *buffer)
+                      const unsigned int filters, float4 wbal, local float4 *buffer)
 {
   // image in contains full green and sparse r b
   const int x = get_global_id(0);
@@ -274,6 +274,12 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
       else color.x = (guess1 + guess2)*0.25f;
     }
   }
+
+  color.x *= wbal.r;
+  color.y *= wbal.g;
+  color.z *= wbal.b;
+  color.w = 1;
+
   write_imagef (out, (int2)(x, y), fmax(color, 0.0f));
 }
 
@@ -281,7 +287,9 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
  * Demosaic image border
  */
 kernel void
-border_interpolate(read_only image2d_t in, write_only image2d_t out, const int width, const int height, const unsigned int filters, const int border)
+border_interpolate(read_only image2d_t in, write_only image2d_t out,
+                   const int width, const int height, const unsigned int filters,
+                   const int border)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -301,7 +309,7 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out, const int w
     if (j>=0 && i>=0 && j<height && i<width)
     {
       const int f = FC(j,i,filters);
-      sum[f] += read_imagef(in, sampleri, (int2)(i, j)).x;
+      sum[f] += read_imageui(in, sampleri, (int2)(i, j)).x / 4096.0;
       count[f]++;
     }
   }
