@@ -102,7 +102,9 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
     if(bufidx >= maxbuf) continue;
     const int xx = xul + bufidx % stride;
     const int yy = yul + bufidx / stride;
-    buffer[bufidx] = (float)(read_imageui(in, sampleri, (int2)(xx, yy)).x - black_level) / (float)(white_level - black_level);
+    unsigned int val = read_imageui(in, sampleri, (int2)(xx, yy)).x;
+    if(val < black_level) val = black_level;
+    buffer[bufidx] = (float)(val - black_level) / (float)(white_level - black_level);
   }
 
   // center buffer around current x,y-Pixel
@@ -165,7 +167,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
       color.y = fmax(fmin(guessx*0.25f, M), m);
     }
   }
-  write_imagef (out, (int2)(x, y), fmax(color, 0.0f));
+  write_imagef (out, (int2)(x,y), fmax(color, 0.0f));
 }
 
 
@@ -175,7 +177,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
  */
 kernel void
 ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
-                      const unsigned int filters, float4 wbal, local float4 *buffer)
+                      const unsigned int filters, float wbalr, float wbalg, float wbalb, local float4 *buffer)
 {
   // image in contains full green and sparse r b
   const int x = get_global_id(0);
@@ -275,12 +277,12 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
     }
   }
 
-  color.x *= wbal.r;
-  color.y *= wbal.g;
-  color.z *= wbal.b;
+  color.x *= wbalr;
+  color.y *= wbalg;
+  color.z *= wbalb;
   color.w = 1;
 
-  write_imagef (out, (int2)(x, y), fmax(color, 0.0f));
+  write_imagef (out, (int2)(x,  height - 1 - y), fmax(color, 0.0f));
 }
 
 /**
@@ -289,7 +291,7 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
 kernel void
 border_interpolate(read_only image2d_t in, write_only image2d_t out,
                    const int width, const int height, const unsigned int filters,
-                   const int border)
+                   const int border, const unsigned int black_level, const unsigned int white_level)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -309,7 +311,9 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
     if (j>=0 && i>=0 && j<height && i<width)
     {
       const int f = FC(j,i,filters);
-      sum[f] += read_imageui(in, sampleri, (int2)(i, j)).x / 4096.0;
+      unsigned short val = read_imageui(in, sampleri, (int2)(i, j)).x;
+      if(val < black_level) val = black_level;
+      sum[f] += (float)(val - black_level) / (float)(white_level - black_level);
       count[f]++;
     }
   }

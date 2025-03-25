@@ -14,6 +14,8 @@
 #include <mlv_video.h>
 #include <dng_convert.h>
 #define CL_HPP_ENABLE_SIZE_T_COMPATIBILITY 1
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_TARGET_OPENCL_VERSION 120
 #include <CL/opencl.hpp>
 
 #define kPluginName "MLVReader"
@@ -59,7 +61,7 @@
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGBA)
 
 extern "C"
 {

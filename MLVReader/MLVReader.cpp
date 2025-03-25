@@ -270,7 +270,6 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     wbrgb[1] *= ratio;
     wbrgb[2] *= ratio;
 
-    wbrgb[0] = wbrgb[1]= wbrgb[2] = 1;
 
     int width = mlv_video->raw_resolution_x();
     int height = mlv_video->raw_resolution_y();
@@ -286,30 +285,32 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     cl::Event timer;
     cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
     uint32_t filter = 0x94949494;
-    {
-        // Process borders
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
-                                    .cellsize = 4 * sizeof(float), .overhead = 0,
-                                    .sizex = 1 << 8, .sizey = 1 << 8 };
-        cl::Kernel kernel_demosaic_border(_current_clprogram, "border_interpolate");
-        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_border, &locopt)){
-            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
-            return;
-        }
+    // {
+    //     // Process borders
+    //     opencl_local_buffer_t locopt
+    //     = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+    //                                 .cellsize = 4 * sizeof(float), .overhead = 0,
+    //                                 .sizex = 1 << 8, .sizey = 1 << 8 };
+    //     cl::Kernel kernel_demosaic_border(_current_clprogram, "border_interpolate");
+    //     if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_border, &locopt)){
+    //         setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
+    //         return;
+    //     }
 
-        kernel_demosaic_border.setArg(0, img_in);
-        kernel_demosaic_border.setArg(1, img_tmp);
-        kernel_demosaic_border.setArg(2, width);
-        kernel_demosaic_border.setArg(3, height);
-        kernel_demosaic_border.setArg(4, filter);
-        kernel_demosaic_border.setArg(5, 3);
+    //     kernel_demosaic_border.setArg(0, img_in);
+    //     kernel_demosaic_border.setArg(1, img_tmp);
+    //     kernel_demosaic_border.setArg(2, width);
+    //     kernel_demosaic_border.setArg(3, height);
+    //     kernel_demosaic_border.setArg(4, filter);
+    //     kernel_demosaic_border.setArg(5, 3);
+    //     kernel_demosaic_border.setArg(6, black_level);
+    //     kernel_demosaic_border.setArg(7, white_level);
 
-        cl::NDRange sizes(width, height);
+    //     cl::NDRange sizes(width, height);
         
-        queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
-        timer.wait();
-    }
+    //     queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
+    //     timer.wait();
+    // }
 
     {
         // Process green channel
@@ -359,8 +360,10 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_redblue.setArg(2, width);
         kernel_demosaic_redblue.setArg(3, height);
         kernel_demosaic_redblue.setArg(4, filter);
-        kernel_demosaic_redblue.setArg(5, sizeof(float)*4, wbrgb);
-        kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
+        kernel_demosaic_redblue.setArg(5, wbrgb[0]);
+        kernel_demosaic_redblue.setArg(6, wbrgb[1]);
+        kernel_demosaic_redblue.setArg(7, wbrgb[2]);
+        kernel_demosaic_redblue.setArg(8, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
         timer.wait();
