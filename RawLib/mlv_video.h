@@ -44,8 +44,9 @@ public:
 
 	mlv_wbal_hdr_t get_wb_object();
 
-	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size);
+	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer = false);
 	uint32_t get_dng_header_size();
+	void free_dng_buffer();
 	uint16_t* get_raw_image();
 	uint16_t* get_unpacked_raw_buffer();
 
@@ -65,6 +66,9 @@ public:
 	std::string camera_name();
 	std::string lens_name();
 	std::string lens_name_by_id();
+
+	int32_t* get_cameara_forward_matrix2();
+
 	int get_camid();
 	float focal_length();
 	float focal_dist();

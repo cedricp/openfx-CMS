@@ -2,8 +2,6 @@
 
 #include <cstdlib>
 #include "ofxsProcessing.H"
-#include "ofxsMacros.h"
-#include "ofxsGenerator.h"
 #include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
@@ -11,12 +9,12 @@
 #endif
 #include "ofxsThreadSuite.h"
 
+
 #include <mlv_video.h>
 #include <dng_convert.h>
-#define CL_HPP_ENABLE_SIZE_T_COMPATIBILITY 1
-#define CL_HPP_MINIMUM_OPENCL_VERSION 120
-#define CL_HPP_TARGET_OPENCL_VERSION 120
-#include <CL/opencl.hpp>
+#include <vector>
+
+#include "OpenCLBase.h"
 
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
@@ -53,10 +51,6 @@
 #define kDarkframefilename "darkframeFilename"
 #define kDarkFrameButon "darkFrameButton"
 #define kDarkframeRange "darkframeRange"
-#define kUseOpenCL "UseOpenCL"
-#define kOpenCLDevice "OpenCLDevice"
-#include <vector>
-
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -72,11 +66,11 @@ void loadPlugin();
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class MLVReaderPlugin: public OFX::ImageEffect
+class MLVReaderPlugin: public OpenCLBase
 {
 public:
     /** @brief ctor */
-    MLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
+    MLVReaderPlugin(OfxImageEffectHandle handle) : OpenCLBase(handle)
     {
         _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
         _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
@@ -98,8 +92,6 @@ public:
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
-        _openCLDevices = fetchChoiceParam(kOpenCLDevice);
-        _useOpenCL = fetchBooleanParam(kUseOpenCL);
         _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -108,8 +100,10 @@ public:
         }
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
+        std::string debayer_program = _pluginPath + "/Contents/Resources/debayer_ppg.cl";
+
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
-        setupOpenCL();
+        addProgram(debayer_program, "debayer_ppg");
     }
 
     ~MLVReaderPlugin()
@@ -132,7 +126,6 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
 
-    bool setupOpenCL();
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
 
@@ -155,7 +148,6 @@ private:
     OFX::ChoiceParam* _chromaSmooth;
     OFX::ChoiceParam* _dualIsoMode;
     OFX::ChoiceParam* _dualIsoAveragingMethod;
-    OFX::ChoiceParam* _openCLDevices;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
     OFX::Int2DParam* _darkframeRange;
@@ -163,16 +155,22 @@ private:
     OFX::BooleanParam* _fixFocusPixel;
     OFX::BooleanParam* _dualIsoFullresBlending;
     OFX::BooleanParam* _dualIsoAliasMap;
-    OFX::BooleanParam* _useOpenCL;
     std::string _pluginPath;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;
-    cl::Device _current_cldevice;
-    cl::Context _current_clcontext;
-    cl::Program _current_clprogram;
 };
 
-mDeclarePluginFactory(MLVReaderPluginFactory, { loadPlugin(); }, {});
+class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFactory> { 
+    public:
+    MLVReaderPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<MLVReaderPluginFactory>(id, verMaj, verMin)
+    {}
+        virtual void load() { loadPlugin(); } ;
+        virtual void unload() {} ;
+        virtual void describe(OFX::ImageEffectDescriptor &desc);
+        virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
+        virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
+     };
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
+

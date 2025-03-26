@@ -75,7 +75,8 @@ void get_white_balance(mlv_wbal_hdr_t wbal_hdr, int32_t *wbal, uint32_t cam_id);
 /* routines to initialize, save and free DNG exporting struct */
 dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, int32_t par[4]);
 int saveDngFrame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index, char * dng_filename);
-uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index);
+uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index, int init_only);
 void freeDngObject(dngObject_t * dng_data);
+void freeDngData(dngObject_t * dng_data);
 
 #endif

@@ -949,10 +949,14 @@ dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, i
 }
 
 /* get DNG file buffer */
-uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index)
+uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index, int init_only)
 {
     /* get filled dng_data struct */
     if(dng_get_frame(mlv_data, dng_data, frame_index) != 0)
+    {
+        return NULL;
+    }
+    if (init_only)
     {
         return NULL;
     }
@@ -1026,4 +1030,16 @@ void freeDngObject(dngObject_t * dng_data)
     if(dng_data->image_buf) free(dng_data->image_buf);
     if(dng_data->image_buf_unpacked) free(dng_data->image_buf_unpacked);
     free(dng_data);
+}
+
+/* free all buffers used for DNG creation */
+void freeDngData(dngObject_t * dng_data)
+{
+    if(dng_data->header_buf) free(dng_data->header_buf);
+    if(dng_data->image_buf) free(dng_data->image_buf);
+    if(dng_data->image_buf_unpacked) free(dng_data->image_buf_unpacked);
+
+    //dng_data->header_buf = NULL;
+    dng_data->image_buf = NULL;
+    dng_data->image_buf_unpacked = NULL;
 }

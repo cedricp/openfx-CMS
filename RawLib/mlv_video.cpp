@@ -4,6 +4,7 @@ extern "C"{
 	#include "dng/dng.h"
 	#include "llrawproc/llrawproc.h"
 	#include "audio_mlv.h"
+	#include <camid/camera_id.h>
 }
 #include <string.h>
 #include "mlv_video.h"
@@ -75,6 +76,11 @@ uint16_t* Mlv_video::get_raw_image()
 int Mlv_video::get_camid()
 {
 	return _imp->mlv_object->IDNT.cameraModel;
+}
+
+int32_t* Mlv_video::get_cameara_forward_matrix2()
+{
+	return camidGetForwardMatrix2(get_camid());
 }
 
 bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
@@ -211,6 +217,11 @@ Mlv_video::~Mlv_video()
 	delete _imp;
 }
 
+void Mlv_video::free_dng_buffer()
+{
+	freeDngData(_imp->dng_object);
+}
+
 void Mlv_video::write_audio(std::string path)
 {
 	mlvObject_t* mlv = _imp->mlv_object;
@@ -246,16 +257,15 @@ float Mlv_video::fps()
 
 uint32_t Mlv_video::black_level()
 {
-	return _imp->mlv_object->RAWI.raw_info.black_level;
+	return _imp->mlv_object->llrawproc->dng_black_level;
 }
 
 uint32_t Mlv_video::white_level()
 {
-	return _imp->mlv_object->RAWI.raw_info.white_level;
-
+	return _imp->mlv_object->llrawproc->dng_white_level;
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
 
@@ -319,8 +329,15 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
 		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
 
-	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
+	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame, no_buffer ? 1 : 0);
+	
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
+	
+	if (no_buffer){
+		dng_size = 0;
+		return nullptr;
+	}
+
 	dng_size = size;
 
 	return (uint16_t*)buffer;

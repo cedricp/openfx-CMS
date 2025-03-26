@@ -177,7 +177,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
  */
 kernel void
 ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
-                      const unsigned int filters, float wbalr, float wbalg, float wbalb, local float4 *buffer)
+                      const unsigned int filters, global float *cameraMatrix, local float4 *buffer)
 {
   // image in contains full green and sparse r b
   const int x = get_global_id(0);
@@ -277,9 +277,14 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
     }
   }
 
-  color.x *= wbalr;
-  color.y *= wbalg;
-  color.z *= wbalb;
+  color.x *= cameraMatrix[9];
+  color.y *= cameraMatrix[10];
+  color.z *= cameraMatrix[11];
+
+  color.x = cameraMatrix[0]*color.x + cameraMatrix[1]*color.y + cameraMatrix[2]*color.z;
+  color.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
+  color.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
+
   color.w = 1;
 
   write_imagef (out, (int2)(x,  height - 1 - y), fmax(color, 0.0f));
@@ -318,7 +323,12 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
     }
   }
 
-  const float i = read_imagef(in, sampleri, (int2)(x, y)).x;
+  //const float i = read_imagef(in, sampleri, (int2)(x, y)).x;
+  
+  unsigned int val = read_imageui(in, sampleri, (int2)(x, y)).x;
+  if(val < black_level) val = black_level;
+  const float i = (float)(val - black_level) / (float)(white_level - black_level);
+
   o.x = count[0] > 0 ? sum[0]/count[0] : i;
   o.y = count[1]+count[3] > 0 ? (sum[1]+sum[3])/(count[1]+count[3]) : i;
   o.z = count[2] > 0 ? sum[2]/count[2] : i;

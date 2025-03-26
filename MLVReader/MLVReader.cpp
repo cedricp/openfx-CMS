@@ -21,139 +21,22 @@
  * OFX ColorBars plugin.
  */
 
+#include "MLVReader.h"
+
 #include <cmath>
 #include <climits>
 #include <cfloat>
 #include <filesystem>
 #include <fstream>
 #include <stddef.h>
+#include "ofxOpenGLRender.h"
+#include "../utils.h" 
+
 extern "C"{
 #include <dng/dng.h>
 }
-#include "ofxOpenGLRender.h"
-#include "MLVReader.h"
-#include "../utils.h" 
-
-//#define CL_TESTING 1
-
-
-#define CLAMP(A, L, H) ((A) > (L) ? ((A) < (H) ? (A) : (H)) : (L))
-#define ROUNDUP(a, n) ((a) % (n) == 0 ? (a) : ((a) / (n)+1) * (n))
-
-typedef struct opencl_local_buffer_t
-{
-  const int xoffset;
-  const int xfactor;
-  const int yoffset;
-  const int yfactor;
-  const size_t cellsize;
-  const size_t overhead;
-  int sizex;  // initial value and final values after optimization
-  int sizey;  // initial value and final values after optimization
-} opencl_local_buffer_t;
-
-static int _nextpow2(const int n)
-{
-  int k = 1;
-  while(k < n)
-    k <<= 1;
-  return k;
-}
-
-int opencl_get_max_work_item_sizes(cl::Device dev,
-    std::vector<size_t>& sizes)
-{
-    int err;
-    sizes = dev.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>(&err);
-    return err;
-}
-
-int opencl_get_work_group_limits(cl::Device dev,
-    std::vector<size_t>& sizes,
-    size_t& workgroupsize,
-    unsigned long& localmemsize)
-{
-    cl_int err;
-
-    localmemsize = dev.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>(&err);
-
-    if(err != CL_SUCCESS) return err;
-
-    workgroupsize = dev.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>(&err);
-
-    if(err != CL_SUCCESS) return err;
-
-    return opencl_get_max_work_item_sizes(dev, sizes);
-}
-
-int opencl_get_kernel_work_group_size(cl::Device dev,
-    cl::Kernel ker,
-    size_t& kernelworkgroupsize)
-{
-    cl_int err;
-    kernelworkgroupsize = ker.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(dev, &err);
-    return err;
-}
-
-int opencl_local_buffer_opt(cl::Device dev,
-    cl::Kernel ker,
-    opencl_local_buffer_t *factors)
-{
-    std::vector<size_t> maxsizes(3);     // the maximum dimensions for a work group
-    size_t workgroupsize = 0;       // the maximum number of items in a work group
-    unsigned long localmemsize = 0; // the maximum amount of local memory we can use
-    size_t kernelworkgroupsize = 0; // the maximum amount of items in
-        // work group for this kernel
-
-    int *blocksizex = &factors->sizex;
-    int *blocksizey = &factors->sizey;
-
-    // initial values must be supplied in sizex and sizey.
-    // we make sure that these are a power of 2 and lie within reasonable limits.
-    *blocksizex = CLAMP(_nextpow2(*blocksizex), 1, 1 << 16);
-    *blocksizey = CLAMP(_nextpow2(*blocksizey), 1, 1 << 16);
-
-    if(opencl_get_work_group_limits(dev, maxsizes, workgroupsize, localmemsize) == CL_SUCCESS
-                                    && opencl_get_kernel_work_group_size
-                                    (dev, ker, kernelworkgroupsize) == CL_SUCCESS)
-    {
-        while(maxsizes[0] < *blocksizex
-            || maxsizes[1] < *blocksizey
-            || localmemsize < ((factors->xfactor * (*blocksizex) + factors->xoffset) *
-            (factors->yfactor * (*blocksizey) + factors->yoffset))
-            * factors->cellsize + factors->overhead
-            || workgroupsize < (size_t)(*blocksizex) * (*blocksizey)
-            || kernelworkgroupsize < (size_t)(*blocksizex) * (*blocksizey))
-        {
-            if(*blocksizex == 1 && *blocksizey == 1)
-            {
-            printf(
-            "[opencl_local_buffer_opt] no valid resource limits for curent device");
-            return FALSE;
-        }
-
-        if(*blocksizex > *blocksizey)
-        *blocksizex >>= 1;
-        else
-        *blocksizey >>= 1;
-        }
-    }
-    else
-    {
-        printf(
-        "can not identify"
-        " resource limits for current device");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
-
-static std::vector<cl::Device> g_cldevices;
 
 enum ColorSpaceFormat {
         ACES_AP0,
@@ -187,14 +70,6 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
-#ifdef CL_TESTING
-    rod.x1 = 0;
-    rod.x2 = 1920;
-    rod.y1 = 0;
-    rod.y2 = 1080;
-    return true;
-#endif
-
     if (_mlv_video.empty()){
         return false;
     }
@@ -208,42 +83,8 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     return true;
 }
 
-void MLVReaderPlugin::renderCLTest(OFX::Image* dst, int width, int height)
-{
-    int cl_dev = _openCLDevices->getValue();
-    if (cl_dev >= g_cldevices.size()){
-        setPersistentMessage(OFX::Message::eMessageError, "", std::string("Bad OpenCL device"));
-        return;
-    }
-    clearPersistentMessage();
-
-    _current_cldevice = g_cldevices[cl_dev];
-    cl::Image2D out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
-
-    cl::Kernel kernel(_current_clprogram, "test_pattern");
-    kernel.setArg(0, out);
-
-    cl::Event timer;
-    cl::array<size_t, 3> origin = {0,0,0};
-    cl::array<size_t, 3> size = {(size_t)width, (size_t)height, 1};
-    
-    // Render
-    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
-    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height), cl::NullRange, NULL, &timer);
-    timer.wait();
-    queue.enqueueReadImage(out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
-    queue.finish();
-}
-
 void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 {
-    int cl_dev = _openCLDevices->getValue();
-    if (cl_dev >= g_cldevices.size()){
-        setPersistentMessage(OFX::Message::eMessageError, "", std::string("Bad OpenCL device for rendering"));
-        return;
-    }
-
-
     Mlv_video::RawInfo rawInfo;
     int dng_size = 0;
     int camid = mlv_video->get_camid();
@@ -255,7 +96,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
     uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
     
     int32_t wbal[6];
@@ -266,9 +107,16 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
     float ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 
-    wbrgb[0] *= ratio;
-    wbrgb[1] *= ratio;
-    wbrgb[2] *= ratio;
+    int32_t* forward_matrix = mlv_video->get_cameara_forward_matrix2();
+    float cam_matrix[12];
+    for (int i = 0; i < 9; i++)
+    {
+        cam_matrix[i] = (float)forward_matrix[i*2] / 10000.f;
+    }
+
+    cam_matrix[9] = ratio * wbrgb[0];
+    cam_matrix[10] = ratio * wbrgb[1];
+    cam_matrix[11] = ratio * wbrgb[2];
 
 
     int width = mlv_video->raw_resolution_x();
@@ -277,40 +125,39 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t black_level = mlv_video->black_level();
     uint32_t white_level = mlv_video->white_level();
 
-    _current_cldevice = g_cldevices[cl_dev];
-    cl::Image2D img_in(_current_clcontext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
-    cl::Image2D img_out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
-    cl::Image2D img_tmp(_current_clcontext, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_in(get_cl_context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
+    cl::Image2D img_out(get_cl_context(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_tmp(get_cl_context(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
     
     cl::Event timer;
-    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
+    cl::CommandQueue queue = cl::CommandQueue(get_cl_context(), get_cl_device());
     uint32_t filter = 0x94949494;
-    // {
-    //     // Process borders
-    //     opencl_local_buffer_t locopt
-    //     = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
-    //                                 .cellsize = 4 * sizeof(float), .overhead = 0,
-    //                                 .sizex = 1 << 8, .sizey = 1 << 8 };
-    //     cl::Kernel kernel_demosaic_border(_current_clprogram, "border_interpolate");
-    //     if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_border, &locopt)){
-    //         setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
-    //         return;
-    //     }
+    {
+        // Process borders
+        opencl_local_buffer_t locopt
+        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+                                    .cellsize = 4 * sizeof(float), .overhead = 0,
+                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        cl::Kernel kernel_demosaic_border(getProgram("debayer_ppg"), "border_interpolate");
+        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_border, &locopt)){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
+            return;
+        }
 
-    //     kernel_demosaic_border.setArg(0, img_in);
-    //     kernel_demosaic_border.setArg(1, img_tmp);
-    //     kernel_demosaic_border.setArg(2, width);
-    //     kernel_demosaic_border.setArg(3, height);
-    //     kernel_demosaic_border.setArg(4, filter);
-    //     kernel_demosaic_border.setArg(5, 3);
-    //     kernel_demosaic_border.setArg(6, black_level);
-    //     kernel_demosaic_border.setArg(7, white_level);
+        kernel_demosaic_border.setArg(0, img_in);
+        kernel_demosaic_border.setArg(1, img_tmp);
+        kernel_demosaic_border.setArg(2, width);
+        kernel_demosaic_border.setArg(3, height);
+        kernel_demosaic_border.setArg(4, filter);
+        kernel_demosaic_border.setArg(5, 3);
+        kernel_demosaic_border.setArg(6, black_level);
+        kernel_demosaic_border.setArg(7, white_level);
 
-    //     cl::NDRange sizes(width, height);
+        cl::NDRange sizes(width, height);
         
-    //     queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
-    //     timer.wait();
-    // }
+        queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
+        timer.wait();
+    }
 
     {
         // Process green channel
@@ -318,8 +165,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         = (opencl_local_buffer_t){  .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
                                     .cellsize = sizeof(float) * 1, .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
-        cl::Kernel kernel_demosaic_green(_current_clprogram, "ppg_demosaic_green");
-        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_green, &locopt)){
+        cl::Kernel kernel_demosaic_green(getProgram("debayer_ppg"), "ppg_demosaic_green");
+        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_green, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (green)"));
             return;
         }
@@ -346,11 +193,15 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
                                     .cellsize = 4 * sizeof(float), .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
-        cl::Kernel kernel_demosaic_redblue(_current_clprogram, "ppg_demosaic_redblue");
-        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_redblue, &locopt)){
+        cl::Kernel kernel_demosaic_redblue(getProgram("debayer_ppg"), "ppg_demosaic_redblue");
+        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_redblue, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
             return;
         }
+
+        
+        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 12);
+        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 12, cam_matrix);
 
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
@@ -360,10 +211,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_redblue.setArg(2, width);
         kernel_demosaic_redblue.setArg(3, height);
         kernel_demosaic_redblue.setArg(4, filter);
-        kernel_demosaic_redblue.setArg(5, wbrgb[0]);
-        kernel_demosaic_redblue.setArg(6, wbrgb[1]);
-        kernel_demosaic_redblue.setArg(7, wbrgb[2]);
-        kernel_demosaic_redblue.setArg(8, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
+        kernel_demosaic_redblue.setArg(5, matrixbuffer);
+        kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
         timer.wait();
@@ -380,13 +229,6 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 // the overridden render function
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
-#ifdef CL_TESTING
-    {
-        OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
-        renderCLTest(dst.get(), 1920, 1080);
-        return;
-    }
-#endif
     Mlv_video *mlv_video = nullptr;
 
     {
@@ -447,20 +289,9 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         }
         // Release MLV reader
         mlv_video->unlock();
-    } else if (_useOpenCL->getValue()){
-        // float* fltbuff = (float*)malloc(sizeof(float)*mlv_width*mlv_height);
-        // for(int y=0; y < height_img; y++) {
-            //     uint16_t* srcPix = raw_buffer + (y) * (mlv_width);
-            //     float *dstPix = fltbuff + (y) * (mlv_width);
-            //     for(int x=0; x < width_img; x++) {
-            //         *dstPix++ = float(*srcPix++) / maxval;
-            //     }
-            // }
-            // Release MLV reader
+    } else if (getUseOpenCL()){
         renderCL(dst.get(), mlv_video, time);
         mlv_video->unlock();
-        //renderCLTest(dst.get(), mlv_width, mlv_height);
-        //free(fltbuff);
     } else {
         Mlv_video::RawInfo rawInfo;
         rawInfo.dual_iso_mode = _dualIsoMode->getValue();
@@ -481,6 +312,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
         if (dng_buffer == nullptr || dng_size == 0){
             OFX::throwSuiteStatusException(kOfxStatFailed);
+            return;
         }
 
         // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
@@ -598,20 +430,6 @@ void MLVReaderPlugin::setMlvFile(std::string file)
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-#ifdef CL_TESTING
-{
-    OfxRectI format;
-    format.x1 = 0;
-    format.x2 = 1920;
-    format.y1 = 0;
-    format.y2 = 1080;
-
-    double par = 1;
-    clipPreferences.setPixelAspectRatio(*_outputClip, par);
-    clipPreferences.setOutputFormat(format);
-    return;
-}
-#endif
     // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
 
@@ -725,55 +543,18 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         _gThreadHost->mutexUnLock(_videoMutex);
     }
 
-    bool use_opencl = _useOpenCL->getValue();
-    if (paramName == kUseOpenCL || paramName == kOpenCLDevice){
-        _openCLDevices->setEnabled(use_opencl);
-        if (use_opencl){
-            setupOpenCL();
-        }
-    }
-}
-
-bool MLVReaderPlugin::setupOpenCL()
-{
-    if (g_cldevices.empty()){
-        return false;
+    if (paramName == kDualIso){
+        bool enabled = _dualIsoMode->getValue() > 0;
+        _dualIsoAliasMap->setEnabled(enabled);
+        _dualIsoAveragingMethod->setEnabled(enabled);
+        _dualIsoFullresBlending->setEnabled(enabled);
     }
 
-    std::string programpath = getPluginFilePath() + "/Contents/Resources/debayer_ppg.cl";
-    std::ifstream programfile;
-    programfile.open(programpath.c_str());
-    std::ostringstream programtext;
-    programtext << programfile.rdbuf();
-    programfile.close();
-
-    if (programtext.str().empty()){
-        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to load OpenCL program");
-        return false;
+    if (OpenCLBase::changedParamCL(this, args, paramName))
+    {
+        _debayerType->setEnabled(getUseOpenCL() == false);
+        _highlightMode->setEnabled(getUseOpenCL() == false);
     }
-
-    clearPersistentMessage();
-
-    int cl_dev = _openCLDevices->getValue();
-    _current_cldevice = g_cldevices[cl_dev];
-
-    cl::Platform platform(_current_cldevice.getInfo<CL_DEVICE_PLATFORM>());
-    _current_clcontext = cl::Context(_current_cldevice);
-
-    cl_int err;
-    _current_clprogram = cl::Program(_current_clcontext, programtext.str(), true, &err);
-    if (err != CL_SUCCESS){
-        std::string errlog = _current_clprogram.getBuildInfo<CL_PROGRAM_BUILD_LOG>(_current_cldevice);
-        printf("OpenCL Error :\n%s\n", errlog.c_str());
-        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to create program");
-        return false;
-    }
-
-    clearPersistentMessage();
-
-    printf("OpenCL OK!\n");
-
-    return true;
 }
 
 void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
@@ -859,30 +640,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
     }
 
-    { 
-        OFX::BooleanParamDescriptor* param = desc.defineBooleanParam(kUseOpenCL);
-        param->setLabel("OpenCL acceleration");
-        param->setDefault(0);
-        if (page_debayer)
-        {
-            page_debayer->addChild(*param);
-        }
-    }
-
-    { 
-        // linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kOpenCLDevice);
-        param->setLabel("OpenCL device");
-        for (auto cldev : g_cldevices){
-            param->appendOption(cldev.getInfo<CL_DEVICE_NAME>(), "", cldev.getInfo<CL_DEVICE_NAME>());
-        }
-        param->setDefault(0);
-        param->setEnabled(false);
-        if (page_debayer)
-        {
-            page_debayer->addChild(*param);
-        }
-    }
+    OpenCLBase::describeInContextCL(desc, context, page_debayer);
 
     { 
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
@@ -1083,17 +841,6 @@ MLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
 void loadPlugin()
 {
     OFX::ofxsThreadSuiteCheck();
-
-    g_cldevices.clear();
-    std::vector<cl::Platform> platforms;
-    cl::Platform::get(&platforms);
-    for (size_t i=0; i < platforms.size(); i++){
-        std::vector<cl::Device> platformDevices;
-        platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
-        for (size_t i=0; i < platformDevices.size(); i++) {
-            g_cldevices.push_back(platformDevices[i]);
-        }
-    }
 }
 
 static MLVReaderPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
