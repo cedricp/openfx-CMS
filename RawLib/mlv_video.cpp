@@ -3,6 +3,7 @@ extern "C"{
 	#include "video_mlv.h"
 	#include "dng/dng.h"
 	#include "llrawproc/llrawproc.h"
+	#include "audio_mlv.h"
 }
 #include <string.h>
 #include "mlv_video.h"
@@ -49,8 +50,6 @@ Mlv_video::Mlv_video(std::string filename)
 	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
 
 	memcpy(&_imp->original_wbal, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t));
-	_rawinfo.crop_factor = crop_factor();
-	_rawinfo.focal_length = focal_length();
 }
 
 void* Mlv_video::get_mlv_object()
@@ -78,11 +77,11 @@ int Mlv_video::get_camid()
 	return _imp->mlv_object->IDNT.cameraModel;
 }
 
-bool Mlv_video::generate_darkframe(int frame_in, int frame_out)
+bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
 {
 
 	char error_message[256] = { 0 };
-	FILE* mlv_file = fopen(_rawinfo.darkframe_file.c_str(), "wb");
+	FILE* mlv_file = fopen(path, "wb");
 	mlvObject_t* video = _imp->mlv_object;
 
  	uint64_t* avg_buf = (uint64_t *)calloc( video->RAWI.xRes * video->RAWI.yRes * sizeof( uint64_t ), 1 );
@@ -212,6 +211,14 @@ Mlv_video::~Mlv_video()
 	delete _imp;
 }
 
+void Mlv_video::write_audio(std::string path)
+{
+	mlvObject_t* mlv = _imp->mlv_object;
+	const char* wave_path = path.c_str();
+	readMlvAudioData(mlv);
+	writeMlvAudioToWave(mlv, wave_path);
+}
+
 uint32_t Mlv_video::raw_resolution_x()
 {
 	return getMlvWidth(_imp->mlv_object);
@@ -220,6 +227,16 @@ uint32_t Mlv_video::raw_resolution_x()
 uint32_t Mlv_video::raw_resolution_y()
 {
 	return getMlvHeight(_imp->mlv_object);
+}
+
+uint32_t Mlv_video::raw_black_level()
+{
+	return _imp->mlv_object->RAWI.raw_info.black_level;
+}
+
+uint32_t Mlv_video::raw_white_level()
+{
+	return _imp->mlv_object->RAWI.raw_info.white_level;
 }
 
 float Mlv_video::fps()
@@ -238,7 +255,7 @@ uint32_t Mlv_video::white_level()
 
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
 
@@ -267,30 +284,30 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
         cs = 0;
     }
 
+	
+	llrpSetFixRawMode(&mlvob, 1);
+	llrpSetChromaSmoothMode(&mlvob, cs);
+	llrpResetDngBWLevels(&mlvob);
+
 	llrpSetDualIsoMode(&mlvob, ri.dual_iso_mode);
 	llrpSetDualIsoAliasMapMode(&mlvob, (int)ri.dualiso_aliasmap);
 	llrpSetDualIsoFullResBlendingMode(&mlvob, (int)ri.dualiso_fullres_blending);
 	llrpSetDualIsoInterpolationMethod(&mlvob, ri.dualisointerpolation);
 
-	llrpSetFixRawMode(&mlvob, 1);
-	llrpSetChromaSmoothMode(&mlvob, cs);
-	llrpResetDngBWLevels(&mlvob);
-
 	char error_msg[128];
-	if (_rawinfo.darkframe_enable){
+	if (ri.darkframe_enable){
 		llrpSetDarkFrameMode(&mlvob, 1);
-		if( llrpValidateExtDarkFrame(&mlvob, _rawinfo.darkframe_file.c_str(), error_msg) == 0 ){
-			llrpInitDarkFrameExtFileName(&mlvob, _rawinfo.darkframe_file.c_str());
-			_rawinfo.darkframe_ok = true;
-			_rawinfo.darkframe_error = error_msg;
+		if( llrpValidateExtDarkFrame(&mlvob, ri.darkframe_file.c_str(), error_msg) == 0 ){
+			llrpInitDarkFrameExtFileName(&mlvob, ri.darkframe_file.c_str());
+			ri.darkframe_ok = true;
+			ri.darkframe_error = error_msg;
 		} else {
-			_rawinfo.darkframe_ok = false;
-			_rawinfo.darkframe_error.clear();
-			printf("%s\n", error_msg);
+			ri.darkframe_ok = false;
+			ri.darkframe_error.clear();
 		}
 	} else {
 		llrpSetDarkFrameMode(&mlvob, 0);
-		_rawinfo.darkframe_error.clear();        
+		ri.darkframe_error.clear();        
 	}
 
 	if (ri.fix_focuspixels){
@@ -302,7 +319,6 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
 
-
 	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame);
 	size_t size = _imp->dng_object->image_size + _imp->dng_object->header_size;
 	dng_size = size;
@@ -310,12 +326,9 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::unpacked_raw_buffer(uint16_t* input_buffer, bool rgb)
+uint16_t* Mlv_video::get_unpacked_raw_buffer()
 {
-	int mul = rgb ? 3 : 1;
-	uint16_t* out = (uint16_t*)malloc(raw_resolution_x()*raw_resolution_y() * mul);
-	dng_unpack_image_bits(out, input_buffer, raw_resolution_x() * mul, raw_resolution_y(), bpp());
-	return out;
+	return _imp->dng_object->image_buf_unpacked;
 }
 
 std::string Mlv_video::camera_name()
@@ -413,3 +426,4 @@ int Mlv_video::sampling_factor_y()
 {
 	return _imp->mlv_object->RAWC.binning_y + _imp->mlv_object->RAWC.skipping_y;
 }
+

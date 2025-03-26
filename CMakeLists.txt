@@ -56,11 +56,13 @@ endif()
 
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
-#find_package(Ceres REQUIRED)
+find_package(OpenCL REQUIRED)
+
+message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
+message("Oencl lib dir: ${OpenCL_LIBRARIES}")
 
 set(LibRaw_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/include)
 set(LibRaw_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/lib/libraw.a)
-
 message("Using libRAW ${LibRaw_LIBRARIES}")
 
 add_subdirectory(RawLib)
@@ -78,13 +80,6 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 SET(OPENFX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/openfx)
 
-# Check that submodule have been initialized and updated
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/openfx/include)
-  message(FATAL_ERROR
-    "\n submodule(s) are missing, please update your repository:\n"
-    "  > git submodule update -i\n")
-endif()
-
 # C++ Include directories
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/SupportExt)
@@ -93,6 +88,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/RawLib/mlv-lib)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/include)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/include)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/Plugins/include)
+INCLUDE_DIRECTORIES(${OpenCL_INCLUDE_DIRS})
 
 # Define "DEBUG" on debug builds
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
@@ -148,6 +144,8 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
   "CMSMLVReader/net.sf.openfx.MLVReader.png"
+  "debayer_vng.cl"
+  "debayer_ppg.cl"
 )
 
 ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
@@ -171,7 +169,7 @@ set(TARGET_DEFS ${TARGET_DEFS} STDOUT_SILENT)
 endif()
 
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE ${TARGET_DEFS})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32) 
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html

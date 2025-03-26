@@ -193,7 +193,7 @@ void writeMlvAudioToWaveCut(mlvObject_t * video, char * path, uint32_t cut_in, u
 }
 
 /* Writes the MLV's audio in WAVE format to a given file path */
-void writeMlvAudioToWave(mlvObject_t * video, char * path)
+void writeMlvAudioToWave(mlvObject_t * video, const char * path)
 {
     if (!doesMlvHaveAudio(video)) return;
 

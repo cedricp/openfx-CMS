@@ -13,7 +13,7 @@ public:
 		bool dualiso_fullres_blending = false;
 		bool dualiso_aliasmap = false;
 		int dual_iso_mode = false;
-		int dualisointerpolation;
+		int dualisointerpolation = 0;
 		bool fix_focuspixels = true;
 		int32_t chroma_smooth = 0;
 		int32_t temperature = -1;
@@ -26,7 +26,6 @@ public:
 	};
 	mlv_imp* _imp = NULL;
 private:
-	RawInfo _rawinfo;
 	bool _valid = false;
 	bool _locked = false;
 
@@ -45,10 +44,11 @@ public:
 
 	mlv_wbal_hdr_t get_wb_object();
 
-	uint16_t* get_dng_buffer(uint32_t frame, const RawInfo& ri, int& dng_size);
+	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size);
 	uint32_t get_dng_header_size();
 	uint16_t* get_raw_image();
-	uint16_t* unpacked_raw_buffer(uint16_t* input_buffer, bool rgb = false);
+	uint16_t* get_unpacked_raw_buffer();
+
 
 	uint32_t black_level();
 	uint32_t white_level();
@@ -58,6 +58,10 @@ public:
 
 	uint32_t raw_resolution_x();
 	uint32_t raw_resolution_y();
+
+	uint32_t raw_black_level();
+	uint32_t raw_white_level();
+
 	std::string camera_name();
 	std::string lens_name();
 	std::string lens_name_by_id();
@@ -76,5 +80,6 @@ public:
 	int bpp();
 	void sensor_resolulion(int& x, int& y);
 
-	bool generate_darkframe(int in, int out);
+	bool generate_darkframe(const char* path, int in, int out);
+	void write_audio(std::string path);
 };
