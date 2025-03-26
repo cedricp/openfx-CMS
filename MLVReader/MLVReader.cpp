@@ -24,13 +24,136 @@
 #include <cmath>
 #include <climits>
 #include <cfloat>
-
+#include <filesystem>
+#include <fstream>
+#include <stddef.h>
+extern "C"{
+#include <dng/dng.h>
+}
 #include "ofxOpenGLRender.h"
 #include "MLVReader.h"
 #include "../utils.h" 
 
+//#define CL_TESTING 1
+
+
+#define CLAMP(A, L, H) ((A) > (L) ? ((A) < (H) ? (A) : (H)) : (L))
+#define ROUNDUP(a, n) ((a) % (n) == 0 ? (a) : ((a) / (n)+1) * (n))
+
+typedef struct opencl_local_buffer_t
+{
+  const int xoffset;
+  const int xfactor;
+  const int yoffset;
+  const int yfactor;
+  const size_t cellsize;
+  const size_t overhead;
+  int sizex;  // initial value and final values after optimization
+  int sizey;  // initial value and final values after optimization
+} opencl_local_buffer_t;
+
+static int _nextpow2(const int n)
+{
+  int k = 1;
+  while(k < n)
+    k <<= 1;
+  return k;
+}
+
+int opencl_get_max_work_item_sizes(cl::Device dev,
+    std::vector<size_t>& sizes)
+{
+    int err;
+    sizes = dev.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>(&err);
+    return err;
+}
+
+int opencl_get_work_group_limits(cl::Device dev,
+    std::vector<size_t>& sizes,
+    size_t& workgroupsize,
+    unsigned long& localmemsize)
+{
+    cl_int err;
+
+    localmemsize = dev.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>(&err);
+
+    if(err != CL_SUCCESS) return err;
+
+    workgroupsize = dev.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>(&err);
+
+    if(err != CL_SUCCESS) return err;
+
+    return opencl_get_max_work_item_sizes(dev, sizes);
+}
+
+int opencl_get_kernel_work_group_size(cl::Device dev,
+    cl::Kernel ker,
+    size_t& kernelworkgroupsize)
+{
+    cl_int err;
+    kernelworkgroupsize = ker.getWorkGroupInfo<CL_KERNEL_WORK_GROUP_SIZE>(dev, &err);
+    return err;
+}
+
+int opencl_local_buffer_opt(cl::Device dev,
+    cl::Kernel ker,
+    opencl_local_buffer_t *factors)
+{
+    std::vector<size_t> maxsizes(3);     // the maximum dimensions for a work group
+    size_t workgroupsize = 0;       // the maximum number of items in a work group
+    unsigned long localmemsize = 0; // the maximum amount of local memory we can use
+    size_t kernelworkgroupsize = 0; // the maximum amount of items in
+        // work group for this kernel
+
+    int *blocksizex = &factors->sizex;
+    int *blocksizey = &factors->sizey;
+
+    // initial values must be supplied in sizex and sizey.
+    // we make sure that these are a power of 2 and lie within reasonable limits.
+    *blocksizex = CLAMP(_nextpow2(*blocksizex), 1, 1 << 16);
+    *blocksizey = CLAMP(_nextpow2(*blocksizey), 1, 1 << 16);
+
+    if(opencl_get_work_group_limits(dev, maxsizes, workgroupsize, localmemsize) == CL_SUCCESS
+                                    && opencl_get_kernel_work_group_size
+                                    (dev, ker, kernelworkgroupsize) == CL_SUCCESS)
+    {
+        while(maxsizes[0] < *blocksizex
+            || maxsizes[1] < *blocksizey
+            || localmemsize < ((factors->xfactor * (*blocksizex) + factors->xoffset) *
+            (factors->yfactor * (*blocksizey) + factors->yoffset))
+            * factors->cellsize + factors->overhead
+            || workgroupsize < (size_t)(*blocksizex) * (*blocksizey)
+            || kernelworkgroupsize < (size_t)(*blocksizex) * (*blocksizey))
+        {
+            if(*blocksizex == 1 && *blocksizey == 1)
+            {
+            printf(
+            "[opencl_local_buffer_opt] no valid resource limits for curent device");
+            return FALSE;
+        }
+
+        if(*blocksizex > *blocksizey)
+        *blocksizex >>= 1;
+        else
+        *blocksizey >>= 1;
+        }
+    }
+    else
+    {
+        printf(
+        "can not identify"
+        " resource limits for current device");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
+
+static std::vector<cl::Device> g_cldevices;
 
 enum ColorSpaceFormat {
         ACES_AP0,
@@ -64,6 +187,14 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
+#ifdef CL_TESTING
+    rod.x1 = 0;
+    rod.x2 = 1920;
+    rod.y1 = 0;
+    rod.y2 = 1080;
+    return true;
+#endif
+
     if (_mlv_video.empty()){
         return false;
     }
@@ -77,9 +208,185 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     return true;
 }
 
+void MLVReaderPlugin::renderCLTest(OFX::Image* dst, int width, int height)
+{
+    int cl_dev = _openCLDevices->getValue();
+    if (cl_dev >= g_cldevices.size()){
+        setPersistentMessage(OFX::Message::eMessageError, "", std::string("Bad OpenCL device"));
+        return;
+    }
+    clearPersistentMessage();
+
+    _current_cldevice = g_cldevices[cl_dev];
+    cl::Image2D out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+
+    cl::Kernel kernel(_current_clprogram, "test_pattern");
+    kernel.setArg(0, out);
+
+    cl::Event timer;
+    cl::array<size_t, 3> origin = {0,0,0};
+    cl::array<size_t, 3> size = {(size_t)width, (size_t)height, 1};
+    
+    // Render
+    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
+    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height), cl::NullRange, NULL, &timer);
+    timer.wait();
+    queue.enqueueReadImage(out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
+    queue.finish();
+}
+
+void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
+{
+    int cl_dev = _openCLDevices->getValue();
+    if (cl_dev >= g_cldevices.size()){
+        setPersistentMessage(OFX::Message::eMessageError, "", std::string("Bad OpenCL device for rendering"));
+        return;
+    }
+
+
+    Mlv_video::RawInfo rawInfo;
+    int dng_size = 0;
+    int camid = mlv_video->get_camid();
+    rawInfo.dual_iso_mode = _dualIsoMode->getValue();
+    rawInfo.chroma_smooth = _chromaSmooth->getValue();
+    rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
+    rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
+    rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
+    rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
+    rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
+    rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
+    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+    
+    int32_t wbal[6];
+    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+    wbobj.wb_mode = WB_KELVIN;
+    wbobj.kelvin = _colorTemperature->getValue();
+    ::get_white_balance(wbobj, wbal, camid);
+    float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
+    float ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
+
+    wbrgb[0] *= ratio;
+    wbrgb[1] *= ratio;
+    wbrgb[2] *= ratio;
+
+
+    int width = mlv_video->raw_resolution_x();
+    int height = mlv_video->raw_resolution_y();
+
+    uint32_t black_level = mlv_video->black_level();
+    uint32_t white_level = mlv_video->white_level();
+
+    _current_cldevice = g_cldevices[cl_dev];
+    cl::Image2D img_in(_current_clcontext, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
+    cl::Image2D img_out(_current_clcontext, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_tmp(_current_clcontext, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    
+    cl::Event timer;
+    cl::CommandQueue queue = cl::CommandQueue(_current_clcontext, _current_cldevice);
+    uint32_t filter = 0x94949494;
+    // {
+    //     // Process borders
+    //     opencl_local_buffer_t locopt
+    //     = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+    //                                 .cellsize = 4 * sizeof(float), .overhead = 0,
+    //                                 .sizex = 1 << 8, .sizey = 1 << 8 };
+    //     cl::Kernel kernel_demosaic_border(_current_clprogram, "border_interpolate");
+    //     if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_border, &locopt)){
+    //         setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
+    //         return;
+    //     }
+
+    //     kernel_demosaic_border.setArg(0, img_in);
+    //     kernel_demosaic_border.setArg(1, img_tmp);
+    //     kernel_demosaic_border.setArg(2, width);
+    //     kernel_demosaic_border.setArg(3, height);
+    //     kernel_demosaic_border.setArg(4, filter);
+    //     kernel_demosaic_border.setArg(5, 3);
+    //     kernel_demosaic_border.setArg(6, black_level);
+    //     kernel_demosaic_border.setArg(7, white_level);
+
+    //     cl::NDRange sizes(width, height);
+        
+    //     queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
+    //     timer.wait();
+    // }
+
+    {
+        // Process green channel
+        opencl_local_buffer_t locopt
+        = (opencl_local_buffer_t){  .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
+                                    .cellsize = sizeof(float) * 1, .overhead = 0,
+                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        cl::Kernel kernel_demosaic_green(_current_clprogram, "ppg_demosaic_green");
+        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_green, &locopt)){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (green)"));
+            return;
+        }
+        
+        cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
+        cl::NDRange local( locopt.sizex, locopt.sizey );
+
+        kernel_demosaic_green.setArg(0, img_in);
+        kernel_demosaic_green.setArg(1, img_tmp);
+        kernel_demosaic_green.setArg(2, width);
+        kernel_demosaic_green.setArg(3, height);
+        kernel_demosaic_green.setArg(4, filter);
+        kernel_demosaic_green.setArg(5, black_level);
+        kernel_demosaic_green.setArg(6, white_level);
+        kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
+        
+        queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
+        timer.wait();
+    }
+
+    {
+        // Process red/blue channel
+        opencl_local_buffer_t locopt
+        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+                                    .cellsize = 4 * sizeof(float), .overhead = 0,
+                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        cl::Kernel kernel_demosaic_redblue(_current_clprogram, "ppg_demosaic_redblue");
+        if (!opencl_local_buffer_opt(_current_cldevice, kernel_demosaic_redblue, &locopt)){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
+            return;
+        }
+
+        cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
+        cl::NDRange local( locopt.sizex, locopt.sizey );
+
+        kernel_demosaic_redblue.setArg(0, img_tmp);
+        kernel_demosaic_redblue.setArg(1, img_out);
+        kernel_demosaic_redblue.setArg(2, width);
+        kernel_demosaic_redblue.setArg(3, height);
+        kernel_demosaic_redblue.setArg(4, filter);
+        kernel_demosaic_redblue.setArg(5, wbrgb[0]);
+        kernel_demosaic_redblue.setArg(6, wbrgb[1]);
+        kernel_demosaic_redblue.setArg(7, wbrgb[2]);
+        kernel_demosaic_redblue.setArg(8, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
+        
+        queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
+        timer.wait();
+    }
+    clearPersistentMessage();
+
+    // Fetch result from GPU
+    cl::array<size_t, 3> origin = {0,0,0};
+    cl::array<size_t, 3> size = {(size_t)width, (size_t)height, 1};
+    queue.enqueueReadImage(img_out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
+    queue.finish();
+}
+
 // the overridden render function
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
+#ifdef CL_TESTING
+    {
+        OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
+        renderCLTest(dst.get(), 1920, 1080);
+        return;
+    }
+#endif
     Mlv_video *mlv_video = nullptr;
 
     {
@@ -99,30 +406,11 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         return;
     }
     
+    const int time = floor(args.time+0.5);
     
     bool cam_wb = _cameraWhiteBalance->getValue();
-    const int time = floor(args.time+0.5);
     int dng_size = 0;
 
-    Mlv_video::RawInfo rawInfo;
-    rawInfo.dual_iso_mode = _dualIsoMode->getValue();
-    rawInfo.chroma_smooth = _chromaSmooth->getValue();
-    rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
-    rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
-    rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
-    rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
-    rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
-    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
-
-    int mlv_width = mlv_video->raw_resolution_x();
-    int mlv_height = mlv_video->raw_resolution_y();
-    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
-    int camid = mlv_video->get_camid();
-
-    if (dng_buffer == nullptr || dng_size == 0){
-        OFX::throwSuiteStatusException(kOfxStatFailed);
-    }
-    
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
     assert(OFX_COMPONENTS_OK(dstComponents));
@@ -135,13 +423,16 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     float maxval = _maxValue;
+    int mlv_width = mlv_video->raw_resolution_x();
+    int mlv_height = mlv_video->raw_resolution_y();
 
     OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
     int width_img = (int)(rodd.x2 - rodd.x1);
     int height_img = (int)(rodd.y2 - rodd.y1);
 
     if (_debayerType->getValue() == 0){
-        uint16_t* raw_buffer = mlv_video->unpacked_raw_buffer(mlv_video->get_raw_image());
+        // Extract raw buffer - No processing (debug)
+        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -151,17 +442,46 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
+                *dstPix++ = 1.f;
             }
         }
-
-        free(raw_buffer);
-        free(dng_buffer);
-
         // Release MLV reader
         mlv_video->unlock();
+    } else if (_useOpenCL->getValue()){
+        // float* fltbuff = (float*)malloc(sizeof(float)*mlv_width*mlv_height);
+        // for(int y=0; y < height_img; y++) {
+            //     uint16_t* srcPix = raw_buffer + (y) * (mlv_width);
+            //     float *dstPix = fltbuff + (y) * (mlv_width);
+            //     for(int x=0; x < width_img; x++) {
+            //         *dstPix++ = float(*srcPix++) / maxval;
+            //     }
+            // }
+            // Release MLV reader
+        renderCL(dst.get(), mlv_video, time);
+        mlv_video->unlock();
+        //renderCLTest(dst.get(), mlv_width, mlv_height);
+        //free(fltbuff);
     } else {
+        Mlv_video::RawInfo rawInfo;
+        rawInfo.dual_iso_mode = _dualIsoMode->getValue();
+        rawInfo.chroma_smooth = _chromaSmooth->getValue();
+        rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
+        rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
+        rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
+        rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
+        rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
+        rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
+        rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
+        uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+
+        mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+        int camid = mlv_video->get_camid();
         // Release MLV reader
         mlv_video->unlock();
+
+        if (dng_buffer == nullptr || dng_size == 0){
+            OFX::throwSuiteStatusException(kOfxStatFailed);
+        }
 
         // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
         int colorspace = _colorSpaceFormat->getValue();
@@ -177,6 +497,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
         // Get raw buffer in XYZ-D50 colorspace
         uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
+        free(dng_buffer);
 
         // Compute colorspace matrix and adjust white balance parameters
         float idt_matrix[9] = {0};
@@ -194,7 +515,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
         }
 
-        free(dng_buffer);
 
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
@@ -210,8 +530,9 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                     dstPix[0]=in[0];
                     dstPix[1]=in[1];
                     dstPix[2]=in[2];
+                    dstPix[3]=1.f;
                 }
-                dstPix+=3;
+                dstPix+=4;
             }
         }
     }
@@ -222,6 +543,7 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
 
     if (_mlv_video.empty()){
+        _gThreadHost->mutexUnLock(_videoMutex);
         return false;
     }
 
@@ -276,6 +598,20 @@ void MLVReaderPlugin::setMlvFile(std::string file)
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+#ifdef CL_TESTING
+{
+    OfxRectI format;
+    format.x1 = 0;
+    format.x2 = 1920;
+    format.y1 = 0;
+    format.y2 = 1080;
+
+    double par = 1;
+    clipPreferences.setPixelAspectRatio(*_outputClip, par);
+    clipPreferences.setOutputFormat(format);
+    return;
+}
+#endif
     // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
 
@@ -289,7 +625,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     format.y1 = 0;
     format.y2 = _mlv_video[0]->raw_resolution_y();
 
-    double par = 1.;
+    double par = 1;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
 
@@ -327,6 +663,14 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kMLVfileParamter)
     {
         std::string filename = _mlvfilename_param->getValue();
+        std::string upperfn = filename;
+        std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
+        if (upperfn.find(".MLV") == std::string::npos){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
+            OFX::throwSuiteStatusException(kOfxStatFailed);
+            return;
+        }
+        clearPersistentMessage();
         if (filename != _mlvfilename){
             setMlvFile(filename);
             _mlvfilename = filename;
@@ -343,6 +687,93 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         _dualIsoAveragingMethod->setEnabled(enabled);
         _dualIsoFullresBlending->setEnabled(enabled);
     }
+
+    if (paramName == kAudioExport){
+        std::string filename = _mlv_audiofilename->getValue();
+        if (filename.empty()) return;
+        if (_mlv_video.empty()) return;
+        
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        Mlv_video  *mlv_video = nullptr;
+        for(Mlv_video *mlv: _mlv_video){
+            if (!mlv->locked()){
+                mlv_video = mlv;
+                break;
+            }
+        }
+        if (mlv_video) mlv_video->write_audio(filename);
+        _gThreadHost->mutexUnLock(_videoMutex);
+    }
+
+    if (paramName == kDarkFrameButon){
+        int sf = _darkframeRange->getValue().x;
+        int ef = _darkframeRange->getValue().y;
+        if (sf >= ef) return;
+        std::string filename = _mlv_darkframefilename->getValue();
+        if (filename.empty()) return;
+        if (_mlv_video.empty()) return;
+        
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        Mlv_video  *mlv_video = nullptr;
+        for(Mlv_video *mlv: _mlv_video){
+            if (!mlv->locked()){
+                mlv_video = mlv;
+                break;
+            }
+        }
+        if (mlv_video) mlv_video->generate_darkframe(filename.c_str(), sf, ef);
+        _gThreadHost->mutexUnLock(_videoMutex);
+    }
+
+    bool use_opencl = _useOpenCL->getValue();
+    if (paramName == kUseOpenCL || paramName == kOpenCLDevice){
+        _openCLDevices->setEnabled(use_opencl);
+        if (use_opencl){
+            setupOpenCL();
+        }
+    }
+}
+
+bool MLVReaderPlugin::setupOpenCL()
+{
+    if (g_cldevices.empty()){
+        return false;
+    }
+
+    std::string programpath = getPluginFilePath() + "/Contents/Resources/debayer_ppg.cl";
+    std::ifstream programfile;
+    programfile.open(programpath.c_str());
+    std::ostringstream programtext;
+    programtext << programfile.rdbuf();
+    programfile.close();
+
+    if (programtext.str().empty()){
+        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to load OpenCL program");
+        return false;
+    }
+
+    clearPersistentMessage();
+
+    int cl_dev = _openCLDevices->getValue();
+    _current_cldevice = g_cldevices[cl_dev];
+
+    cl::Platform platform(_current_cldevice.getInfo<CL_DEVICE_PLATFORM>());
+    _current_clcontext = cl::Context(_current_cldevice);
+
+    cl_int err;
+    _current_clprogram = cl::Program(_current_clcontext, programtext.str(), true, &err);
+    if (err != CL_SUCCESS){
+        std::string errlog = _current_clprogram.getBuildInfo<CL_PROGRAM_BUILD_LOG>(_current_cldevice);
+        printf("OpenCL Error :\n%s\n", errlog.c_str());
+        setPersistentMessage(OFX::Message::eMessageError, "", "Failed to create program");
+        return false;
+    }
+
+    clearPersistentMessage();
+
+    printf("OpenCL OK!\n");
+
+    return true;
 }
 
 void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
@@ -356,15 +787,16 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     srcClip->setOptional(true);
 
     OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
-    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     dstClip->setSupportsTiles(kSupportsTiles);
 
     // Create pages
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
     OFX::PageParamDescriptor *page_raw = desc.definePageParam("Raw processing");
-    OFX::PageParamDescriptor *page_dualiso = desc.definePageParam("Dual iso");
     OFX::PageParamDescriptor *page_debayer = desc.definePageParam("Debayering");
     OFX::PageParamDescriptor *page_colors = desc.definePageParam("Colors");
+    OFX::PageParamDescriptor *page_dualiso = desc.definePageParam("Dual iso");
+    OFX::PageParamDescriptor *page_audio = desc.definePageParam("Audio");
 
     // Create parameters
     {
@@ -421,6 +853,31 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         //param->appendOption("DHT", "", "dht");
         //param->appendOption("Modifier AHD", "", "mahd");
         param->setDefault(1);
+        if (page_debayer)
+        {
+            page_debayer->addChild(*param);
+        }
+    }
+
+    { 
+        OFX::BooleanParamDescriptor* param = desc.defineBooleanParam(kUseOpenCL);
+        param->setLabel("OpenCL acceleration");
+        param->setDefault(0);
+        if (page_debayer)
+        {
+            page_debayer->addChild(*param);
+        }
+    }
+
+    { 
+        // linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+        OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kOpenCLDevice);
+        param->setLabel("OpenCL device");
+        for (auto cldev : g_cldevices){
+            param->appendOption(cldev.getInfo<CL_DEVICE_NAME>(), "", cldev.getInfo<CL_DEVICE_NAME>());
+        }
+        param->setDefault(0);
+        param->setEnabled(false);
         if (page_debayer)
         {
             page_debayer->addChild(*param);
@@ -558,6 +1015,62 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
             page_dualiso->addChild(*param);
         }
     }
+
+    {
+        OFX::StringParamDescriptor *param = desc.defineStringParam(kAudioFilename);
+        param->setLabel("Audio Filename");
+        param->setHint("Name of the output audio .wav file");
+        param->setDefault("audio.wav");
+        param->setFilePathExists(true);
+        param->setStringType(OFX::eStringTypeFilePath);
+        if (page_audio)
+        {
+            page_audio->addChild(*param);
+        }
+    }
+
+    {
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kAudioExport);
+        param->setLabel("Export...");
+        param->setHint("Export audio file");
+        if (page_audio)
+        {
+            page_audio->addChild(*param);
+        }
+    }
+
+    {
+        OFX::StringParamDescriptor *param = desc.defineStringParam(kDarkframefilename);
+        param->setLabel("Darkframe Filename");
+        param->setHint("Name of the .mlv darkframe file");
+        param->setDefault("darkframe.mlv");
+        param->setFilePathExists(true);
+        param->setStringType(OFX::eStringTypeFilePath);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+    
+    {
+        OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kDarkframeRange);
+        param->setLabel("Darkframe frame range");
+        param->setHint("Darkframe export frame range");
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+    
+    {
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kDarkFrameButon);
+        param->setLabel("Generate darkframe");
+        param->setHint("Lauch darkframe generation");
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
 }
 
 OFX::ImageEffect *
@@ -565,6 +1078,22 @@ MLVReaderPluginFactory::createInstance(OfxImageEffectHandle handle,
     OFX::ContextEnum /*context*/)
 {
     return new MLVReaderPlugin(handle);
+}
+
+void loadPlugin()
+{
+    OFX::ofxsThreadSuiteCheck();
+
+    g_cldevices.clear();
+    std::vector<cl::Platform> platforms;
+    cl::Platform::get(&platforms);
+    for (size_t i=0; i < platforms.size(); i++){
+        std::vector<cl::Device> platformDevices;
+        platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &platformDevices);
+        for (size_t i=0; i < platformDevices.size(); i++) {
+            g_cldevices.push_back(platformDevices[i]);
+        }
+    }
 }
 
 static MLVReaderPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);

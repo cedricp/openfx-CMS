@@ -13,6 +13,10 @@
 
 #include <mlv_video.h>
 #include <dng_convert.h>
+#define CL_HPP_ENABLE_SIZE_T_COMPATIBILITY 1
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#include <CL/opencl.hpp>
 
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
@@ -44,18 +48,28 @@
 #define kDualIsoAliasMap "dualIsoAliasMap"
 #define kDualIsoFullresBlending "dualIsoFullResBlending"
 #define kDualIsoAveragingMethod "dualIsoAveragingMethod"
+#define kAudioFilename "audioFilename"
+#define kAudioExport "audioExport"
+#define kDarkframefilename "darkframeFilename"
+#define kDarkFrameButon "darkFrameButton"
+#define kDarkframeRange "darkframeRange"
+#define kUseOpenCL "UseOpenCL"
+#define kOpenCLDevice "OpenCLDevice"
 #include <vector>
 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGBA)
 
 extern "C"
 {
     extern char FOCUSPIXELMAPFILE[256];
 }
+
+void loadPlugin();
+
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
 class MLVReaderPlugin: public OFX::ImageEffect
@@ -64,7 +78,12 @@ public:
     /** @brief ctor */
     MLVReaderPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
+        _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
+        _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
+        _darkframeRange = fetchInt2DParam(kDarkframeRange);
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
+        _mlv_audiofilename = fetchStringParam(kAudioFilename);
+        _audioExportButton = fetchPushButtonParam(kAudioExport);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
@@ -79,6 +98,8 @@ public:
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
+        _openCLDevices = fetchChoiceParam(kOpenCLDevice);
+        _useOpenCL = fetchBooleanParam(kUseOpenCL);
         _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -88,7 +109,7 @@ public:
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
-        //pthread_mutex_init(&_mlv_mutex, NULL);
+        setupOpenCL();
     }
 
     ~MLVReaderPlugin()
@@ -98,7 +119,6 @@ public:
                 delete mlv;
             }
         }
-        //pthread_mutex_destroy(&_mlv_mutex);
         _gThreadHost->mutexDestroy(_videoMutex);
     }
 
@@ -112,15 +132,22 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
 
+    bool setupOpenCL();
+    void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
+    void renderCLTest(OFX::Image* destimg, int width, int height);
+
 private:
     OfxMultiThreadSuiteV1 *_gThreadHost = 0;
     OfxMutexHandle _videoMutex;
-    //pthread_mutex_t _mlv_mutex;
 
     unsigned int _numThreads;
     OFX::Clip* _outputClip;
     std::string _mlvfilename;
     OFX::StringParam* _mlvfilename_param;
+    OFX::StringParam* _mlv_audiofilename;
+    OFX::StringParam* _mlv_darkframefilename;
+    OFX::PushButtonParam* _audioExportButton;
+    OFX::PushButtonParam* _darkFrameButton;
     OFX::DoubleParam* _mlv_fps;
     OFX::ChoiceParam* _colorSpaceFormat;
     OFX::ChoiceParam* _debayerType;
@@ -128,18 +155,24 @@ private:
     OFX::ChoiceParam* _chromaSmooth;
     OFX::ChoiceParam* _dualIsoMode;
     OFX::ChoiceParam* _dualIsoAveragingMethod;
+    OFX::ChoiceParam* _openCLDevices;
     OFX::IntParam* _colorTemperature;
     OFX::Int2DParam* _timeRange;
+    OFX::Int2DParam* _darkframeRange;
     OFX::BooleanParam* _cameraWhiteBalance;
     OFX::BooleanParam* _fixFocusPixel;
     OFX::BooleanParam* _dualIsoFullresBlending;
     OFX::BooleanParam* _dualIsoAliasMap;
+    OFX::BooleanParam* _useOpenCL;
     std::string _pluginPath;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;
+    cl::Device _current_cldevice;
+    cl::Context _current_clcontext;
+    cl::Program _current_clprogram;
 };
 
-mDeclarePluginFactory(MLVReaderPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+mDeclarePluginFactory(MLVReaderPluginFactory, { loadPlugin(); }, {});
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
