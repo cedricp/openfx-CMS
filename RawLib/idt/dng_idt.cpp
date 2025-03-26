@@ -449,8 +449,6 @@ vector < T > uvToXYZ ( const vector < T > &uv )
 
 
 DNGIdt::DNGIdt() {
-	_cameraCalibration1DNG = vector < double > ( 9, 1.0 );
-	_cameraCalibration2DNG = vector < double > ( 9, 1.0 );
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
@@ -462,8 +460,6 @@ DNGIdt::DNGIdt() {
 }
 
 DNGIdt::DNGIdt ( libraw_rawdata_t* R ) {
-	_cameraCalibration1DNG = vector < double > ( 9, 1.0 );
-	_cameraCalibration2DNG = vector < double > ( 9, 1.0 );
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
@@ -484,8 +480,31 @@ DNGIdt::DNGIdt ( libraw_rawdata_t* R ) {
 	FORIJ ( 3, 3 ) {
 		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( R->color.dng_color[0].colormatrix[i][j] );
 		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( R->color.dng_color[1].colormatrix[i][j] );
-		_cameraCalibration1DNG[i*3+j] = static_cast < double > ( R->color.dng_color[0].calibration[i][j] );
-		_cameraCalibration2DNG[i*3+j] = static_cast < double > ( R->color.dng_color[1].calibration[i][j] );
+	}
+}
+
+DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
+    float matrix1[9], matrix2[9];
+    mlv->get_camera_forward_matrix1f(matrix1);
+    mlv->get_camera_forward_matrix2f(matrix2);
+
+	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
+	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
+	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
+	_analogBalanceDNG      = vector < double > ( 3, 1.0 );
+	_neutralRGBDNG         = vector < double > ( 3, 1.0 );
+	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
+	_calibrateIllum        = vector < double > ( 2, 1.0 );
+
+    _baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
+	_calibrateIllum[0] = static_cast < double > ( 17 ); // 2856K    
+	_calibrateIllum[1] = static_cast < double > ( 21 ); // 6500K
+
+    FORI ( 3 ) _neutralRGBDNG[i] = 1.0 / static_cast < double > ( wbal[i] );
+    
+    FORI ( 9 ) {
+		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( matrix1[i] );
+		_xyz2rgbMatrix2DNG[i] = static_cast < double > ( matrix2[i] );
 	}
 }
 

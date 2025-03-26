@@ -67,7 +67,9 @@ public:
 	std::string lens_name();
 	std::string lens_name_by_id();
 
-	int32_t* get_cameara_forward_matrix2();
+	int32_t* get_camera_forward_matrix2();
+	void get_camera_forward_matrix2f(float matrix[9]);
+	void get_camera_forward_matrix1f(float matrix[9]);
 
 	int get_camid();
 	float focal_length();

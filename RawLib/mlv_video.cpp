@@ -78,10 +78,27 @@ int Mlv_video::get_camid()
 	return _imp->mlv_object->IDNT.cameraModel;
 }
 
-int32_t* Mlv_video::get_cameara_forward_matrix2()
+int32_t* Mlv_video::get_camera_forward_matrix2()
 {
 	return camidGetForwardMatrix2(get_camid());
 }
+
+void Mlv_video::get_camera_forward_matrix2f(float matrix[9])
+{
+	int32_t* matrixi = camidGetForwardMatrix2(get_camid());
+	for (int i = 0; i < 9; i++){
+		matrix[i] = (float)matrixi[i*2] / 10000.f;
+	}
+}
+
+void Mlv_video::get_camera_forward_matrix1f(float matrix[9])
+{
+	int32_t* matrixi = camidGetForwardMatrix1(get_camid());
+	for (int i = 0; i < 9; i++){
+		matrix[i] = (float)matrixi[i*2] / 10000.f;
+	}
+}
+
 
 bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
 {

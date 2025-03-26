@@ -22,6 +22,9 @@
  */
 
 #include "MLVReader.h"
+#define IDT_NOGNG
+#include <RawLib/idt/dng_idt.h>
+#undef IDT_NOGNG
 
 #include <cmath>
 #include <climits>
@@ -83,6 +86,77 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     return true;
 }
 
+// the overridden render function
+void MLVReaderPlugin::render(const OFX::RenderArguments &args)
+{
+    Mlv_video *mlv_video = nullptr;
+
+    {
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        for (int i = 0; i < _mlv_video.size(); ++i){
+            if (!_mlv_video[i]->locked()){
+                mlv_video = _mlv_video[i];
+                _mlv_video[i]->lock();
+                break;
+            }
+        }
+        _gThreadHost->mutexUnLock(_videoMutex);
+    }
+
+    if (mlv_video == nullptr){
+        OFX::throwSuiteStatusException(kOfxStatFailed);
+        return;
+    }
+    
+    const int time = floor(args.time+0.5);
+    
+    bool cam_wb = _cameraWhiteBalance->getValue();
+    int dng_size = 0;
+
+    OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
+    OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
+    assert(OFX_COMPONENTS_OK(dstComponents));
+
+    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
+
+    if (!dst)
+    {
+        OFX::throwSuiteStatusException(kOfxStatFailed);
+    }
+
+    float maxval = _maxValue;
+    int mlv_width = mlv_video->raw_resolution_x();
+    int mlv_height = mlv_video->raw_resolution_y();
+
+    OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
+    int width_img = (int)(rodd.x2 - rodd.x1);
+    int height_img = (int)(rodd.y2 - rodd.y1);
+
+    if (_debayerType->getValue() == 0){
+        // Extract raw buffer - No processing (debug)
+        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+    
+        for(int y=0; y < height_img; y++) {
+            uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
+            float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
+            for(int x=0; x < width_img; x++) {
+                float pixel_val = float(*srcPix++) / maxval;
+                *dstPix++ = pixel_val;
+                *dstPix++ = pixel_val;
+                *dstPix++ = pixel_val;
+                *dstPix++ = 1.f;
+            }
+        }
+        // Release MLV reader
+        mlv_video->unlock();
+    } else if (getUseOpenCL()){
+        renderCL(dst.get(), mlv_video, time);
+        mlv_video->unlock();
+    } else {
+        renderCPU(dst.get(), mlv_video, cam_wb, dng_size, time, height_img, width_img, rodd);
+    }
+}
+
 void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 {
     Mlv_video::RawInfo rawInfo;
@@ -105,19 +179,46 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     wbobj.kelvin = _colorTemperature->getValue();
     ::get_white_balance(wbobj, wbal, camid);
     float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
-    float ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
+    float wb_compensation = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 
-    int32_t* forward_matrix = mlv_video->get_cameara_forward_matrix2();
-    float cam_matrix[12];
+    int32_t* forward_matrix = mlv_video->get_camera_forward_matrix2();
+    float cam_matrix[21];
     for (int i = 0; i < 9; i++)
     {
         cam_matrix[i] = (float)forward_matrix[i*2] / 10000.f;
     }
 
-    cam_matrix[9] = ratio * wbrgb[0];
-    cam_matrix[10] = ratio * wbrgb[1];
-    cam_matrix[11] = ratio * wbrgb[2];
+    // WB coeffs
+    cam_matrix[9] = 1;
+    cam_matrix[10] = 1;
+    cam_matrix[11] = 1;
 
+    int colorspace = _colorSpaceFormat->getValue();
+    float dngidt_matrix[9];
+    DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+    idt.getDNGIDTMatrix2(dngidt_matrix, colorspace == ACES_AP1);
+    
+    float idt_matrix[9] = {0};
+    if(colorspace == ACES_AP0){
+        memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
+    } else if (colorspace == ACES_AP1){
+        memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
+    } else if (colorspace == REC709){
+        cam_matrix[9] = wbrgb[0];
+        cam_matrix[10] = wbrgb[1];
+        cam_matrix[11] = wbrgb[2];
+        memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
+    } else {
+        cam_matrix[9] = wbrgb[0];
+        cam_matrix[10] = wbrgb[1];
+        cam_matrix[11] = wbrgb[2];
+        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
+    }
+
+
+    for(int i=0; i<9; ++i){
+        cam_matrix[i+12] = idt_matrix[i] * wb_compensation;
+    }
 
     int width = mlv_video->raw_resolution_x();
     int height = mlv_video->raw_resolution_y();
@@ -199,9 +300,9 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
             return;
         }
 
-        
-        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 12);
-        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 12, cam_matrix);
+        // matrixbufer [0-8] = forward matrix, [9-11] = wb coeffs, [12-20] = idt matrix
+        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 21);
+        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 21, cam_matrix);
 
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
@@ -226,147 +327,87 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     queue.finish();
 }
 
-// the overridden render function
-void MLVReaderPlugin::render(const OFX::RenderArguments &args)
+void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img, OfxRectD rodd)
 {
-    Mlv_video *mlv_video = nullptr;
+    Mlv_video::RawInfo rawInfo;
+    rawInfo.dual_iso_mode = _dualIsoMode->getValue();
+    rawInfo.chroma_smooth = _chromaSmooth->getValue();
+    rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
+    rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
+    rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
+    rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
+    rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
+    rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
+    rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
+    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
 
-    {
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
-        for (int i = 0; i < _mlv_video.size(); ++i){
-            if (!_mlv_video[i]->locked()){
-                mlv_video = _mlv_video[i];
-                _mlv_video[i]->lock();
-                break;
-            }
-        }
-        _gThreadHost->mutexUnLock(_videoMutex);
-    }
+    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+    int camid = mlv_video->get_camid();
+    // Release MLV reader
+    mlv_video->unlock();
 
-    if (mlv_video == nullptr){
+    if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
     }
-    
-    const int time = floor(args.time+0.5);
-    
-    bool cam_wb = _cameraWhiteBalance->getValue();
-    int dng_size = 0;
 
-    OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
-    OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
-    assert(OFX_COMPONENTS_OK(dstComponents));
+    // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
+    int colorspace = _colorSpaceFormat->getValue();
+    Dng_processor dng_processor;
+    wbobj.kelvin = rawInfo.temperature;
+    dng_processor.set_interpolation(_debayerType->getValue()-1);
+    dng_processor.set_camera_wb(cam_wb);
+    dng_processor.set_wb_coeffs(wbobj);
+    dng_processor.set_camid(camid);
+    dng_processor.set_highlight(_highlightMode->getValue());
+    dng_processor.setAP1IDT(colorspace == ACES_AP1);
+    bool apply_wb = colorspace > ACES_AP1;
 
-    OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
+    // Get raw buffer in XYZ-D50 colorspace
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
+    free(dng_buffer);
 
-    if (!dst)
-    {
-        OFX::throwSuiteStatusException(kOfxStatFailed);
+    // Compute colorspace matrix and adjust white balance parameters
+    float idt_matrix[9] = {0};
+    float ratio = dng_processor.get_wbratio();
+    bool use_matrix = true;
+    compute_colorspace_xform_matrix(idt_matrix, dng_processor, use_matrix, ratio);
+
+    for(int y=0; y < height_img; y++) {
+        uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (width_img * 3);
+        float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
+        for(int x=0; x < width_img; x++) {
+            float in[3];
+            in[0] = float(*srcPix++) / _maxValue;
+            in[1] = float(*srcPix++) / _maxValue;
+            in[2] = float(*srcPix++) / _maxValue;
+            if (use_matrix){
+                matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+            } else {
+                dstPix[0]=in[0];
+                dstPix[1]=in[1];
+                dstPix[2]=in[2];
+                dstPix[3]=1.f;
+            }
+            dstPix+=4;
+        }
     }
+}
 
-    float maxval = _maxValue;
-    int mlv_width = mlv_video->raw_resolution_x();
-    int mlv_height = mlv_video->raw_resolution_y();
+void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor, bool &use_matrix, float wbratio)
+{
+    int colorspace = _colorSpaceFormat->getValue();
 
-    OfxRectD rodd = _outputClip->getRegionOfDefinition(time, args.renderView);
-    int width_img = (int)(rodd.x2 - rodd.x1);
-    int height_img = (int)(rodd.y2 - rodd.y1);
-
-    if (_debayerType->getValue() == 0){
-        // Extract raw buffer - No processing (debug)
-        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
-    
-        for(int y=0; y < height_img; y++) {
-            uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
-            float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
-            for(int x=0; x < width_img; x++) {
-                float pixel_val = float(*srcPix++) / maxval;
-                *dstPix++ = pixel_val;
-                *dstPix++ = pixel_val;
-                *dstPix++ = pixel_val;
-                *dstPix++ = 1.f;
-            }
-        }
-        // Release MLV reader
-        mlv_video->unlock();
-    } else if (getUseOpenCL()){
-        renderCL(dst.get(), mlv_video, time);
-        mlv_video->unlock();
+    if(colorspace == ACES_AP0){
+        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+    } else if (colorspace == ACES_AP1){
+        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+    } else if (colorspace == REC709){
+        memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
+        for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
     } else {
-        Mlv_video::RawInfo rawInfo;
-        rawInfo.dual_iso_mode = _dualIsoMode->getValue();
-        rawInfo.chroma_smooth = _chromaSmooth->getValue();
-        rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
-        rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
-        rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
-        rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
-        rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
-        rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
-        rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-        uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
-
-        mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
-        int camid = mlv_video->get_camid();
-        // Release MLV reader
-        mlv_video->unlock();
-
-        if (dng_buffer == nullptr || dng_size == 0){
-            OFX::throwSuiteStatusException(kOfxStatFailed);
-            return;
-        }
-
-        // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
-        int colorspace = _colorSpaceFormat->getValue();
-        Dng_processor dng_processor;
-        wbobj.kelvin = rawInfo.temperature;
-        dng_processor.set_interpolation(_debayerType->getValue()-1);
-        dng_processor.set_camera_wb(cam_wb);
-        dng_processor.set_wb_coeffs(wbobj);
-        dng_processor.set_camid(camid);
-        dng_processor.set_highlight(_highlightMode->getValue());
-        dng_processor.setAP1IDT(colorspace == ACES_AP1);
-        bool apply_wb = colorspace > ACES_AP1;
-
-        // Get raw buffer in XYZ-D50 colorspace
-        uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
-        free(dng_buffer);
-
-        // Compute colorspace matrix and adjust white balance parameters
-        float idt_matrix[9] = {0};
-        float use_matrix = true;
-        float ratio = dng_processor.get_wbratio();
-        if(colorspace == ACES_AP0){
-            memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-        } else if (colorspace == ACES_AP1){
-            memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-        } else if (colorspace == REC709){
-            memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
-            for(int i=0; i<9; ++i) idt_matrix[i] *= ratio; 
-        } else {
-            use_matrix = false;
-            idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
-        }
-
-
-        for(int y=0; y < height_img; y++) {
-            uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (mlv_width * 3);
-            float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
-            for(int x=0; x < width_img; x++) {
-                float in[3];
-                in[0] = float(*srcPix++) / _maxValue;
-                in[1] = float(*srcPix++) / _maxValue;
-                in[2] = float(*srcPix++) / _maxValue;
-                if (use_matrix){
-                    matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
-                } else {
-                    dstPix[0]=in[0];
-                    dstPix[1]=in[1];
-                    dstPix[2]=in[2];
-                    dstPix[3]=1.f;
-                }
-                dstPix+=4;
-            }
-        }
+        use_matrix = false;
+        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
 }
 

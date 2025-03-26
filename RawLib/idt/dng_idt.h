@@ -2,12 +2,16 @@
 
 
 #include <vector>
+#include "../mlv_video.h"
 
 namespace DNGIdt{
 	class DNGIdt {
 		public:
 			DNGIdt();
+			#ifndef IDT_NOGNG
 			DNGIdt (libraw_rawdata_t* rawdata_type);
+			#endif
+			DNGIdt (Mlv_video* mlv, float *wbal );
 			virtual ~DNGIdt();
 
 			double ccttoMired ( const double cct ) const;
@@ -30,8 +34,6 @@ namespace DNGIdt{
 			void getCameraXYZMtxAndWhitePoint ( );
 
 		private:
-			std::vector < double >  _cameraCalibration1DNG;
-			std::vector < double >  _cameraCalibration2DNG;
 			std::vector < double >  _cameraToXYZMtx;
 			std::vector < double >  _xyz2rgbMatrix1DNG;
 			std::vector < double >  _xyz2rgbMatrix2DNG;

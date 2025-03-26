@@ -281,9 +281,14 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   color.y *= cameraMatrix[10];
   color.z *= cameraMatrix[11];
 
+  
   color.x = cameraMatrix[0]*color.x + cameraMatrix[1]*color.y + cameraMatrix[2]*color.z;
   color.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
   color.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
+
+  color.x = cameraMatrix[12]*color.x + cameraMatrix[13]*color.y + cameraMatrix[14]*color.z;
+  color.y = cameraMatrix[15]*color.x + cameraMatrix[16]*color.y + cameraMatrix[17]*color.z;
+  color.z = cameraMatrix[18]*color.x + cameraMatrix[19]*color.y + cameraMatrix[20]*color.z;
 
   color.w = 1;
 

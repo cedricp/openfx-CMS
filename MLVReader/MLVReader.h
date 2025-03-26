@@ -117,17 +117,19 @@ public:
     }
 
 private:
-    virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     virtual void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
     virtual bool getTimeDomain(OfxRangeD& range) OVERRIDE FINAL;
-    bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
-    void setMlvFile(std::string file);
+    virtual bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
+    virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
 
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
+    void renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img, OfxRectD rodd);
+    void setMlvFile(std::string file);
+    void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor, bool &use_matrix, float wbratio);
 
 private:
     OfxMultiThreadSuiteV1 *_gThreadHost = 0;
