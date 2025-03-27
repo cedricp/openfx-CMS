@@ -54,10 +54,10 @@ const float xyzD50_rec709D65[9] = {
      0.0556434, -0.2040259, 1.0572252
 };
 
-const float rec709toxyz[9] = {
-    1.9644,   -1.1197,    0.1553,
-    -0.2412,    1.6738,   -0.4326,
-    0.0139,   -0.5498,    1.5359,
+const float rec709toxyzD50[9] = {
+    0.4124564, 0.3575761, 0.1804375,
+    0.2126729, 0.7151522, 0.0721750,
+    0.0193339, 0.1191920, 0.9503041
 };
 
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
@@ -71,6 +71,53 @@ inline void matrix_vector_mult(const float *mat, const float *vec, float *result
         }
         result[i] = res;
     }
+}
+
+inline void mat_mat_mult(const float *mat1, const float *mat2, float *result)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            float res = 0.0;
+            for (int k = 0; k < 3; k++)
+            {
+                res += mat1[i*3+k] * mat2[k*3+j];
+            }
+            result[i*3+j] = res;
+        }
+    }
+}
+
+inline void invert_matrix(const float *mat, float *result)
+{
+    float det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7]) -
+                mat[1] * (mat[3] * mat[8] - mat[5] * mat[6]) +
+                mat[2] * (mat[3] * mat[7] - mat[4] * mat[6]);
+    if (det == 0) return;
+    det = 1.f / det;
+    result[0] = (mat[4] * mat[8] - mat[5] * mat[7]) * det;
+    result[1] = -(mat[1] * mat[8] - mat[2] * mat[7]) * det;
+    result[2] = (mat[1] * mat[5] - mat[2] * mat[4]) * det;
+    result[3] = -(mat[3] * mat[8] - mat[5] * mat[6]) * det;
+    result[4] = (mat[0] * mat[8] - mat[2] * mat[6]) * det;
+    result[5] = -(mat[0] * mat[5] - mat[2] * mat[3]) * det;
+    result[6] = (mat[3] * mat[7] - mat[4] * mat[6]) * det;
+    result[7] = -(mat[0] * mat[7] - mat[1] * mat[6]) * det;
+    result[8] = (mat[0] * mat[4] - mat[1] * mat[3]) * det;
+}
+
+inline void get_matrix_cam2rec709(float colormatrix[9], float result[9])
+{
+    float rgb2cam[9];
+    mat_mat_mult(colormatrix, rec709toxyzD50, rgb2cam);
+    float sum[3] = {rgb2cam[0] + rgb2cam[1] + rgb2cam[2],
+        rgb2cam[3] + rgb2cam[4] + rgb2cam[5],
+        rgb2cam[6] + rgb2cam[7] + rgb2cam[8]};
+    rgb2cam[0] /= sum[0];rgb2cam[1] /= sum[0];rgb2cam[2] /= sum[0];
+    rgb2cam[3] /= sum[1];rgb2cam[4] /= sum[1];rgb2cam[5] /= sum[1];
+    rgb2cam[6] /= sum[2];rgb2cam[7] /= sum[2];rgb2cam[8] /= sum[2];
+    invert_matrix(rgb2cam, result);
 }
 
 bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
@@ -212,9 +259,21 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     } else if (colorspace == REC709){
         memset(cam_matrix, 0, sizeof(float)*9);
         cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
-        memcpy(idt_matrix, cam2rec709, 9*sizeof(float));
+        float cto709[9];
+        float cammat[9];
+        mlv_video->get_camera_matrix2f(cammat);
+        get_matrix_cam2rec709(cammat, cto709);
+        memcpy(idt_matrix, cto709, 9*sizeof(float));
     } else {
-        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
+        memset(cam_matrix, 0, sizeof(float)*9);
+        cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
+        float xyz[9];
+        float cto709[9];
+        float cammat[9];
+        mlv_video->get_camera_matrix2f(cammat);
+        get_matrix_cam2rec709(cammat, cto709);
+        mat_mat_mult(rec709toxyzD50, cto709, xyz);
+        memcpy(idt_matrix, xyz, 9*sizeof(float));
     }
 
     for(int i=0; i<9; ++i){
