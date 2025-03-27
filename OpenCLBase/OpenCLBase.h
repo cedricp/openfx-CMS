@@ -40,8 +40,8 @@ public:
     cl::Program getProgram(std::string program_name){return _programs[program_name];}
 protected:
     void setupOpenCL();
-    cl::Device& get_cl_device(){return _current_cldevice;}
-    cl::Context& get_cl_context(){return _current_clcontext;}
+    cl::Device& getCurrentCLDevice(){return _current_cldevice;}
+    cl::Context& getCurrentCLContext(){return _current_clcontext;}
 
 private:
     std::map<std::string, cl::Program> _programs;

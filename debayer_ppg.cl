@@ -34,19 +34,6 @@ FC(const int row, const int col, const unsigned int filters)
   return filters >> ((((row) << 1 & 14) + ((col) & 1)) << 1) & 3;
 }
 
-// static inline void matmut(float mat[9], float vec[3], float result[3])
-// {
-//     for (int i = 0; i < 3; i++)
-//     {
-//         float res = 0.0f;
-//         for (int j = 0; j < 3; j++)
-//         {
-//             res += mat[i*3+j] * vec[j];
-//         }
-//         result[i] = res;
-//     }
-// }
-
 kernel void
 test_pattern (write_only image2d_t out)
 {

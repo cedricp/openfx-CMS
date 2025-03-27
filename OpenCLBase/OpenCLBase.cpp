@@ -204,7 +204,7 @@ bool OpenCLBase::changedParamCL(OpenCLBase* instance, const OFX::InstanceChanged
     bool use_opencl = instance->getUseOpenCL();
 
     if (paramName == kUseOpenCL || paramName == kOpenCLDevice){
-        instance-> _openCLDevices->setEnabled(use_opencl);
+        instance->_openCLDevices->setEnabled(use_opencl);
         if (use_opencl){
             instance->setupOpenCL();
         }

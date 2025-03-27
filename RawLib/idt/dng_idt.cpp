@@ -8,6 +8,7 @@
 
 #include <libraw_types.h>
 #include "dng_idt.h"
+#include "dng_tag_values.h"
 
 /*
  * Code borrowed from rawtoaces
@@ -497,8 +498,8 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	_calibrateIllum        = vector < double > ( 2, 1.0 );
 
     _baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( 17 ); // 2856K - lsStandardLightA  
-	_calibrateIllum[1] = static_cast < double > ( 21 ); // 6500K - lsD65
+	_calibrateIllum[0] = static_cast < double > ( lsStandardLightA ); // 2856K - lsStandardLightA  
+	_calibrateIllum[1] = static_cast < double > ( lsD65 ); // 6500K - lsD65
 
     FORI ( 3 ){
          _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
