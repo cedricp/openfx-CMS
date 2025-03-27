@@ -173,48 +173,46 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
     uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
     
+    
     int32_t wbal[6];
-    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
-    wbobj.wb_mode = WB_KELVIN;
-    wbobj.kelvin = _colorTemperature->getValue();
+    mlv_wbal_hdr_t wbobj;
+    mlv_video->get_wb_object(&wbobj);
+    if ( ! _cameraWhiteBalance->getValue() )
+    {
+        wbobj.wb_mode = WB_KELVIN;
+        wbobj.kelvin = _colorTemperature->getValue();
+    }
+
     ::get_white_balance(wbobj, wbal, camid);
     float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
     float wb_compensation = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 
-    int32_t* forward_matrix = mlv_video->get_camera_forward_matrix2();
     float cam_matrix[21];
-    for (int i = 0; i < 9; i++)
-    {
-        cam_matrix[i] = (float)forward_matrix[i*2] / 10000.f;
-    }
+    mlv_video->get_camera_forward_matrix2f(cam_matrix);
 
     // WB coeffs
-    cam_matrix[9] = 1;
-    cam_matrix[10] = 1;
-    cam_matrix[11] = 1;
+    cam_matrix[9]  = wbrgb[0];
+    cam_matrix[10] = wbrgb[1];
+    cam_matrix[11] = wbrgb[2];
 
     int colorspace = _colorSpaceFormat->getValue();
-    float dngidt_matrix[9];
-    DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-    idt.getDNGIDTMatrix2(dngidt_matrix, colorspace == ACES_AP1);
     
     float idt_matrix[9] = {0};
     if(colorspace == ACES_AP0){
+        float dngidt_matrix[9];
+        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+        idt.getDNGIDTMatrix2(dngidt_matrix, false);
         memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
     } else if (colorspace == ACES_AP1){
+        float dngidt_matrix[9];
+        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+        idt.getDNGIDTMatrix2(dngidt_matrix, true);
         memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
     } else if (colorspace == REC709){
-        cam_matrix[9] = wbrgb[0];
-        cam_matrix[10] = wbrgb[1];
-        cam_matrix[11] = wbrgb[2];
         memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
     } else {
-        cam_matrix[9] = wbrgb[0];
-        cam_matrix[10] = wbrgb[1];
-        cam_matrix[11] = wbrgb[2];
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
-
 
     for(int i=0; i<9; ++i){
         cam_matrix[i+12] = idt_matrix[i] * wb_compensation;
@@ -302,11 +300,11 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
         // matrixbufer [0-8] = forward matrix, [9-11] = wb coeffs, [12-20] = idt matrix
         cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 21);
-        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 21, cam_matrix);
-
+        queue.enqueueWriteBuffer(matrixbuffer, CL_FALSE, 0, sizeof(float) * 21, cam_matrix);
+        
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
-
+        
         kernel_demosaic_redblue.setArg(0, img_tmp);
         kernel_demosaic_redblue.setArg(1, img_out);
         kernel_demosaic_redblue.setArg(2, width);
@@ -341,7 +339,8 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
 
-    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+    mlv_wbal_hdr_t wbobj;
+    mlv_video->get_wb_object(&wbobj);
     int camid = mlv_video->get_camid();
     // Release MLV reader
     mlv_video->unlock();
@@ -362,6 +361,7 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
     dng_processor.set_highlight(_highlightMode->getValue());
     dng_processor.setAP1IDT(colorspace == ACES_AP1);
     bool apply_wb = colorspace > ACES_AP1;
+    float scale = 1./32767.;
 
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
@@ -378,9 +378,9 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
         float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
         for(int x=0; x < width_img; x++) {
             float in[3];
-            in[0] = float(*srcPix++) / _maxValue;
-            in[1] = float(*srcPix++) / _maxValue;
-            in[2] = float(*srcPix++) / _maxValue;
+            in[0] = float(*srcPix++) * scale;
+            in[1] = float(*srcPix++) * scale;
+            in[2] = float(*srcPix++) * scale;
             if (use_matrix){
                 matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
             } else {
@@ -404,11 +404,11 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
         memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
     } else if (colorspace == REC709){
         memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
-        for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
     } else {
         use_matrix = false;
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
+    for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
 }
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)

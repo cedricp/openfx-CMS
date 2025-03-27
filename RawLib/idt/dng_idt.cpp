@@ -485,8 +485,8 @@ DNGIdt::DNGIdt ( libraw_rawdata_t* R ) {
 
 DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
     float matrix1[9], matrix2[9];
-    mlv->get_camera_forward_matrix1f(matrix1);
-    mlv->get_camera_forward_matrix2f(matrix2);
+    mlv->get_camera_matrix1f(matrix1);
+    mlv->get_camera_matrix2f(matrix2);
 
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
@@ -497,10 +497,13 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	_calibrateIllum        = vector < double > ( 2, 1.0 );
 
     _baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( 17 ); // 2856K    
-	_calibrateIllum[1] = static_cast < double > ( 21 ); // 6500K
+	_calibrateIllum[0] = static_cast < double > ( 17 ); // 2856K - lsStandardLightA  
+	_calibrateIllum[1] = static_cast < double > ( 21 ); // 6500K - lsD65
 
-    FORI ( 3 ) _neutralRGBDNG[i] = 1.0 / static_cast < double > ( wbal[i] );
+    FORI ( 3 ){
+         _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
+    }
+        
     
     FORI ( 9 ) {
 		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( matrix1[i] );

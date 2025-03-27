@@ -42,7 +42,7 @@ public:
 	bool valid(){return _valid;}
 	void* get_mlv_object();
 
-	mlv_wbal_hdr_t get_wb_object();
+	void get_wb_object(mlv_wbal_hdr_t* out);
 
 	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer = false);
 	uint32_t get_dng_header_size();
@@ -70,6 +70,8 @@ public:
 	int32_t* get_camera_forward_matrix2();
 	void get_camera_forward_matrix2f(float matrix[9]);
 	void get_camera_forward_matrix1f(float matrix[9]);
+	void get_camera_matrix2f(float matrix[9]);
+	void get_camera_matrix1f(float matrix[9]);
 
 	int get_camid();
 	float focal_length();

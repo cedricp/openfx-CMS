@@ -82,9 +82,6 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
 		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
 		_imp->libraw->imgdata.params.user_mul[3] = wbrgb[1];
-		_wb[0] = wbrgb[0];
-		_wb[1] = wbrgb[1];
-		_wb[2] = wbrgb[2];
 	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
 	_imp->libraw->imgdata.params.no_interpolation= 0;

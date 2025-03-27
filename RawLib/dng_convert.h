@@ -22,7 +22,6 @@ public:
 	void setAP1IDT(bool a){_ap1_matrix = a;}
 	float* get_idt_matrix(){return _idt_matrix;}
 	float get_wbratio(){return _ratio;}
-	float* get_rgb_white_balance(){ return _wb; }
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;
@@ -36,6 +35,5 @@ private:
 	float _ratio = 1;
 	float _idt_matrix[9];
 	bool _ap1_matrix = false;
-	float _wb[3] = {1,1,1};
 	mlv_wbal_hdr_t _wb_coeffs;
 };
