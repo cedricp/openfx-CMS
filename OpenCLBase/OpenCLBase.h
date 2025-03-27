@@ -53,7 +53,7 @@ private:
     cl::Context _current_clcontext;
 };
 
-typedef struct opencl_local_buffer_t
+struct OpenCLLocalBufferStruct
 {
   const int xoffset;
   const int xfactor;
@@ -63,11 +63,12 @@ typedef struct opencl_local_buffer_t
   const size_t overhead;
   int sizex;  // initial value and final values after optimization
   int sizey;  // initial value and final values after optimization
-} opencl_local_buffer_t;
+};
+
 
 #define CLAMP(A, L, H) ((A) > (L) ? ((A) < (H) ? (A) : (H)) : (L))
 #define ROUNDUP(a, n) ((a) % (n) == 0 ? (a) : ((a) / (n)+1) * (n))
 
-int opencl_local_buffer_opt(cl::Device dev,
+int openCLGetLocalBufferOpt(cl::Device dev,
     cl::Kernel ker,
-    opencl_local_buffer_t *factors);
+    OpenCLLocalBufferStruct *factors);

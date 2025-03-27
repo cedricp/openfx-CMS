@@ -48,7 +48,7 @@ public:
 	uint32_t get_dng_header_size();
 	void free_dng_buffer();
 	uint16_t* get_raw_image();
-	uint16_t* get_unpacked_raw_buffer();
+	uint16_t* get_unpacked_dng_buffer();
 
 
 	uint32_t black_level();

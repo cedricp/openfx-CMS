@@ -187,7 +187,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
-        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+        uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -224,7 +224,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
-    uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+    uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
     
     
     int32_t wbal[6];
@@ -295,12 +295,12 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t filter = 0x94949494;
     {
         // Process borders
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
-                                    .cellsize = 4 * sizeof(float), .overhead = 0,
-                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){ .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+                                     .cellsize = 4 * sizeof(float), .overhead = 0,
+                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_border(getProgram("debayer_ppg"), "border_interpolate");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_border, &locopt)){
+        if (!openCLGetLocalBufferOpt(get_cl_device(), kernel_demosaic_border, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
             return;
         }
@@ -322,12 +322,12 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     {
         // Process green channel
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
-                                    .cellsize = sizeof(float) * 1, .overhead = 0,
-                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){ .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
+                                     .cellsize = sizeof(float) * 1, .overhead = 0,
+                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_green(getProgram("debayer_ppg"), "ppg_demosaic_green");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_green, &locopt)){
+        if (!openCLGetLocalBufferOpt(get_cl_device(), kernel_demosaic_green, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (green)"));
             return;
         }
@@ -352,12 +352,12 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     {
         // Process red/blue channel
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
                                     .cellsize = 4 * sizeof(float), .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_redblue(getProgram("debayer_ppg"), "ppg_demosaic_redblue");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_redblue, &locopt)){
+        if (!openCLGetLocalBufferOpt(get_cl_device(), kernel_demosaic_redblue, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
             return;
         }
@@ -433,9 +433,9 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
 
     // Compute colorspace matrix and adjust white balance parameters
     float idt_matrix[9] = {0};
-    float ratio = dng_processor.get_wbratio();
+    float wb_compensation = dng_processor.get_wbratio();
     bool use_matrix = true;
-    compute_colorspace_xform_matrix(idt_matrix, dng_processor, use_matrix, ratio);
+    compute_colorspace_xform_matrix(idt_matrix, dng_processor, use_matrix, wb_compensation);
 
     for(int y=0; y < height_img; y++) {
         uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (width_img * 3);
@@ -447,6 +447,7 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
             in[2] = float(*srcPix++) * scale;
             if (use_matrix){
                 matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+                dstPix[3]=1.f;
             } else {
                 dstPix[0]=in[0];
                 dstPix[1]=in[1];

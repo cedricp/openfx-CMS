@@ -63,9 +63,9 @@ int opencl_get_kernel_work_group_size(cl::Device dev,
     return err;
 }
 
-int opencl_local_buffer_opt(cl::Device dev,
+int openCLGetLocalBufferOpt(cl::Device dev,
     cl::Kernel ker,
-    opencl_local_buffer_t *factors)
+    OpenCLLocalBufferStruct *factors)
 {
     std::vector<size_t> maxsizes(3);     // the maximum dimensions for a work group
     size_t workgroupsize = 0;       // the maximum number of items in a work group
@@ -96,7 +96,7 @@ int opencl_local_buffer_opt(cl::Device dev,
             if(*blocksizex == 1 && *blocksizey == 1)
             {
             printf(
-            "[opencl_local_buffer_opt] no valid resource limits for curent device");
+            "[openCLGetLocalBufferOpt] no valid resource limits for curent device");
             return FALSE;
         }
 
