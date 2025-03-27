@@ -503,7 +503,6 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
     FORI ( 3 ){
          _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
     }
-        
     
     FORI ( 9 ) {
 		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( matrix1[i] );

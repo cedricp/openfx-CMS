@@ -70,7 +70,7 @@ test_pattern (write_only image2d_t out)
 kernel void
 ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
                     const unsigned int filters, const unsigned int black_level, const unsigned int white_level,
-                    local float *buffer)
+                    local float *buffer, float rmult, float bmult)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -122,9 +122,9 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
 
   const float pc = buffer[0];
 
-  if     (c == 0) color.x = pc; // red
+  if     (c == 0) color.x = pc * rmult; // red
   else if(c == 1) color.y = pc; // green1
-  else if(c == 2) color.z = pc; // blue
+  else if(c == 2) color.z = pc * bmult; // blue
   else            color.y = pc; // green2
 
   // fill green layer for red and blue pixels:
@@ -276,21 +276,15 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
       else color.x = (guess1 + guess2)*0.25f;
     }
   }
-  float4 tmp;
-
-  color.x *= cameraMatrix[9];
-  color.y *= cameraMatrix[10];
-  color.z *= cameraMatrix[11];
+  float4 tmp = color;
 
   tmp.x = cameraMatrix[0]*color.x + cameraMatrix[1]*color.y + cameraMatrix[2]*color.z;
   tmp.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
   tmp.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
 
-  
-
-  color.x = cameraMatrix[12]*tmp.x + cameraMatrix[13]*tmp.y + cameraMatrix[14]*tmp.z;
-  color.y = cameraMatrix[15]*tmp.x + cameraMatrix[16]*tmp.y + cameraMatrix[17]*tmp.z;
-  color.z = cameraMatrix[18]*tmp.x + cameraMatrix[19]*tmp.y + cameraMatrix[20]*tmp.z;
+  color.x = cameraMatrix[9]*tmp.x + cameraMatrix[10]*tmp.y + cameraMatrix[11]*tmp.z;
+  color.y = cameraMatrix[12]*tmp.x + cameraMatrix[13]*tmp.y + cameraMatrix[14]*tmp.z;
+  color.z = cameraMatrix[15]*tmp.x + cameraMatrix[16]*tmp.y + cameraMatrix[17]*tmp.z;
 
   color.w = 1.f;
 

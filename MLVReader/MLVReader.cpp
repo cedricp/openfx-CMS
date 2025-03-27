@@ -54,6 +54,12 @@ const float xyzD50_rec709D65[9] = {
      0.0556434, -0.2040259, 1.0572252
 };
 
+const float rec709toxyz[9] = {
+    1.9644,   -1.1197,    0.1553,
+    -0.2412,    1.6738,   -0.4326,
+    0.0139,   -0.5498,    1.5359,
+};
+
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
 {
     for (int i = 0; i < rows; i++)
@@ -187,13 +193,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
     float wb_compensation = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 
-    float cam_matrix[21];
+    float cam_matrix[18];
     mlv_video->get_camera_forward_matrix2f(cam_matrix);
-
-    // WB coeffs
-    cam_matrix[9]  = wbrgb[0];
-    cam_matrix[10] = wbrgb[1];
-    cam_matrix[11] = wbrgb[2];
 
     int colorspace = _colorSpaceFormat->getValue();
     
@@ -209,13 +210,15 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         idt.getDNGIDTMatrix2(dngidt_matrix, true);
         memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
     } else if (colorspace == REC709){
-        memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
+        memset(cam_matrix, 0, sizeof(float)*9);
+        cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
+        memcpy(idt_matrix, cam2rec709, 9*sizeof(float));
     } else {
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
 
     for(int i=0; i<9; ++i){
-        cam_matrix[i+12] = idt_matrix[i] * wb_compensation;
+        cam_matrix[i+9] = idt_matrix[i] * wb_compensation;
     }
 
     int width = mlv_video->raw_resolution_x();
@@ -281,6 +284,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(5, black_level);
         kernel_demosaic_green.setArg(6, white_level);
         kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
+        kernel_demosaic_green.setArg(8, wbrgb[0]);
+        kernel_demosaic_green.setArg(9, wbrgb[2]);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
         timer.wait();
@@ -299,8 +304,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         }
 
         // matrixbufer [0-8] = forward matrix, [9-11] = wb coeffs, [12-20] = idt matrix
-        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 21);
-        queue.enqueueWriteBuffer(matrixbuffer, CL_FALSE, 0, sizeof(float) * 21, cam_matrix);
+        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 18);
+        queue.enqueueWriteBuffer(matrixbuffer, CL_FALSE, 0, sizeof(float) * 18, cam_matrix);
         
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
@@ -731,8 +736,8 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kColorTemperature);
         param->setLabel("Color temperature");
-        param->setRange(800, 8500);
-        param->setDisplayRange(800, 8500);
+        param->setRange(2800, 8000);
+        param->setDisplayRange(2800, 8000);
         param->setHint("Color temperature in Kelvin");
         param->setDefault(6500);
         if (page_colors)
