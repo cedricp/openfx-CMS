@@ -382,7 +382,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_highlight(_highlightMode->getValue());
     dng_processor.setAP1IDT(colorspace == ACES_AP1);
     bool apply_wb = colorspace > ACES_AP1;
-    float scale = 1./32767.;
+    float scale = 1./65535;
 
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
