@@ -29,8 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ofxCore.h"
 #include "ofxhUtilities.h"
-#include "ofxhPlatformDefines.h"
-
 #ifdef WINDOWS
 #include <windows.h>
 #endif

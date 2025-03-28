@@ -1,11 +1,9 @@
-#include <glad/gladegl.h>
-
 #if !defined(__APPLE__) && !defined(__HAIKU__) \
   && !defined(_WIN32) && !defined(__CYGWIN__)
 
+#include <glad/glad.h>
 #include <EGL/egl.h>
 #include <dlfcn.h>
-#include <cstddef>
 
 static void* libEGL;
 
@@ -53,15 +51,12 @@ void* get_proc(const char *namez) {
     return result;
 }
 
-// Some older versions of egl.h are missing typedefs (e.g. from CentOS 7)
-typedef EGLBoolean (EGLAPIENTRYP PFNEGLBINDAPIPROC_PRIVATE) (EGLenum api);
-
 int gladLoadEGL(void) {
     int status = 0;
-    PFNEGLBINDAPIPROC_PRIVATE bindAPI = NULL;
+    PFNEGLBINDAPIPROC bindAPI = NULL;
 
     if(open_egl()) {
-        bindAPI = (PFNEGLBINDAPIPROC_PRIVATE)get_proc("eglBindAPI");
+        bindAPI = (PFNEGLBINDAPIPROC)get_proc("eglBindAPI");
         if (bindAPI != NULL && bindAPI(EGL_OPENGL_API)) {
             status = gladLoadGLLoader(&get_proc);
         }

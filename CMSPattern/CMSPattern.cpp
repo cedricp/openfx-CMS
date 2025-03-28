@@ -74,12 +74,13 @@ private:
             if (_effect.abort())
             {
                 break;
-            } 
-                
-            float *dstPix = (float *)_dstImg->getPixelAddress(procWindow.x1, y);
+            }
+            if (y > _res.y) continue;
             int curr_y = y / 7 * num_x;
+            float *dstPix = static_cast<float*>(_dstImg->getPixelAddress(procWindow.x1, y));
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
+                if (x > _res.x) continue;
                 int curr_x = x / 7;
                 int curr_pos = curr_y + curr_x;
                 if (curr_pos >= lut_cub)
@@ -127,7 +128,7 @@ bool CMSPatternPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
 
 void CMSPatternPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
 {
-    if (paramName == kParamLUTSize)
+    if (paramName == kParamLUTSizeName)
     {
 
     }
@@ -210,6 +211,9 @@ void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     clipPreferences.setOutputFormat(format);
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
+    clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
+
+    //GeneratorPlugin::getClipPreferences(clipPreferences);
 }
 
 void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -234,7 +238,6 @@ void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
 
-    OFX::generatorDescribe(desc);
 }
 
 void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
@@ -256,10 +259,10 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
     generatorDescribeInContext(page, desc, *dstClip, eGeneratorExtentDefault, OFX::ePixelComponentRGBA, true, context);
 
     {
-        OFX::IntParamDescriptor *param = desc.defineIntParam(kParamLUTSize);
-        param->setLabel(kParamBarIntensityLabel);
-        param->setHint(kParamBarIntensityHint);
-        param->setDefault(kParamBarIntensityDefault);
+        OFX::IntParamDescriptor *param = desc.defineIntParam(kParamLUTSizeName);
+        param->setLabel(kParamLutSizeLabel);
+        param->setHint(kParamLutSizeHint);
+        param->setDefault(kParamLUTSize);
         param->setRange(8, 33);
         param->setDisplayRange(8, 33);
         if (page)

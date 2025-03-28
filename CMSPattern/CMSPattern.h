@@ -19,8 +19,8 @@
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
 
-#define kSupportsByte true
-#define kSupportsUShort true
+#define kSupportsByte false
+#define kSupportsUShort false
 #define kSupportsHalf false
 #define kSupportsFloat true
 
@@ -31,10 +31,10 @@
 #define kSupportsMultipleClipDepths false
 #define kRenderThreadSafety eRenderFullySafe
 
-#define kParamLUTSize "LUTSize"
-#define kParamBarIntensityLabel "LUT Size"
-#define kParamBarIntensityHint "CMS Pattern LUT size."
-#define kParamBarIntensityDefault 16
+#define kParamLUTSizeName "LUTSize"
+#define kParamLutSizeLabel "LUT Size"
+#define kParamLutSizeHint "CMS Pattern LUT size."
+#define kParamLUTSize 16
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -53,7 +53,7 @@ public:
     CMSPatternPlugin(OfxImageEffectHandle handle)
         : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
     {
-        _lutSize = fetchIntParam(kParamLUTSize);
+        _lutSize = fetchIntParam(kParamLUTSizeName);
         _antiLogScale = fetchBooleanParam("log2 encode");
         _logminmax = fetchDouble2DParam("log2 min max");
         assert(_lutSize);

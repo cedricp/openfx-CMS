@@ -10,7 +10,7 @@ public:
 	~Dng_processor();
 
 	void unpack(uint8_t* buffer, size_t buffersize);
-	uint16_t* get_processed_image(uint8_t* buffer, size_t buffersize, bool apply_wb_coeffs);
+	uint16_t* get_processed_image(uint8_t* buffer, size_t buffersize, bool compute_aces_matrix);
 	int width(){return _w;}
 	int height(){return _h;}
 	void set_interpolation(int i){_interpolation_mode = i;}

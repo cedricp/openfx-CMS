@@ -39,7 +39,7 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	}
 }
 
-uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, bool apply_wb_coeffs)
+uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, bool compute_aces_matrix)
 {
 	//_imp->libraw->recycle();
 
@@ -71,7 +71,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	_imp->libraw->imgdata.params.half_size = 0;
 	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
 	_ratio = 1;
-	if (!_camera_wb && apply_wb_coeffs){
+	if (!_camera_wb && compute_aces_matrix){
 		int32_t wbal[6];
 		::get_white_balance(_wb_coeffs, wbal, _camid);
 		float wbrgb[3] = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
@@ -112,7 +112,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	_w = _imp->_image->width;
 	_h = _imp->_image->height;
 
-	if (!apply_wb_coeffs){
+	if (!compute_aces_matrix){
 		DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
 		idt.getDNGIDTMatrix2(_idt_matrix, _ap1_matrix);
 

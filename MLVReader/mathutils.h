@@ -13,14 +13,14 @@ const float rec709toxyzD50[9] = {
     0.0193339, 0.1191920, 0.9503041
 };
 
-inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
+inline void matrix_vector_mult(const float *mat, const float *vec, float *result)
 {
-    for (int i = 0; i < rows; i++)
+    for (int i = 0; i < 3; i++)
     {
         float res = 0.0;
-        for (int j = 0; j < cols; j++)
+        for (int j = 0; j < 3; j++)
         {
-            res += mat[i*cols+j] * vec[j];
+            res += mat[i*3+j] * vec[j];
         }
         result[i] = res;
     }

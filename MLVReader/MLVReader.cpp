@@ -49,6 +49,47 @@ enum ColorSpaceFormat {
         XYZ
 };
 
+class ColorProcessor
+    : public OFX::ImageProcessor
+{
+public:
+    ColorProcessor(OFX::ImageEffect &instance): ImageProcessor(instance)
+    {
+
+    } 
+
+    ~ColorProcessor()
+    {
+    }
+
+    float idt_matrix[9];
+    OFX::Image *srcImg;
+    float scale;
+    uint16_t *raw_buffer;
+    int width, height;
+
+private:
+    void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
+    {
+        OFX::unused(rs);
+        for (int y = procWindow.y1; y < procWindow.y2; y++)
+        {
+            float *dstPix = static_cast<float*>(_dstImg->getPixelAddress(procWindow.x1, y) );
+            uint16_t* srcPix = raw_buffer + (height - 1 - y) * (width * 3) + (procWindow.x1 * 3);
+            for (int x = procWindow.x1; x < procWindow.x2; ++x)
+            {
+                float in[3] = { float(*srcPix++) * scale, float(*srcPix++) * scale, float(*srcPix++) * scale };
+                dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
+                dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
+                dstPix[2] = idt_matrix[6]*in[0] + idt_matrix[7]*in[1] + idt_matrix[8]*in[2];
+                dstPix[3]=1.f;
+                dstPix+=4;
+            }
+        }
+    }
+
+};
+
 bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
     if (!kSupportsRenderScale && ((args.renderScale.x != 1.) || (args.renderScale.y != 1.))) {
@@ -72,13 +113,12 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
     Mlv_video *mlv_video = nullptr;
-
     {
         if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
         for (int i = 0; i < _mlv_video.size(); ++i){
             if (!_mlv_video[i]->locked()){
-                mlv_video = _mlv_video[i];
                 _mlv_video[i]->lock();
+                mlv_video = _mlv_video[i];
                 break;
             }
         }
@@ -116,10 +156,12 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
+        Mlv_video::RawInfo  info;
+        mlv_video->get_dng_buffer(time, info, dng_size, true);
         uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
-    
+
         for(int y=0; y < height_img; y++) {
-            uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
+            uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (width_img);
             float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
             for(int x=0; x < width_img; x++) {
                 float pixel_val = float(*srcPix++) / maxval;
@@ -135,7 +177,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         renderCL(dst.get(), mlv_video, time);
         mlv_video->unlock();
     } else {
-        renderCPU(dst.get(), mlv_video, cam_wb, dng_size, time, height_img, width_img, rodd);
+        renderCPU(args, dst.get(), mlv_video, cam_wb, dng_size, time, height_img, width_img, rodd);
     }
 }
 
@@ -304,7 +346,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     queue.finish();
 }
 
-void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img, OfxRectD rodd)
+void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img, OfxRectD rodd)
 {
     Mlv_video::RawInfo rawInfo;
     rawInfo.dual_iso_mode = _dualIsoMode->getValue();
@@ -349,21 +391,16 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
     // Compute colorspace matrix and adjust white balance parameters
     float idt_matrix[9] = {0};
     float wb_compensation = dng_processor.get_wbratio();
-    compute_colorspace_xform_matrix(idt_matrix, dng_processor, wb_compensation);
-
-    for(int y=0; y < height_img; y++) {
-        uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (width_img * 3);
-        float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
-        for(int x=0; x < width_img; x++) {
-            float in[3];
-            in[0] = float(*srcPix++) * scale;
-            in[1] = float(*srcPix++) * scale;
-            in[2] = float(*srcPix++) * scale;
-            matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
-            dstPix[3]=1.f;
-            dstPix+=4;
-        }
-    }
+    
+    ColorProcessor processor(*this);
+    processor.setDstImg(dst);
+    processor.raw_buffer = processed_buffer;
+    processor.setRenderWindow(args.renderWindow, args.renderScale);
+    processor.scale = scale;
+    processor.width = width_img;
+    processor.height = height_img;
+    compute_colorspace_xform_matrix(processor.idt_matrix, dng_processor, wb_compensation);
+    processor.process();
 }
 
 void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor, float wbratio)
@@ -400,7 +437,7 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 
 bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
 {
-    return false;
+    return true;
 }
 
 void MLVReaderPlugin::setMlvFile(std::string file)
@@ -458,6 +495,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     double par = 1;
     clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+    clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }
@@ -471,6 +509,7 @@ void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     #ifdef OFX_EXTENSIONS_TUTTLE
     desc.addSupportedContext(OFX::eContextReader);
     #endif
+    desc.addSupportedContext(OFX::eContextGenerator);
     desc.addSupportedBitDepth(OFX::eBitDepthFloat);
     desc.setSingleInstance(false);
     desc.setHostFrameThreading(true);
