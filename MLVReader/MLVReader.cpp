@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include "ofxOpenGLRender.h"
 #include "../utils.h" 
+#include "mathutils.h"
 
 extern "C"{
 #include <dng/dng.h>
@@ -47,25 +48,6 @@ enum ColorSpaceFormat {
         REC709,
         XYZ
 };
-
-const float xyzD50_rec709D65[9] = {
-    3.2404542, -1.5371385, -0.4985314,
-    -0.9692660 , 1.8760108, 0.0415560,
-     0.0556434, -0.2040259, 1.0572252
-};
-
-inline void matrix_vector_mult(const float *mat, const float *vec, float *result, int rows, int cols)
-{
-    for (int i = 0; i < rows; i++)
-    {
-        float res = 0.0;
-        for (int j = 0; j < cols; j++)
-        {
-            res += mat[i*cols+j] * vec[j];
-        }
-        result[i] = res;
-    }
-}
 
 bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
@@ -134,7 +116,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
-        uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+        uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
     
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (mlv_width);
@@ -171,53 +153,52 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
-    uint16_t* raw_buffer = mlv_video->get_unpacked_raw_buffer();
+    uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
     
     int32_t wbal[6];
-    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
-    wbobj.wb_mode = WB_KELVIN;
-    wbobj.kelvin = _colorTemperature->getValue();
+    mlv_wbal_hdr_t wbobj;
+    mlv_video->get_wb_object(&wbobj);
+    if ( ! _cameraWhiteBalance->getValue() )
+    {
+        wbobj.wb_mode = WB_KELVIN;
+        wbobj.kelvin = _colorTemperature->getValue();
+    }
+
     ::get_white_balance(wbobj, wbal, camid);
     float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
     float wb_compensation = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 
-    int32_t* forward_matrix = mlv_video->get_camera_forward_matrix2();
-    float cam_matrix[21];
-    for (int i = 0; i < 9; i++)
-    {
-        cam_matrix[i] = (float)forward_matrix[i*2] / 10000.f;
-    }
-
-    // WB coeffs
-    cam_matrix[9] = 1;
-    cam_matrix[10] = 1;
-    cam_matrix[11] = 1;
+    float cam_matrix[18] = {0};
+    cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
 
     int colorspace = _colorSpaceFormat->getValue();
-    float dngidt_matrix[9];
-    DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-    idt.getDNGIDTMatrix2(dngidt_matrix, colorspace == ACES_AP1);
     
     float idt_matrix[9] = {0};
     if(colorspace == ACES_AP0){
+        mlv_video->get_camera_forward_matrix2f(cam_matrix);
+        float dngidt_matrix[9];
+        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+        idt.getDNGIDTMatrix2(dngidt_matrix, false);
         memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
     } else if (colorspace == ACES_AP1){
+        mlv_video->get_camera_forward_matrix2f(cam_matrix);
+        float dngidt_matrix[9];
+        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+        idt.getDNGIDTMatrix2(dngidt_matrix, true);
         memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
     } else if (colorspace == REC709){
-        cam_matrix[9] = wbrgb[0];
-        cam_matrix[10] = wbrgb[1];
-        cam_matrix[11] = wbrgb[2];
-        memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
+        float cam2rec709[9], xyz2cam[9];
+        mlv_video->get_camera_matrix2f(xyz2cam);
+        get_matrix_cam2rec709(xyz2cam, idt_matrix);
     } else {
-        cam_matrix[9] = wbrgb[0];
-        cam_matrix[10] = wbrgb[1];
-        cam_matrix[11] = wbrgb[2];
-        idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
+        float xyz[9], cam2rec709[9], xyz2cam[9];
+        mlv_video->get_camera_matrix2f(xyz2cam);
+        get_matrix_cam2rec709(xyz2cam, cam2rec709);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, idt_matrix);
     }
 
-
     for(int i=0; i<9; ++i){
-        cam_matrix[i+12] = idt_matrix[i] * wb_compensation;
+        cam_matrix[i+9] = idt_matrix[i] * wb_compensation;
     }
 
     int width = mlv_video->raw_resolution_x();
@@ -226,21 +207,23 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t black_level = mlv_video->black_level();
     uint32_t white_level = mlv_video->white_level();
 
-    cl::Image2D img_in(get_cl_context(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
-    cl::Image2D img_out(get_cl_context(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
-    cl::Image2D img_tmp(get_cl_context(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_in(getCurrentCLContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
+    cl::Image2D img_out(getCurrentCLContext(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
+    cl::Image2D img_tmp(getCurrentCLContext(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
     
     cl::Event timer;
-    cl::CommandQueue queue = cl::CommandQueue(get_cl_context(), get_cl_device());
+    cl::CommandQueue queue = cl::CommandQueue(getCurrentCLContext(), getCurrentCLDevice());
+
+    // Standard Canon filter (RGGB)
     uint32_t filter = 0x94949494;
     {
         // Process borders
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
-                                    .cellsize = 4 * sizeof(float), .overhead = 0,
-                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){ .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+                                     .cellsize = 4 * sizeof(float), .overhead = 0,
+                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_border(getProgram("debayer_ppg"), "border_interpolate");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_border, &locopt)){
+        if (!openCLGetLocalBufferOpt(getCurrentCLDevice(), kernel_demosaic_border, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (border_interpolate)"));
             return;
         }
@@ -262,12 +245,12 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     {
         // Process green channel
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
-                                    .cellsize = sizeof(float) * 1, .overhead = 0,
-                                    .sizex = 1 << 8, .sizey = 1 << 8 };
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){ .xoffset = 2*3, .xfactor = 1, .yoffset = 2*3, .yfactor = 1,
+                                     .cellsize = sizeof(float) * 1, .overhead = 0,
+                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_green(getProgram("debayer_ppg"), "ppg_demosaic_green");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_green, &locopt)){
+        if (!openCLGetLocalBufferOpt(getCurrentCLDevice(), kernel_demosaic_green, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (green)"));
             return;
         }
@@ -283,6 +266,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(5, black_level);
         kernel_demosaic_green.setArg(6, white_level);
         kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
+        kernel_demosaic_green.setArg(8, wbrgb[0]);
+        kernel_demosaic_green.setArg(9, wbrgb[2]);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
         timer.wait();
@@ -290,23 +275,22 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     {
         // Process red/blue channel
-        opencl_local_buffer_t locopt
-        = (opencl_local_buffer_t){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
+        OpenCLLocalBufferStruct locopt
+        = (OpenCLLocalBufferStruct){  .xoffset = 2*1, .xfactor = 1, .yoffset = 2*1, .yfactor = 1,
                                     .cellsize = 4 * sizeof(float), .overhead = 0,
                                     .sizex = 1 << 8, .sizey = 1 << 8 };
         cl::Kernel kernel_demosaic_redblue(getProgram("debayer_ppg"), "ppg_demosaic_redblue");
-        if (!opencl_local_buffer_opt(get_cl_device(), kernel_demosaic_redblue, &locopt)){
+        if (!openCLGetLocalBufferOpt(getCurrentCLDevice(), kernel_demosaic_redblue, &locopt)){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Invalid work dimension (red/blue)"));
             return;
         }
 
-        // matrixbufer [0-8] = forward matrix, [9-11] = wb coeffs, [12-20] = idt matrix
-        cl::Buffer matrixbuffer(get_cl_context(), CL_MEM_READ_ONLY, sizeof(float) * 21);
-        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 21, cam_matrix);
-
+        
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
-
+        
+        // matrixbufer [0-8] = forward matrix, [9-17] = idt matrix
+        cl::Buffer matrixbuffer(getCurrentCLContext(), CL_MEM_READ_ONLY, sizeof(float) * 18);
         kernel_demosaic_redblue.setArg(0, img_tmp);
         kernel_demosaic_redblue.setArg(1, img_out);
         kernel_demosaic_redblue.setArg(2, width);
@@ -315,6 +299,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_redblue.setArg(5, matrixbuffer);
         kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
+        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 18, cam_matrix);
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
         timer.wait();
     }
@@ -341,7 +326,8 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
 
-    mlv_wbal_hdr_t wbobj = mlv_video->get_wb_object();
+    mlv_wbal_hdr_t wbobj;
+    mlv_video->get_wb_object(&wbobj);
     int camid = mlv_video->get_camid();
     // Release MLV reader
     mlv_video->unlock();
@@ -362,6 +348,7 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
     dng_processor.set_highlight(_highlightMode->getValue());
     dng_processor.setAP1IDT(colorspace == ACES_AP1);
     bool apply_wb = colorspace > ACES_AP1;
+    float scale = 1./32767.;
 
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
@@ -369,32 +356,25 @@ void MLVReaderPlugin::renderCPU(OFX::Image* dst, Mlv_video* mlv_video, bool cam_
 
     // Compute colorspace matrix and adjust white balance parameters
     float idt_matrix[9] = {0};
-    float ratio = dng_processor.get_wbratio();
-    bool use_matrix = true;
-    compute_colorspace_xform_matrix(idt_matrix, dng_processor, use_matrix, ratio);
+    float wb_compensation = dng_processor.get_wbratio();
+    compute_colorspace_xform_matrix(idt_matrix, dng_processor, wb_compensation);
 
     for(int y=0; y < height_img; y++) {
         uint16_t* srcPix = processed_buffer + (height_img - 1 - y) * (width_img * 3);
         float *dstPix = (float*)dst->getPixelAddress((int)rodd.x1, y+(int)rodd.y1);
         for(int x=0; x < width_img; x++) {
             float in[3];
-            in[0] = float(*srcPix++) / _maxValue;
-            in[1] = float(*srcPix++) / _maxValue;
-            in[2] = float(*srcPix++) / _maxValue;
-            if (use_matrix){
-                matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
-            } else {
-                dstPix[0]=in[0];
-                dstPix[1]=in[1];
-                dstPix[2]=in[2];
-                dstPix[3]=1.f;
-            }
+            in[0] = float(*srcPix++) * scale;
+            in[1] = float(*srcPix++) * scale;
+            in[2] = float(*srcPix++) * scale;
+            matrix_vector_mult(idt_matrix, in, dstPix, 3, 3);
+            dstPix[3]=1.f;
             dstPix+=4;
         }
     }
 }
 
-void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor, bool &use_matrix, float wbratio)
+void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor, float wbratio)
 {
     int colorspace = _colorSpaceFormat->getValue();
 
@@ -404,11 +384,10 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
         memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
     } else if (colorspace == REC709){
         memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
-        for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
     } else {
-        use_matrix = false;
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
+    for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
 }
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
@@ -731,8 +710,8 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kColorTemperature);
         param->setLabel("Color temperature");
-        param->setRange(800, 8500);
-        param->setDisplayRange(800, 8500);
+        param->setRange(2800, 8000);
+        param->setDisplayRange(2800, 8000);
         param->setHint("Color temperature in Kelvin");
         param->setDefault(6500);
         if (page_colors)

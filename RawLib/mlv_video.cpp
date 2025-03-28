@@ -58,9 +58,9 @@ void* Mlv_video::get_mlv_object()
 	return (void*)_imp->mlv_object;
 }
 
-mlv_wbal_hdr_t Mlv_video::get_wb_object()
+void Mlv_video::get_wb_object(mlv_wbal_hdr_t* out)
 {
-	return _imp->mlv_object->WBAL;
+	memcpy(out, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t ));
 }
 
 uint32_t Mlv_video::get_dng_header_size()
@@ -86,6 +86,22 @@ int32_t* Mlv_video::get_camera_forward_matrix2()
 void Mlv_video::get_camera_forward_matrix2f(float matrix[9])
 {
 	int32_t* matrixi = camidGetForwardMatrix2(get_camid());
+	for (int i = 0; i < 9; i++){
+		matrix[i] = (float)matrixi[i*2] / 10000.f;
+	}
+}
+
+void Mlv_video::get_camera_matrix2f(float matrix[9])
+{
+	int32_t* matrixi = camidGetColorMatrix2(get_camid());
+	for (int i = 0; i < 9; i++){
+		matrix[i] = (float)matrixi[i*2] / 10000.f;
+	}
+}
+
+void Mlv_video::get_camera_matrix1f(float matrix[9])
+{
+	int32_t* matrixi = camidGetColorMatrix1(get_camid());
 	for (int i = 0; i < 9; i++){
 		matrix[i] = (float)matrixi[i*2] / 10000.f;
 	}
@@ -360,7 +376,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, 
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::get_unpacked_raw_buffer()
+uint16_t* Mlv_video::get_unpacked_dng_buffer()
 {
 	return _imp->dng_object->image_buf_unpacked;
 }
