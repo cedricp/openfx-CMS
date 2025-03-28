@@ -55,8 +55,8 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	12 - Modified AHD intepolation (by Anton Petrusevich)
 	*/
 
-// output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-	_imp->libraw->imgdata.params.output_color = 5; // XYZ;
+	// output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
+	_imp->libraw->imgdata.params.output_color = 5; // XYZ is the one we want -> every colorspaces can be converted from it
 	_imp->libraw->imgdata.params.output_bps = 16;
 	_imp->libraw->imgdata.params.gamm[0] = 1.0;
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;
@@ -78,6 +78,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 		if(_highlight_mode > 0){
 			_ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
 		}
+		// Set white balance coefficients
 		_imp->libraw->imgdata.params.user_mul[0] = wbrgb[0];
 		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
 		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
@@ -85,6 +86,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	}
 	// _imp->libraw->imgdata.params.use_rawspeed = 1;
 	_imp->libraw->imgdata.params.no_interpolation= 0;
+	// Highlight mode is highlight reconstruction
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
 
 	unpack(buffer, buffersize);

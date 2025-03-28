@@ -176,28 +176,23 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t black_level = mlv_video->black_level();
     uint32_t white_level = mlv_video->white_level();
 
-    float idt_matrix[9] = {0};
     if(colorspace <= ACES_AP1){
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix+9);
 
         DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix2(idt_matrix, colorspace == ACES_AP1);
+        idt.getDNGIDTMatrix2(cam_matrix, colorspace == ACES_AP1);
     } else if (colorspace == REC709){
         float cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
-        get_matrix_cam2rec709(xyz2cam, idt_matrix);
+        get_matrix_cam2rec709(xyz2cam, cam_matrix+9);
     } else {
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, idt_matrix);
-    }
-
-    for(int i=0; i<9; ++i){
-        cam_matrix[i+9] = idt_matrix[i] * wb_compensation;
+        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix+9);
     }
 
     int width = mlv_video->raw_resolution_x();
