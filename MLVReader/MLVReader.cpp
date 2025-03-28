@@ -173,19 +173,18 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     int colorspace = _colorSpaceFormat->getValue();
     
+    uint32_t black_level = mlv_video->black_level();
+    uint32_t white_level = mlv_video->white_level();
+
     float idt_matrix[9] = {0};
-    if(colorspace == ACES_AP0){
-        mlv_video->get_camera_forward_matrix2f(cam_matrix);
-        float dngidt_matrix[9];
+    if(colorspace <= ACES_AP1){
+        float xyz[9], cam2rec709[9], xyz2cam[9];
+        mlv_video->get_camera_matrix2f(xyz2cam);
+        get_matrix_cam2rec709(xyz2cam, cam2rec709);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
+
         DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix2(dngidt_matrix, false);
-        memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
-    } else if (colorspace == ACES_AP1){
-        mlv_video->get_camera_forward_matrix2f(cam_matrix);
-        float dngidt_matrix[9];
-        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix2(dngidt_matrix, true);
-        memcpy(idt_matrix, dngidt_matrix, 9*sizeof(float));
+        idt.getDNGIDTMatrix2(idt_matrix, colorspace == ACES_AP1);
     } else if (colorspace == REC709){
         float cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
@@ -204,8 +203,6 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     int width = mlv_video->raw_resolution_x();
     int height = mlv_video->raw_resolution_y();
 
-    uint32_t black_level = mlv_video->black_level();
-    uint32_t white_level = mlv_video->white_level();
 
     cl::Image2D img_in(getCurrentCLContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
     cl::Image2D img_out(getCurrentCLContext(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);

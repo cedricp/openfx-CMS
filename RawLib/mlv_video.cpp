@@ -37,6 +37,7 @@ Mlv_video::Mlv_video(std::string filename)
 	char err_mess[512];
 
 	_imp->mlv_object = initMlvObjectWithClip(filename.c_str(), MLV_OPEN_FULL, &err, err_mess);
+	_imp->dng_object = NULL;
 
 	
 	if (err){

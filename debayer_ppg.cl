@@ -154,6 +154,9 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
       color.y = fmax(fmin(guessx*0.25f, M), m);
     }
   }
+
+  color.w = 1.f;
+
   write_imagef (out, (int2)(x,y), fmax(color, 0.0f));
 }
 
@@ -265,6 +268,8 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   }
   float4 tmp = color;
 
+  color.w = 1.f;
+
   tmp.x = cameraMatrix[0]*color.x + cameraMatrix[1]*color.y + cameraMatrix[2]*color.z;
   tmp.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
   tmp.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
@@ -273,7 +278,6 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   color.y = cameraMatrix[12]*tmp.x + cameraMatrix[13]*tmp.y + cameraMatrix[14]*tmp.z;
   color.z = cameraMatrix[15]*tmp.x + cameraMatrix[16]*tmp.y + cameraMatrix[17]*tmp.z;
 
-  color.w = 1.f;
 
   write_imagef (out, (int2)(x,  height - 1 - y), fmax(color, 0.0f));
 }

@@ -1026,6 +1026,7 @@ int saveDngFrame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_
 /* free all buffers used for DNG creation */
 void freeDngObject(dngObject_t * dng_data)
 {
+    if (!dng_data) return;
     if(dng_data->header_buf) free(dng_data->header_buf);
     if(dng_data->image_buf) free(dng_data->image_buf);
     if(dng_data->image_buf_unpacked) free(dng_data->image_buf_unpacked);
