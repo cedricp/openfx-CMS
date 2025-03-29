@@ -14,7 +14,10 @@
 
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
+
+
+// Adapted to work with MLV openfx reader
 
 #define NORM_MIN 1.52587890625e-05f // norm can't be < to 2^(-16)
 
@@ -266,10 +269,8 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
       else color.x = (guess1 + guess2)*0.25f;
     }
   }
-  float4 tmp = color;
-
-  color.w = 1.f;
-
+  float4 tmp;
+  
   tmp.x = cameraMatrix[0]*color.x + cameraMatrix[1]*color.y + cameraMatrix[2]*color.z;
   tmp.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
   tmp.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
@@ -278,6 +279,7 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   color.y = cameraMatrix[12]*tmp.x + cameraMatrix[13]*tmp.y + cameraMatrix[14]*tmp.z;
   color.z = cameraMatrix[15]*tmp.x + cameraMatrix[16]*tmp.y + cameraMatrix[17]*tmp.z;
 
+  color.w = 1.f;
 
   write_imagef (out, (int2)(x,  height - 1 - y), fmax(color, 0.0f));
 }

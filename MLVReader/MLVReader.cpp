@@ -82,7 +82,7 @@ private:
                 dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
                 dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
                 dstPix[2] = idt_matrix[6]*in[0] + idt_matrix[7]*in[1] + idt_matrix[8]*in[2];
-                dstPix[3]=1.f;
+                dstPix[3] = 1.f;
                 dstPix+=4;
             }
         }
@@ -222,10 +222,10 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix+9);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
 
         DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix2(cam_matrix, colorspace == ACES_AP1);
+        idt.getDNGIDTMatrix2(cam_matrix + 9, colorspace == ACES_AP1);
     } else if (colorspace == REC709){
         float cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
@@ -376,6 +376,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
     int colorspace = _colorSpaceFormat->getValue();
     Dng_processor dng_processor;
+    wbobj.wb_mode = WB_KELVIN;
     wbobj.kelvin = rawInfo.temperature;
     dng_processor.set_interpolation(_debayerType->getValue()-1);
     dng_processor.set_camera_wb(cam_wb);
