@@ -47,13 +47,13 @@
 * 14-bit encoding:
 
 hi          lo
-aaaaaaaaaaaaaabb
-bbbbbbbbbbbbcccc
-ccccccccccdddddd
-ddddddddeeeeeeee
-eeeeeeffffffffff
-ffffgggggggggggg
-gghhhhhhhhhhhhhh
+aaaaaaaa aaaaaabb
+bbbbbbbb bbbbcccc
+cccccccc ccdddddd
+dddddddd eeeeeeee
+eeeeeeff ffffffff
+ffffgggg gggggggg
+gghhhhhh hhhhhhhh
 */
 
 /* group 8 pixels in 14 bytes to simplify decoding */

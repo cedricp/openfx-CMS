@@ -67,39 +67,4 @@
 #define setMlvFramerateCustom(video, newFrameRate) (video)->frame_rate = (newFrameRate)
 #define setMlvFramerateDefault(video) (video)->frame_rate = (video)->frame_rate_default
 
-/* How many cores CPU has (defaultly set to 4 which works from laptop i5 up to big i7) */
-#define setMlvCpuCores(video, cores) (video)->cpu_cores = (cores)
-#define getMlvCpuCores(video) (video)->cpu_cores
-
-/* Use setMlvAlwaysUseAmaze() to always get AMaZE frames, for best quality always */
-#define setMlvAlwaysUseAmaze(video) (video)->use_amaze = 1; (video)->current_cached_frame_active = 0
-/* Or this one for speed/ultimate playback performance, will give AMaZE if it is in cache, 
- * or bilinear if cached AMaZE frame is not avalible in cache */
-#define setMlvDontAlwaysUseAmaze(video) (video)->use_amaze = 0; (video)->current_cached_frame_active = 0
-/* Use the non debayer for best speed + no quality :-P */
-#define setMlvUseNoneDebayer(video) (video)->use_amaze = 2; (video)->current_cached_frame_active = 0
-/* Use the easy debayer for best speed + a little quality */
-#define setMlvUseSimpleDebayer(video) (video)->use_amaze = 3; (video)->current_cached_frame_active = 0
-/* Use the LMMSE debayer */
-#define setMlvUseLmmseDebayer(video) (video)->use_amaze = 4; (video)->current_cached_frame_active = 0
-/* Use the IGV debayer */
-#define setMlvUseIgvDebayer(video) (video)->use_amaze = 5; (video)->current_cached_frame_active = 0
-/* Use the AHD debayer */
-#define setMlvUseAhdDebayer(video) (video)->use_amaze = 6; (video)->current_cached_frame_active = 0
-/* Use the RCD debayer */
-#define setMlvUseRcdDebayer(video) (video)->use_amaze = 7; (video)->current_cached_frame_active = 0
-/* Use the DCB debayer */
-#define setMlvUseDcbDebayer(video) (video)->use_amaze = 8; (video)->current_cached_frame_active = 0
-
-/* Set CA correction parameters */
-#define setMlvCaCorrectionRed(video, value) (video)->ca_red = (value)
-#define setMlvCaCorrectionBlue(video, value) (video)->ca_blue = (value)
-
-/* Reset the current cached frame. Needed if a raw correction parameter changed */
-#define resetMlvCachedFrame(video) (video)->current_cached_frame_active = 0
-
-/* This is pretty much private */
-#define doesMlvAlwaysUseAmaze(video) (video)->use_amaze
-#define getMlvVideoClass(video) (video)->MLVI.videoClass
-
 #endif

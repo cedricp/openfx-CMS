@@ -128,8 +128,6 @@ static inline pixelvalue opt_med9(pixelvalue * p)
 
 static inline pixelvalue opt_med25(pixelvalue * p)
 {
-    
-    
     PIX_SORT(p[0], p[1]) ;   PIX_SORT(p[3], p[4]) ;   PIX_SORT(p[2], p[4]) ;
     PIX_SORT(p[2], p[3]) ;   PIX_SORT(p[6], p[7]) ;   PIX_SORT(p[5], p[7]) ;
     PIX_SORT(p[5], p[6]) ;   PIX_SORT(p[9], p[10]) ;  PIX_SORT(p[8], p[10]) ;

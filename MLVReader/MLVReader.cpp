@@ -158,7 +158,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
         mlv_video->get_dng_buffer(time, info, dng_size, true);
-        uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
+        uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
 
         for(int y=0; y < height_img; y++) {
             uint16_t* srcPix = raw_buffer + (height_img - 1 -y) * (width_img);
@@ -195,20 +195,11 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
-    uint16_t* raw_buffer = mlv_video->get_unpacked_dng_buffer();
+    uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
     
-    int32_t wbal[6];
-    mlv_wbal_hdr_t wbobj;
-    mlv_video->get_wb_object(&wbobj);
-    if ( ! _cameraWhiteBalance->getValue() )
-    {
-        wbobj.wb_mode = WB_KELVIN;
-        wbobj.kelvin = _colorTemperature->getValue();
-    }
-
-    ::get_white_balance(wbobj, wbal, camid);
-    float wbrgb[4] = {float(wbal[1]) / 1000000.f, float(wbal[3]) / 1000000.f, float(wbal[5]) / 1000000.f, 1.f};
-    float wb_compensation = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
+    float wbrgb[4];
+    float wb_compensation;
+    mlv_video->get_white_balance_coeffs(_colorTemperature->getValue(), wbrgb, wb_compensation, _cameraWhiteBalance->getValue());
 
     float cam_matrix[18] = {0};
     cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
@@ -362,10 +353,6 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
     
     int color_temperature = _colorTemperature->getValue();
-    mlv_wbal_hdr_t wbobj;
-    mlv_video->get_wb_object(&wbobj);
-    int camid = mlv_video->get_camid();
-    // Release MLV reader
     
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -375,18 +362,14 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
     int colorspace = _colorSpaceFormat->getValue();
     Dng_processor dng_processor(mlv_video);
-    mlv_video->unlock();
 
-    if (!_cameraWhiteBalance->getValue()){
-        wbobj.wb_mode = WB_KELVIN;
-        wbobj.kelvin = color_temperature;
-    }
+    // Release MLV reader
+    mlv_video->unlock();
 
     dng_processor.set_interpolation(_debayerType->getValue()-1);
     dng_processor.set_camera_wb(cam_wb);
-    dng_processor.set_wb_coeffs(wbobj);
-    dng_processor.set_camid(camid);
     dng_processor.set_highlight(_highlightMode->getValue());
+    dng_processor.set_color_temperature(color_temperature);
     dng_processor.setAP1IDT(colorspace == ACES_AP1);
     bool apply_wb = colorspace <= ACES_AP1;
     float scale = 1./65535;
@@ -394,9 +377,6 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
     free(dng_buffer);
-
-    // Compute colorspace matrix and adjust white balance parameters
-    float idt_matrix[9] = {0};
     
     ColorProcessor processor(*this);
     processor.setDstImg(dst);
@@ -420,6 +400,7 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
     } else if (colorspace == REC709){
         memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
     } else {
+        // XYZD50 -- Return identity matrix
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
 }

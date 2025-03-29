@@ -7,11 +7,6 @@
 #include "mlv.h"
 
 
-/* cache states */
-#define MLV_FRAME_NOT_CACHED 0
-#define MLV_FRAME_IS_CACHED 1
-#define MLV_FRAME_BEING_CACHED 2
-
 /* Struct of index of video and audio frames for quick access */
 typedef struct
 {
@@ -51,9 +46,6 @@ typedef struct {
     /* MLV/Lite file(s) */
     FILE ** file;
     char * path;
-    pthread_mutex_t * main_file_mutex; /* One for each file */
-    pthread_mutex_t g_mutexFind; /* 'g' mutexes should prevent pink frames */
-    pthread_mutex_t g_mutexCount;
 
     /* For access to MLV headers */
     mlv_file_hdr_t    MLVI;
@@ -104,31 +96,6 @@ typedef struct {
 
     /* Restricted lossless raw data bit depth */
     int lossless_bpp;
-
-    /************************************************************
-     *** CACHE AREA - used by getMlvProcessedFrame and things ***
-     ************************************************************/
-
-    /* 0 = no, 1 = (yes... cache threads are alive right now) */
-    int is_caching;
-    int cache_thread_count; /* Total active cache threads */
-    uint64_t cache_next; /* Like a cache request (any non-zero frame) */
-    pthread_mutex_t cache_mutex;
-    /* Will be set to 1 for cache threads to stop (probably only by freeMlvObject) */
-    int stop_caching;
-
-    /* Decides whether or not AMaZE *has* to be used or not, normally disabled for smooth playback */
-    int use_amaze;
-
-    /* CA correction */
-    //uint8_t ca_auto; /* off=0, on=1 */
-    float ca_red;    /* Range -5..5 */
-    float ca_blue;   /* Range -5..5 */
-
-    /* How many cores, will not neccesarily determine number of threads made in any case, but helps */
-    int cpu_cores; /* Default 4 */
-
-
 } mlvObject_t;
 
 #endif

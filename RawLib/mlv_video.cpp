@@ -7,6 +7,7 @@ extern "C"{
 	#include <camid/camera_id.h>
 }
 #include <string.h>
+#include <algorithm>
 #include "mlv_video.h"
 #include <iostream>
 #include "lens_id.h"
@@ -57,11 +58,6 @@ Mlv_video::Mlv_video(std::string filename)
 void* Mlv_video::get_mlv_object()
 {
 	return (void*)_imp->mlv_object;
-}
-
-void Mlv_video::get_wb_object(mlv_wbal_hdr_t* out)
-{
-	memcpy(out, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t ));
 }
 
 uint32_t Mlv_video::get_dng_header_size()
@@ -372,7 +368,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, 
 	return (uint16_t*)buffer;
 }
 
-uint16_t* Mlv_video::get_unpacked_dng_buffer()
+uint16_t* Mlv_video::postprocecessed_raw_buffer()
 {
 	return _imp->dng_object->image_buf_unpacked;
 }
@@ -472,4 +468,17 @@ int Mlv_video::sampling_factor_y()
 {
 	return _imp->mlv_object->RAWC.binning_y + _imp->mlv_object->RAWC.skipping_y;
 }
-
+void Mlv_video::get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation,bool cam_wb)
+{
+	int32_t wbal[6];
+	mlv_wbal_hdr_t  wbobj = _imp->mlv_object->WBAL;
+	if (!cam_wb){
+		wbobj.wb_mode = WB_KELVIN;
+		wbobj.kelvin = temperature;
+	}
+	::get_white_balance(wbobj, wbal, get_camid());
+	coeffs[0] = float(wbal[1]) / 1000000.f;
+	coeffs[1] = float(wbal[3]) / 1000000.f;
+	coeffs[2] = float(wbal[5]) / 1000000.f;
+	compensation = *std::max_element(coeffs, coeffs+3) / *std::min_element(coeffs, coeffs+3);
+}

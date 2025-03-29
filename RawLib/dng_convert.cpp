@@ -74,13 +74,9 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	// Highlight mode is highlight reconstruction
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
 
-	_ratio = 1;
-	int32_t wbal[6];
-	::get_white_balance(_wb_coeffs, wbal, _camid);
-	float wbrgb[3] = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
-	if(_highlight_mode > 0){
-		_ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
-	}
+	float wbrgb[3];// = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
+	_mlv_video->get_white_balance_coeffs(_color_temperature, wbrgb, _wb_compensation, _camera_wb);
+
 
 	if (!_camera_wb){
 		// Set white balance coefficients

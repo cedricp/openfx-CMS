@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <mlv.h>
 
 struct mlv_imp;
 
@@ -41,13 +40,11 @@ public:
 	bool valid(){return _valid;}
 	void* get_mlv_object();
 
-	void get_wb_object(mlv_wbal_hdr_t* out);
-
 	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer = false);
 	uint32_t get_dng_header_size();
 	void free_dng_buffer();
 	uint16_t* get_raw_image();
-	uint16_t* get_unpacked_dng_buffer();
+	uint16_t* postprocecessed_raw_buffer();
 
 
 	uint32_t black_level();
@@ -71,6 +68,8 @@ public:
 	void get_camera_forward_matrix1f(float matrix[9]);
 	void get_camera_matrix2f(float matrix[9]);
 	void get_camera_matrix1f(float matrix[9]);
+
+	void get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation, bool cam_wb = true);
 
 	int get_camid();
 	float focal_length();

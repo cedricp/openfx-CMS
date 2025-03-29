@@ -208,15 +208,11 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
 
     FILE * file = video->file[chunk];
 
-    /* Move to start of frame in file and read the RAW data */
-    pthread_mutex_lock(video->main_file_mutex + chunk);
-
     file_set_pos(file, frame_header_offset, SEEK_SET);
     if(fread(&video->VIDF, sizeof(mlv_vidf_hdr_t), 1, file) != 1)
     {
         DEBUG( printf("Frame header read error\n"); )
         free(raw_frame);
-        pthread_mutex_unlock(video->main_file_mutex + chunk);
         return 1;
     }
 
@@ -227,11 +223,8 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
         {
             DEBUG( printf("Frame data read error\n"); )
             free(raw_frame);
-            pthread_mutex_unlock(video->main_file_mutex + chunk);
             return 1;
         }
-
-        pthread_mutex_unlock(video->main_file_mutex + chunk);
 
         int components = 1;
         lj92 decoder_object;
@@ -260,11 +253,8 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
         {
             DEBUG( printf("Frame data read error\n"); )
             free(raw_frame);
-            pthread_mutex_unlock(video->main_file_mutex + chunk);
             return 1;
         }
-
-        pthread_mutex_unlock(video->main_file_mutex + chunk);
 
         uint32_t mask = (1 << bitdepth) - 1;
         #pragma omp parallel for
@@ -348,21 +338,8 @@ mlvObject_t * initMlvObject()
     /* Path (so separate cache threads can have their own FILE*s) */
     video->path = NULL;
 
-    /* Will avoid main file conflicts with audio and stuff */
-    pthread_mutex_init(&video->g_mutexFind, NULL);
-    pthread_mutex_init(&video->g_mutexCount, NULL);
-    pthread_mutex_init(&video->cache_mutex, NULL);
-
-    /* Seems about right */
-    setMlvCpuCores(video, 4);
-
     /* Init low level raw processing object */
     video->llrawproc = initLLRawProcObject();
-
-    /* Init CA correction */
-    //video->ca_auto = 0;
-    video->ca_red = 0.0;
-    video->ca_blue = 0.0;
 
     /* Retun pointer */
     return video;
@@ -372,10 +349,6 @@ mlvObject_t * initMlvObject()
 void freeMlvObject(mlvObject_t * video)
 {
     isMlvActive(video) = 0;
-
-    /* Stop caching and make sure using silly sleep trick */
-    video->stop_caching = 1;
-    while (video->cache_thread_count) usleep(100);
 
     /* Close all MLV file chunks */
     if(video->file) close_all_chunks(video->file, video->filenum);
@@ -393,14 +366,6 @@ void freeMlvObject(mlvObject_t * video)
 
     if(video->path) free(video->path);
     freeLLRawProcObject(video);
-
-    /* Mutex things here... */
-    for (int i = 0; i < video->filenum; ++i)
-        if(video->main_file_mutex) pthread_mutex_destroy(video->main_file_mutex + i);
-    if(video->main_file_mutex) free(video->main_file_mutex);
-    pthread_mutex_destroy(&video->g_mutexFind);
-    pthread_mutex_destroy(&video->g_mutexCount);
-    pthread_mutex_destroy(&video->cache_mutex);
 
     /* Main 1 */
     free(video);
@@ -1282,13 +1247,6 @@ int openMlvClip(mlvObject_t * video, const char * mlvPath, int open_mode, char *
         sprintf(error_message, "openMlvClip : Could not open file:  %s", video->path);
         DEBUG( printf("\n%s\n", error_message); )
         return MLV_ERR_OPEN; // can not open file
-    }
-
-    /* Mutexes for every file */
-    video->main_file_mutex = calloc(sizeof(pthread_mutex_t), video->filenum);
-    for (int i = 0; i < video->filenum; ++i)
-    {
-        pthread_mutex_init(video->main_file_mutex + i, NULL);
     }
 
     /* In preview mode we don't need to waste time on audio loading from MAPP */
