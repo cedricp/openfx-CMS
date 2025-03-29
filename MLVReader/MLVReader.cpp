@@ -276,7 +276,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         cl::NDRange sizes(width, height);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
-        timer.wait();
+        //timer.wait();
     }
 
     {
@@ -306,7 +306,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(9, wbrgb[2]);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
-        timer.wait();
+        //timer.wait();
     }
 
     {
@@ -337,7 +337,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 18, cam_matrix);
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
-        timer.wait();
+        //timer.wait();
     }
     clearPersistentMessage();
 
@@ -397,7 +397,6 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
 
     // Compute colorspace matrix and adjust white balance parameters
     float idt_matrix[9] = {0};
-    float wb_compensation = dng_processor.get_wbratio();
     
     ColorProcessor processor(*this);
     processor.setDstImg(dst);
@@ -406,11 +405,11 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.scale = scale;
     processor.width = width_img;
     processor.height = height_img;
-    compute_colorspace_xform_matrix(processor.idt_matrix, dng_processor, wb_compensation);
+    compute_colorspace_xform_matrix(processor.idt_matrix, dng_processor);
     processor.process();
 }
 
-void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor, float wbratio)
+void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_processor& dng_processor)
 {
     int colorspace = _colorSpaceFormat->getValue();
 
