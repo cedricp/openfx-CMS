@@ -270,6 +270,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_border.setArg(5, 3);
         kernel_demosaic_border.setArg(6, black_level);
         kernel_demosaic_border.setArg(7, white_level);
+        kernel_demosaic_border.setArg(8, wbrgb[0]);
+        kernel_demosaic_border.setArg(9, wbrgb[2]);
 
         cl::NDRange sizes(width, height);
         

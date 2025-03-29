@@ -215,7 +215,7 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   float4 color = buffer[0];
   if(x == 0 || y == 0 || x == (width-1) || y == (height-1))
   {
-    write_imagef (out, (int2)(x, y), fmax(color, 0.0f));  
+    write_imagef (out, (int2)(x, height - 1 - y), fmax(color, 0.0f));  
     return;
   }
 
@@ -288,7 +288,8 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
 kernel void
 border_interpolate(read_only image2d_t in, write_only image2d_t out,
                    const int width, const int height, const unsigned int filters,
-                   const int border, const unsigned int black_level, const unsigned int white_level)
+                   const int border, const unsigned int black_level, const unsigned int white_level,
+                   float rmult, float bmult)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -308,14 +309,12 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
     if (j>=0 && i>=0 && j<height && i<width)
     {
       const int f = FC(j,i,filters);
-      unsigned short val = read_imageui(in, sampleri, (int2)(i, j)).x;
+      unsigned int val = read_imageui(in, sampleri, (int2)(i, j)).x;
       if(val < black_level) val = black_level;
       sum[f] += (float)(val - black_level) / (float)(white_level - black_level);
       count[f]++;
     }
   }
-
-  //const float i = read_imagef(in, sampleri, (int2)(x, y)).x;
   
   unsigned int val = read_imageui(in, sampleri, (int2)(x, y)).x;
   if(val < black_level) val = black_level;
@@ -327,9 +326,9 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
 
   const int f = FC(y,x,filters);
 
-  if     (f == 0) o.x = i;
+  if     (f == 0) o.x = i * rmult;
   else if(f == 1) o.y = i;
-  else if(f == 2) o.z = i;
+  else if(f == 2) o.z = i * bmult;
   else            o.y = i;
 
   write_imagef (out, (int2)(x, y), fmax(o, 0.0f));
