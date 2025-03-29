@@ -357,17 +357,16 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     rawInfo.dualisointerpolation = _dualIsoAveragingMethod->getValue(); 
     rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
-    rawInfo.temperature = cam_wb ? -1 : _colorTemperature->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
-
+    
+    int color_temperature = _colorTemperature->getValue();
     mlv_wbal_hdr_t wbobj;
     mlv_video->get_wb_object(&wbobj);
     int camid = mlv_video->get_camid();
     // Release MLV reader
-    mlv_video->unlock();
-
+    
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
@@ -375,18 +374,23 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
 
     // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
     int colorspace = _colorSpaceFormat->getValue();
-    Dng_processor dng_processor;
-    wbobj.wb_mode = WB_KELVIN;
-    wbobj.kelvin = rawInfo.temperature;
+    Dng_processor dng_processor(mlv_video);
+    mlv_video->unlock();
+
+    if (!_cameraWhiteBalance->getValue()){
+        wbobj.wb_mode = WB_KELVIN;
+        wbobj.kelvin = color_temperature;
+    }
+
     dng_processor.set_interpolation(_debayerType->getValue()-1);
     dng_processor.set_camera_wb(cam_wb);
     dng_processor.set_wb_coeffs(wbobj);
     dng_processor.set_camid(camid);
     dng_processor.set_highlight(_highlightMode->getValue());
     dng_processor.setAP1IDT(colorspace == ACES_AP1);
-    bool apply_wb = colorspace > ACES_AP1;
+    bool apply_wb = colorspace <= ACES_AP1;
     float scale = 1./65535;
-
+    
     // Get raw buffer in XYZ-D50 colorspace
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
     free(dng_buffer);
@@ -419,7 +423,6 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
     } else {
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
-    for(int i=0; i<9; ++i) idt_matrix[i] *= wbratio; 
 }
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)

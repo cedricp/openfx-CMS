@@ -6,7 +6,7 @@
 class Dng_processor
 {
 public:
-	Dng_processor();
+	Dng_processor(Mlv_video* mlv_video);
 	~Dng_processor();
 
 	void unpack(uint8_t* buffer, size_t buffersize);
@@ -36,4 +36,5 @@ private:
 	float _idt_matrix[9];
 	bool _ap1_matrix = false;
 	mlv_wbal_hdr_t _wb_coeffs;
+	Mlv_video* _mlv_video;
 };

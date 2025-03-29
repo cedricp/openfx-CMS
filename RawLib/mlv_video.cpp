@@ -307,11 +307,6 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, 
 		frame = mlvob.frames - 1;
 	}
 
-	if (ri.temperature > 0){
-		mlvob.WBAL.wb_mode = WB_KELVIN;
-		mlvob.WBAL.kelvin = ri.temperature;
-	}
-
 	int cs = 0;
 	switch (ri.chroma_smooth){
         case 1:

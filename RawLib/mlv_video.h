@@ -16,7 +16,6 @@ public:
 		int dualisointerpolation = 0;
 		bool fix_focuspixels = true;
 		int32_t chroma_smooth = 0;
-		int32_t temperature = -1;
 		float crop_factor = 1.0f;
 		float focal_length = 35.0f;
 		std::string darkframe_file;

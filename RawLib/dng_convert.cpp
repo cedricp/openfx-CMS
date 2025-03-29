@@ -12,7 +12,7 @@ struct Dng_processor::dngc_impl{
 	libraw_processed_image_t* _image;
 };
 
-Dng_processor::Dng_processor() : _buffer(NULL)
+Dng_processor::Dng_processor(Mlv_video* mlv_video) : _buffer(NULL), _mlv_video(mlv_video)
 {
 	_imp = new dngc_impl;
 	_imp->libraw = new LibRaw;
@@ -70,24 +70,30 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	_imp->libraw->imgdata.params.no_auto_bright = 1.;
 	_imp->libraw->imgdata.params.half_size = 0;
 	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
+	_imp->libraw->imgdata.params.no_interpolation= 0;
+	// Highlight mode is highlight reconstruction
+	_imp->libraw->imgdata.params.highlight = _highlight_mode;
+
 	_ratio = 1;
-	if (!_camera_wb && compute_aces_matrix){
-		int32_t wbal[6];
-		::get_white_balance(_wb_coeffs, wbal, _camid);
-		float wbrgb[3] = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
-		if(_highlight_mode > 0){
-			_ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
-		}
+	int32_t wbal[6];
+	::get_white_balance(_wb_coeffs, wbal, _camid);
+	float wbrgb[3] = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
+	if(_highlight_mode > 0){
+		_ratio = *std::max_element(wbrgb, wbrgb+3) / *std::min_element(wbrgb, wbrgb+3);
+	}
+
+	if (!_camera_wb){
 		// Set white balance coefficients
 		_imp->libraw->imgdata.params.user_mul[0] = wbrgb[0];
 		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
 		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
 		_imp->libraw->imgdata.params.user_mul[3] = wbrgb[1];
 	}
-	// _imp->libraw->imgdata.params.use_rawspeed = 1;
-	_imp->libraw->imgdata.params.no_interpolation= 0;
-	// Highlight mode is highlight reconstruction
-	_imp->libraw->imgdata.params.highlight = _highlight_mode;
+
+	if (compute_aces_matrix){
+		DNGIdt::DNGIdt idt(_mlv_video, wbrgb);
+		idt.getDNGIDTMatrix2(_idt_matrix, _ap1_matrix);
+	}
 
 	unpack(buffer, buffersize);
 	if (!buffer){
@@ -111,20 +117,6 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 
 	_w = _imp->_image->width;
 	_h = _imp->_image->height;
-
-	if (!compute_aces_matrix){
-		DNGIdt::DNGIdt idt(&_imp->libraw->imgdata.rawdata);
-		idt.getDNGIDTMatrix2(_idt_matrix, _ap1_matrix);
-
-		if(_highlight_mode > 0){
-			// Fix WB scale
-			float ratio = ( *(std::max_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) /
-							*(std::min_element ( _imp->libraw->imgdata.color.pre_mul, _imp->libraw->imgdata.color.pre_mul+3)) );
-			for(int i=0; i < 9; ++i){
-				_idt_matrix[i] *= ratio;
-			}
-		}
-	}
 
 	return (uint16_t*)&_imp->_image->data;
 }
