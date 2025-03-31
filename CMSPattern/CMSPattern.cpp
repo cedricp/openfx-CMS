@@ -80,7 +80,12 @@ private:
             float *dstPix = static_cast<float*>(_dstImg->getPixelAddress(procWindow.x1, y));
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
-                if (x > _res.x) continue;
+                if (x > _res.x){
+                    *dstPix++ = 0;
+                    *dstPix++ = 0;
+                    *dstPix++ = 0;
+                    continue;
+                } 
                 int curr_x = x / 7;
                 int curr_pos = curr_y + curr_x;
                 if (curr_pos >= lut_cub)
@@ -100,6 +105,7 @@ private:
                     *dstPix++ = curr_red;
                     *dstPix++ = curr_green;  
                     *dstPix++ = curr_blue;
+                    *dstPix++ = 1;
                 }
             }
         }
@@ -145,7 +151,7 @@ void CMSPatternPlugin::render(const OFX::RenderArguments &args)
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
-    checkComponents(dstBitDepth, dstComponents);
+    //checkComponents(dstBitDepth, dstComponents);
 
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
 
@@ -196,9 +202,23 @@ OfxPointI CMSPatternPlugin::getCMSResolution()
     return res;
 }
 
+bool CMSPatternPlugin::getTimeDomain(OfxRangeD& range)
+{
+    range.min = 0;
+    range.max = 1;
+    return true;
+}
+
+bool CMSPatternPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
+{
+    return false;
+}
 
 void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
+    if (!_dstClip->isConnected()){
+        return;
+    }
     OfxPointI res = getCMSResolution();
     OfxRectI format;
     format.x1 = 0;
@@ -206,14 +226,14 @@ void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     format.y1 = 0;
     format.y2 = res.y;
 
-    double par = 1.;
-    clipPreferences.setPixelAspectRatio(*_dstClip, par);
+    clipPreferences.setOutputFrameVarying(false);
     clipPreferences.setOutputFormat(format);
-    // output is continuous
-    clipPreferences.setOutputHasContinuousSamples(true);
-    clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
 
-    //GeneratorPlugin::getClipPreferences(clipPreferences);
+    clipPreferences.setPixelAspectRatio(*_dstClip, 1);
+    clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_dstClip, OFX::ePixelComponentRGBA);
+
+    clipPreferences.setOutputHasContinuousSamples(true);
 }
 
 void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -227,6 +247,7 @@ void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSingleInstance(false);
     desc.setHostFrameThreading(false);
     desc.setSupportsMultiResolution(kSupportsMultiResolution);
+    desc.setHostFrameThreading(true);
     desc.setSupportsTiles(kSupportsTiles);
     desc.setTemporalClipAccess(false);
     desc.setRenderTwiceAlways(false);
@@ -245,18 +266,16 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
 {
     // there has to be an input clip, even for generators
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
-
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(true);
 
     OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
     dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGBA); // For some reason, Nuke crashes if not enabled
     dstClip->setSupportsTiles(kSupportsTiles);
 
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
-
-    generatorDescribeInContext(page, desc, *dstClip, eGeneratorExtentDefault, OFX::ePixelComponentRGBA, true, context);
 
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kParamLUTSizeName);
@@ -265,15 +284,15 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         param->setDefault(kParamLUTSize);
         param->setRange(8, 33);
         param->setDisplayRange(8, 33);
+        desc.addClipPreferencesSlaveParam(*param);
         if (page)
         {
             page->addChild(*param);
         }
-        desc.addClipPreferencesSlaveParam(*param);
     }
 
     {
-        OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("log2 encode");
+        OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamLog2EncodeEnable);
         param->setLabel("AntiLog2 Encode");
         param->setHint("AntiLog2 encode output samples");
         param->setDefault(false);
@@ -283,7 +302,7 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
     }
 
     {
-        OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
+        OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam(kParamLog2MinMax);
         param->setLabel("Log2 Min Max values");
         param->setHint("Min and max exposure values");
         param->setDefault(-8, 4);
@@ -300,7 +319,12 @@ CMSPatternPluginFactory::createInstance(OfxImageEffectHandle handle,
     return new CMSPatternPlugin(handle);
 }
 
+void loadPlugin()
+{
+    OFX::ofxsThreadSuiteCheck();
+}
+
 static CMSPatternPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
-mRegisterPluginFactoryInstance(p)
+static OFX::PluginFactories mypluginfactory_p(&p);
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

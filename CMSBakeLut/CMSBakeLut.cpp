@@ -52,6 +52,7 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     const double time = args.time;
     OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
+    bool alpha = dstComponents == 4;
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
@@ -108,11 +109,16 @@ void CMSBakeLutPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     }
     OfxRectI format;
     _inputClip->getFormat(format);
-    double par = 1.;
-    clipPreferences.setPixelAspectRatio(*_dstClip, par);
-    clipPreferences.setOutputFormat(format);
 
-    // output is continuous
+    clipPreferences.setOutputFormat(format);
+    
+    clipPreferences.setClipBitDepth(*_inputClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_inputClip, OFX::ePixelComponentRGB);
+    
+    clipPreferences.setPixelAspectRatio(*_dstClip, 1);
+    clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_dstClip, OFX::ePixelComponentRGB);
+
     clipPreferences.setOutputHasContinuousSamples(true);
 }
 
@@ -185,7 +191,7 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSupportsMultipleClipPARs(kSupportsMultipleClipPARs);
     desc.setSupportsMultipleClipDepths(kSupportsMultipleClipDepths);
     desc.setRenderTwiceAlways(false);
-    desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
+    desc.setRenderThreadSafety(OFX::eRenderInstanceSafe);
 #ifdef OFX_EXTENSIONS_NATRON
     desc.setChannelSelector(OFX::ePixelComponentRGB);
 #endif
@@ -196,14 +202,16 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
                                                 OFX::ContextEnum context)
 {
-    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
-    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
-    dstClip->setSupportsTiles(kSupportsTiles);
-    
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    srcClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(false);
+
+    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGBA);
+    dstClip->setSupportsTiles(kSupportsTiles);
 
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
 

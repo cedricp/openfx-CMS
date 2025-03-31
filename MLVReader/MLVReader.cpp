@@ -472,6 +472,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
         return;
     }
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+
     OfxRectI format;
     format.x1 = 0;
     format.x2 = _mlv_video[0]->raw_resolution_x();
@@ -479,9 +480,11 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     format.y2 = _mlv_video[0]->raw_resolution_y();
 
     double par = 1;
-    clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+    
+    clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }

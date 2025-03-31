@@ -28,7 +28,7 @@ public:
         _useOpenCL = fetchBooleanParam(kUseOpenCL);
     }
 
-    ~OpenCLBase()
+    virtual ~OpenCLBase()
     {
     }
 

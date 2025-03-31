@@ -2,8 +2,7 @@
 
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
-#include "ofxsGenerator.h"
-#include "ofxsLut.h"
+#include "ofxsImageEffect.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
@@ -11,18 +10,12 @@
 #include "ofxsThreadSuite.h"
 
 #define kPluginName "CMSPatternOFX"
-#define kPluginGrouping "CMSPlugin"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-    "Generate an image for 3D LUT creation"
+#define kPluginGrouping "CMSPlugins"
+#define kPluginDescription "Generate an image for 3D LUT creation"
 
 #define kPluginIdentifier "net.sf.openfx.CMSPattern"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
-
-#define kSupportsByte false
-#define kSupportsUShort false
-#define kSupportsHalf false
-#define kSupportsFloat true
 
 #define kSupportsTiles 1
 #define kSupportsMultiResolution 0
@@ -36,6 +29,9 @@
 #define kParamLutSizeHint "CMS Pattern LUT size."
 #define kParamLUTSize 16
 
+#define kParamLog2EncodeEnable "enableLog2Encode"
+#define kParamLog2MinMax "log2MinMax"
+
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #ifdef OFX_EXTENSIONS_NATRON
@@ -46,18 +42,20 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSPatternPlugin: public GeneratorPlugin
+class CMSPatternPlugin: public OFX::ImageEffect
 {
 public:
     /** @brief ctor */
     CMSPatternPlugin(OfxImageEffectHandle handle)
-        : GeneratorPlugin(handle, true, kSupportsByte, kSupportsUShort, kSupportsHalf, kSupportsFloat)
+        : OFX::ImageEffect(handle)
     {
+        _dstClip = fetchClip(kOfxImageEffectOutputClipName);
         _lutSize = fetchIntParam(kParamLUTSizeName);
-        _antiLogScale = fetchBooleanParam("log2 encode");
-        _logminmax = fetchDouble2DParam("log2 min max");
-        assert(_lutSize);
+        _antiLogScale = fetchBooleanParam(kParamLog2EncodeEnable);
+        _logminmax = fetchDouble2DParam(kParamLog2MinMax);
     }
+
+    virtual ~CMSPatternPlugin(){ }
 
 private:
     /* Override the render */
@@ -65,14 +63,30 @@ private:
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     virtual void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
     bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
+    virtual bool isVideoStream(const std::string& filename){return false;};
+    virtual bool getTimeDomain(OfxRangeD& range) OVERRIDE FINAL;
+    virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
+    
     OfxPointI getCMSResolution();
-
 private:
     OFX::IntParam *_lutSize;
     OFX::BooleanParam *_antiLogScale;
     OFX::Double2DParam *_logminmax;
+
+    OFX::Clip* _dstClip;
 };
 
-mDeclarePluginFactory(CMSPatternPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+
+void loadPlugin();
+class CMSPatternPluginFactory : public OFX::PluginFactoryHelper<CMSPatternPluginFactory> { 
+    public:
+    CMSPatternPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<CMSPatternPluginFactory>(id, verMaj, verMin)
+    {}
+        virtual void load() { loadPlugin(); }
+        virtual void unload() {} ;
+        virtual void describe(OFX::ImageEffectDescriptor &desc);
+        virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
+        virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

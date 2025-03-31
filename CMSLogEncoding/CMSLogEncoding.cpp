@@ -184,8 +184,10 @@ void CMSLogEncodingPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPr
     OfxRectI format;
     _inputClip->getFormat(format);
     double par = 1.;
-    clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+    clipPreferences.setPixelAspectRatio(*_outputClip, par);
+    clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGB);
 
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
@@ -241,7 +243,6 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
 
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
-    srcClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(false);
 
@@ -254,7 +255,7 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
 
     {
         {
-            OFX::BooleanParamDescriptor *param = desc.defineBooleanParam("antiLog");
+            OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kParamAntilog);
             param->setLabel("antiLog");
             param->setHint("Log/Antilog switch");
             param->setDefault(false);
@@ -265,7 +266,7 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
 
         {
-            OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam("log2 min max");
+            OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kParamMinMax);
             param->setLabel("Log2 Min Max values");
             param->setHint("Min and max exposure values");
             param->setDefault(-8, 4);

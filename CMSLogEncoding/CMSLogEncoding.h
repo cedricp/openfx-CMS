@@ -11,9 +11,8 @@
 #include "ofxsThreadSuite.h"
 
 #define kPluginName "CMSLogEncodingOFX"
-#define kPluginGrouping "CMSPlugin"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-    "Log2 allocation utility."
+#define kPluginGrouping "CMSPlugins"
+#define kPluginDescription "Log2 allocation utility."
 
 #define kPluginIdentifier "net.sf.openfx.CMSLogEncoding"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
@@ -30,6 +29,9 @@
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
 #define kRenderThreadSafety eRenderFullySafe
+
+#define kParamAntilog "antiLog"
+#define kParamMinMax "log2minmax"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -49,8 +51,8 @@ public:
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
-        _isAntiLog = fetchBooleanParam("antiLog");
-        _logminmax = fetchDouble2DParam("log2 min max");
+        _isAntiLog = fetchBooleanParam(kParamAntilog);
+        _logminmax = fetchDouble2DParam(kParamMinMax);
     }
 
 private:

@@ -3,7 +3,6 @@
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
 #include "ofxsImageEffect.h"
-#include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
@@ -11,25 +10,20 @@
 #include "ofxsThreadSuite.h"
 
 #define kPluginName "CMSBakeLutOFX"
-#define kPluginGrouping "CMSPlugin"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-    "Generate a 3D LUT from a CMS pattern."
+#define kPluginGrouping "CMSPlugins"
+#define kPluginDescription "Generate a 3D LUT from a CMS pattern."
 
 #define kPluginIdentifier "net.sf.openfx.CMSBakeLut"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
-
-#define kSupportsByte true
-#define kSupportsUShort true
-#define kSupportsHalf false
-#define kSupportsFloat true
 
 #define kSupportsTiles 0
 #define kSupportsMultiResolution 0
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
-#define kRenderThreadSafety eRenderFullySafe
+
+#define 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 

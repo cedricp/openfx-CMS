@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include "ofxsProcessing.H"
-#include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
@@ -18,8 +17,7 @@
 
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-"Magic lantern MLV reader plugin"
+#define kPluginDescription "Magic lantern MLV reader plugin"
 
 #define kPluginIdentifier "net.sf.openfx.MLVReader"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
@@ -72,13 +70,13 @@ public:
     /** @brief ctor */
     MLVReaderPlugin(OfxImageEffectHandle handle) : OpenCLBase(handle)
     {
+        _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
         _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
         _darkframeRange = fetchInt2DParam(kDarkframeRange);
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _mlv_audiofilename = fetchStringParam(kAudioFilename);
         _audioExportButton = fetchPushButtonParam(kAudioExport);
-        _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
         _highlightMode = fetchChoiceParam(kHighlightMode);
@@ -167,12 +165,12 @@ class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFa
     public:
     MLVReaderPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<MLVReaderPluginFactory>(id, verMaj, verMin)
     {}
-        virtual void load() { loadPlugin(); } ;
+        virtual void load() { loadPlugin(); }
         virtual void unload() {} ;
         virtual void describe(OFX::ImageEffectDescriptor &desc);
         virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
         virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
-     };
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
 
