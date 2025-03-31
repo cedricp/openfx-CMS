@@ -72,6 +72,16 @@ private:
     OFX::Double2DParam *_logminmax;
 };
 
-mDeclarePluginFactory(CMSLogEncodingPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+class CMSLogEncodingPluginFactory : public OFX::PluginFactoryHelper<CMSLogEncodingPluginFactory>
+{
+public:
+    CMSLogEncodingPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin):OFX::PluginFactoryHelper<CMSLogEncodingPluginFactory>(id, verMaj, verMin)
+    {}
+    virtual void load()
+    { OFX::ofxsThreadSuiteCheck(); }
+    virtual void unload() {}
+    virtual void describe(OFX::ImageEffectDescriptor &desc);
+    virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context); virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context); 
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

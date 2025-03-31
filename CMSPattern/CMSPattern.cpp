@@ -267,6 +267,7 @@ void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
     // there has to be an input clip, even for generators
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    srcClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(true);
 

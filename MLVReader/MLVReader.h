@@ -6,7 +6,6 @@
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
 #endif
-#include "ofxsThreadSuite.h"
 
 
 #include <mlv_video.h>
@@ -122,6 +121,7 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
     virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
+    virtual void changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName) OVERRIDE FINAL;
 
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
@@ -130,7 +130,6 @@ private:
     void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor);
 
 private:
-    OfxMultiThreadSuiteV1 *_gThreadHost = 0;
     OfxMutexHandle _videoMutex;
 
     unsigned int _numThreads;

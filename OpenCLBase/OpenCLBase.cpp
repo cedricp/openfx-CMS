@@ -135,6 +135,8 @@ bool OpenCLBase::addProgram(std::string program_path, std::string program_name)
         return false;
     }
 
+    _gThreadHost->mutexLock(_OclMutex);
+
     std::ifstream programfile;
     programfile.open(program_path.c_str());
     std::ostringstream programtext;
@@ -143,6 +145,7 @@ bool OpenCLBase::addProgram(std::string program_path, std::string program_name)
 
     if (programtext.str().empty()){
         setPersistentMessage(OFX::Message::eMessageError, "", "Failed to load OpenCL program");
+        _gThreadHost->mutexUnLock(_OclMutex);
         return false;
     }
 
@@ -160,6 +163,7 @@ bool OpenCLBase::addProgram(std::string program_path, std::string program_name)
         std::string errlog = prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(_current_cldevice);
         printf("OpenCL Error :\n%s\n", errlog.c_str());
         setPersistentMessage(OFX::Message::eMessageError, "", "Failed to create program");
+        _gThreadHost->mutexUnLock(_OclMutex);
         return false;
     }
 
@@ -167,6 +171,8 @@ bool OpenCLBase::addProgram(std::string program_path, std::string program_name)
     _program_paths.push_back(std::make_pair(program_path, program_name));
 
     clearPersistentMessage();
+
+    _gThreadHost->mutexUnLock(_OclMutex);
 
     return true;
 }

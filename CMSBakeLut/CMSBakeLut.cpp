@@ -45,6 +45,10 @@ bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
     return true;
 }
 
+bool CMSBakeLutPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
+{
+    return false;
+}
 // the overridden render function
 void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 {
@@ -52,7 +56,6 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     const double time = args.time;
     OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
-    bool alpha = dstComponents == 4;
 
     assert(OFX_COMPONENTS_OK(dstComponents));
 
@@ -113,11 +116,11 @@ void CMSBakeLutPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     clipPreferences.setOutputFormat(format);
     
     clipPreferences.setClipBitDepth(*_inputClip, OFX::eBitDepthFloat);
-    clipPreferences.setClipComponents(*_inputClip, OFX::ePixelComponentRGB);
+    clipPreferences.setClipComponents(*_inputClip, OFX::ePixelComponentRGBA);
     
     clipPreferences.setPixelAspectRatio(*_dstClip, 1);
     clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
-    clipPreferences.setClipComponents(*_dstClip, OFX::ePixelComponentRGB);
+    clipPreferences.setClipComponents(*_dstClip, OFX::ePixelComponentRGBA);
 
     clipPreferences.setOutputHasContinuousSamples(true);
 }
@@ -193,7 +196,7 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::eRenderInstanceSafe);
 #ifdef OFX_EXTENSIONS_NATRON
-    desc.setChannelSelector(OFX::ePixelComponentRGB);
+    desc.setChannelSelector(OFX::ePixelComponentRGBA);
 #endif
 
 }
@@ -238,7 +241,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamShaperSize);
+            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamEnableShaperLut);
             param->setLabel("LOG shaper LUT");
             param->setHint("Add a log shaper LUT");
             param->setEnabled(true);

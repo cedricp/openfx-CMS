@@ -488,6 +488,14 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     _gThreadHost->mutexUnLock(_videoMutex);
 }
 
+void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName)
+{
+    if (p_ClipName == kOfxImageEffectSimpleSourceClipName)
+    {
+        
+    }
+}
+
 void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 {
     desc.setLabel(kPluginName);

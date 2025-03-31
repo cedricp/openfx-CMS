@@ -63,6 +63,7 @@ private:
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
     void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
+    virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
 
 private:
     int _lutSize;
@@ -75,6 +76,15 @@ private:
     OFX::Clip* _inputClip;
 };
 
-mDeclarePluginFactory(CMSBakeLutPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+class CMSBakeLutPluginFactory : public OFX::PluginFactoryHelper<CMSBakeLutPluginFactory> { 
+    public:
+    CMSBakeLutPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<CMSBakeLutPluginFactory>(id, verMaj, verMin)
+    {}
+        virtual void load() { OFX::ofxsThreadSuiteCheck(); }
+        virtual void unload() {} ;
+        virtual void describe(OFX::ImageEffectDescriptor &desc);
+        virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
+        virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
