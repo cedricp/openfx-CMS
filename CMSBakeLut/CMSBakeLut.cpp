@@ -238,7 +238,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("enable_shaper_lut");
+            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamShaperSize);
             param->setLabel("LOG shaper LUT");
             param->setHint("Add a log shaper LUT");
             param->setEnabled(true);
@@ -249,7 +249,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
+            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam(kParamLogMinmax);
             param->setLabel("Log2 Min Max values");
             param->setHint("Shaper LUT Min and max exposure values");
             param->setDefault(-8, 4);
@@ -260,7 +260,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam("lut1dsize");
+            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam(kParamShaperSize);
             param->setLabel("Shaper LUT size");
             param->setHint("The size of the Shaper 1D LUT");
             param->appendOption("512");

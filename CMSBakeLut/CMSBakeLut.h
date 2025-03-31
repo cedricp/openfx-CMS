@@ -23,7 +23,9 @@
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
 
-#define 
+#define kParamEnableShaperLut "enable_shaper_lut"
+#define kParamLogMinmax "log2 min max"
+#define kParamShaperSize "lut1dsize"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -50,9 +52,9 @@ public:
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
 
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        _logScale = fetchBooleanParam("enable_shaper_lut");
-        _logminmax = fetchDouble2DParam("log2 min max");
-        _lut1dsize = fetchChoiceParam("lut1dsize");
+        _logScale = fetchBooleanParam(kParamEnableShaperLut);
+        _logminmax = fetchDouble2DParam(kParamLogMinmax);
+        _lut1dsize = fetchChoiceParam(kParamShaperSize);
     }
 
 private:
