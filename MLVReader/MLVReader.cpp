@@ -466,8 +466,7 @@ void MLVReaderPlugin::setMlvFile(std::string file)
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
     // MLV clip is a video stream
-    clipPreferences.setOutputFrameVarying(true);
-
+    
     if (_mlv_video.size() == 0){
         return;
     }
@@ -478,13 +477,15 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     format.x2 = _mlv_video[0]->raw_resolution_x();
     format.y1 = 0;
     format.y2 = _mlv_video[0]->raw_resolution_y();
-
-    double par = 1;
+    
+    clipPreferences.setOutputFrameVarying(true);
     clipPreferences.setOutputFormat(format);
     
-    clipPreferences.setPixelAspectRatio(*_outputClip, par);
+    clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
+
+    clipPreferences.setOutputHasContinuousSamples(true);
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }
@@ -603,7 +604,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     // There has to be an input clip
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
 
-    srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    srcClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(true);
 
