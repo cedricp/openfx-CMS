@@ -167,7 +167,7 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
         fclose(file);
     }
 
-    if (paramName == "enable_shaper_lut")
+    if (paramName == kParamEnableShaperLut)
     {
         bool isEnabled = _logScale->getValue();
         _logminmax->setEnabled(isEnabled);
