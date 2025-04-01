@@ -107,17 +107,18 @@ bool CMSVectorScope::getRegionOfDefinition(const OFX::RegionOfDefinitionArgument
         return false;
     }
 
-    if (_inputClip->isConnected()){
+    if (!_inputClip->isConnected()){
         return false;
     }
 
-    // OfxRectI window;
-    // _inputClip->getFormat(window);
+    OfxRectI window;
+    _inputClip->getFormat(window);
+    OfxRectD srod = _inputClip->getRegionOfDefinition(args.time);
 
     rod.x1 = 0;
-    rod.x2 = 1920;
+    rod.x2 = srod.x2;
     rod.y1 = 0;
-    rod.y2 = 1080;
+    rod.y2 = srod.y2;
 
     return true;
 }
@@ -125,6 +126,9 @@ bool CMSVectorScope::getRegionOfDefinition(const OFX::RegionOfDefinitionArgument
 // the overridden render function
 void CMSVectorScope::render(const OFX::RenderArguments &args)
 {
+    if (!_inputClip->isConnected()){
+        return;
+    }
     // instantiate the render code based on the pixel depth of the dst clip
     const double time = args.time;
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
@@ -140,8 +144,8 @@ void CMSVectorScope::render(const OFX::RenderArguments &args)
         return;
     }
 
-    OfxRectI window;
-    _inputClip->getFormat(window);
+    OfxRectI window = args.renderWindow;
+    //_inputClip->getFormat(window);
 
     // VectorScopeProcessor processor(*this);
     // processor.setRenderWindow(window, args.renderScale);
@@ -180,13 +184,14 @@ void CMSVectorScope::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferen
         return;
     }
     OfxRectI format;
-    //_inputClip->getFormat(format);
+    _inputClip->getFormat(format);
     format.x2 = format.y2 = 512;
     format.x1 = format.y1 = 0;
     clipPreferences.setOutputFormat(format);
     clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
+
 
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
@@ -225,10 +230,6 @@ CMSVectorScope::isIdentity(const OFX::IsIdentityArguments &args,
                              double & /*identityTime*/
                              , int& /*view*/, std::string& /*plane*/)
 {
-    if (0){
-        identityClip = _inputClip;
-        return true;
-    }
     return false;
 }
 

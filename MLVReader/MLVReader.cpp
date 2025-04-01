@@ -482,6 +482,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
+    clipPreferences.setOutputFrameRate(_mlv_video[0]->fps());
 
     clipPreferences.setOutputHasContinuousSamples(true);
 
