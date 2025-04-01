@@ -267,7 +267,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         cl::NDRange sizes(width, height);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
-        //timer.wait();
+        timer.wait();
     }
 
     {
@@ -297,7 +297,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(9, wbrgb[2]);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
-        //timer.wait();
+        timer.wait();
     }
 
     {
@@ -328,7 +328,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 18, cam_matrix);
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
-        //timer.wait();
+        timer.wait();
     }
     clearPersistentMessage();
 
