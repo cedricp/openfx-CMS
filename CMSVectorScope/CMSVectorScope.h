@@ -10,11 +10,11 @@
 #endif
 #include "ofxsThreadSuite.h"
 
-#define kPluginName "CMSLogEncodingOFX"
+#define kPluginName "CMSVectorScope"
 #define kPluginGrouping "CMSPlugins"
-#define kPluginDescription "Log2 allocation utility."
+#define kPluginDescription "Draw a vectorscope on the output"
 
-#define kPluginIdentifier "net.sf.openfx.CMSLogEncoding"
+#define kPluginIdentifier "net.sf.openfx.CMSVectorScope"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
 
@@ -30,8 +30,6 @@
 #define kSupportsMultipleClipDepths false
 #define kRenderThreadSafety eRenderFullySafe
 
-#define kParamAntilog "antiLog"
-#define kParamMinMax "log2minmax"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -43,16 +41,14 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSLogEncodingPlugin: public OFX::ImageEffect
+class CMSVectorScope: public OFX::ImageEffect
 {
 public:
     /** @brief ctor */
-    CMSLogEncodingPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
+    CMSVectorScope(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
-        _isAntiLog = fetchBooleanParam(kParamAntilog);
-        _logminmax = fetchDouble2DParam(kParamMinMax);
     }
 
 private:
@@ -67,15 +63,12 @@ private:
     int _lutSize;
     OFX::Clip* _inputClip;
     OFX::Clip* _outputClip;
-    OFX::StringParam* _outputLutFile;
-    OFX::BooleanParam *_isAntiLog;
-    OFX::Double2DParam *_logminmax;
 };
 
-class CMSLogEncodingPluginFactory : public OFX::PluginFactoryHelper<CMSLogEncodingPluginFactory>
+class CMSVectorScopeFactory : public OFX::PluginFactoryHelper<CMSVectorScopeFactory>
 {
 public:
-    CMSLogEncodingPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin):OFX::PluginFactoryHelper<CMSLogEncodingPluginFactory>(id, verMaj, verMin)
+    CMSVectorScopeFactory(const std::string& id, unsigned int verMaj, unsigned int verMin):OFX::PluginFactoryHelper<CMSVectorScopeFactory>(id, verMaj, verMin)
     {}
     virtual void load()
     { OFX::ofxsThreadSuiteCheck(); }

@@ -45,6 +45,10 @@ bool CMSBakeLutPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
     return true;
 }
 
+bool CMSBakeLutPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
+{
+    return false;
+}
 // the overridden render function
 void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
 {
@@ -108,11 +112,16 @@ void CMSBakeLutPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefer
     }
     OfxRectI format;
     _inputClip->getFormat(format);
-    double par = 1.;
-    clipPreferences.setPixelAspectRatio(*_dstClip, par);
-    clipPreferences.setOutputFormat(format);
 
-    // output is continuous
+    clipPreferences.setOutputFormat(format);
+    
+    clipPreferences.setClipBitDepth(*_inputClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_inputClip, OFX::ePixelComponentRGBA);
+    
+    clipPreferences.setPixelAspectRatio(*_dstClip, 1);
+    clipPreferences.setClipBitDepth(*_dstClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_dstClip, OFX::ePixelComponentRGBA);
+
     clipPreferences.setOutputHasContinuousSamples(true);
 }
 
@@ -161,7 +170,7 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
         fclose(file);
     }
 
-    if (paramName == "enable_shaper_lut")
+    if (paramName == kParamEnableShaperLut)
     {
         bool isEnabled = _logScale->getValue();
         _logminmax->setEnabled(isEnabled);
@@ -185,9 +194,9 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSupportsMultipleClipPARs(kSupportsMultipleClipPARs);
     desc.setSupportsMultipleClipDepths(kSupportsMultipleClipDepths);
     desc.setRenderTwiceAlways(false);
-    desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
+    desc.setRenderThreadSafety(OFX::eRenderInstanceSafe);
 #ifdef OFX_EXTENSIONS_NATRON
-    desc.setChannelSelector(OFX::ePixelComponentRGB);
+    desc.setChannelSelector(OFX::ePixelComponentRGBA);
 #endif
 
 }
@@ -196,14 +205,16 @@ void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
                                                 OFX::ContextEnum context)
 {
-    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
-    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
-    dstClip->setSupportsTiles(kSupportsTiles);
-    
     OFX::ClipDescriptor *srcClip = desc.defineClip(kOfxImageEffectSimpleSourceClipName);
     srcClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    srcClip->addSupportedComponent(OFX::ePixelComponentRGBA);
     srcClip->setSupportsTiles(kSupportsTiles);
     srcClip->setOptional(false);
+
+    OFX::ClipDescriptor *dstClip = desc.defineClip(kOfxImageEffectOutputClipName);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGB);
+    dstClip->addSupportedComponent(OFX::ePixelComponentRGBA);
+    dstClip->setSupportsTiles(kSupportsTiles);
 
     OFX::PageParamDescriptor *page = desc.definePageParam("Controls");
 
@@ -230,7 +241,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam("enable_shaper_lut");
+            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamEnableShaperLut);
             param->setLabel("LOG shaper LUT");
             param->setHint("Add a log shaper LUT");
             param->setEnabled(true);
@@ -241,7 +252,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam("log2 min max");
+            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam(kParamLogMinmax);
             param->setLabel("Log2 Min Max values");
             param->setHint("Shaper LUT Min and max exposure values");
             param->setDefault(-8, 4);
@@ -252,7 +263,7 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
         }
 
         {
-            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam("lut1dsize");
+            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam(kParamShaperSize);
             param->setLabel("Shaper LUT size");
             param->setHint("The size of the Shaper 1D LUT");
             param->appendOption("512");

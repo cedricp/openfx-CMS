@@ -184,8 +184,10 @@ void CMSLogEncodingPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPr
     OfxRectI format;
     _inputClip->getFormat(format);
     double par = 1.;
-    clipPreferences.setPixelAspectRatio(*_outputClip, par);
     clipPreferences.setOutputFormat(format);
+    clipPreferences.setPixelAspectRatio(*_outputClip, par);
+    clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
+    clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
 
     // output is continuous
     clipPreferences.setOutputHasContinuousSamples(true);
@@ -201,12 +203,10 @@ void CMSLogEncodingPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setLabel(kPluginName);
     desc.setPluginDescription(kPluginDescription);
     desc.setPluginGrouping(kPluginGrouping);
-    desc.addSupportedContext(OFX::eContextPaint);
-    desc.addSupportedContext(OFX::eContextGeneral);
     desc.addSupportedContext(OFX::eContextFilter);
     desc.addSupportedBitDepth(OFX::eBitDepthFloat);
     desc.setSingleInstance(false);
-    desc.setHostFrameThreading(false);
+    desc.setHostFrameThreading(true);
     desc.setSupportsMultiResolution(kSupportsMultiResolution);
     desc.setSupportsTiles(kSupportsTiles);
     desc.setTemporalClipAccess(false);
@@ -254,7 +254,7 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
 
     {
         {
-            OFX::BooleanParamDescriptor *param = desc.defineBooleanParam("antiLog");
+            OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kParamAntilog);
             param->setLabel("antiLog");
             param->setHint("Log/Antilog switch");
             param->setDefault(false);
@@ -265,7 +265,7 @@ CMSLogEncodingPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
 
         {
-            OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam("log2 min max");
+            OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kParamMinMax);
             param->setLabel("Log2 Min Max values");
             param->setHint("Min and max exposure values");
             param->setDefault(-8, 4);

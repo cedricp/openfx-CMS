@@ -3,7 +3,6 @@
 #include "ofxsProcessing.H"
 #include "ofxsMacros.h"
 #include "ofxsImageEffect.h"
-#include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
@@ -11,25 +10,22 @@
 #include "ofxsThreadSuite.h"
 
 #define kPluginName "CMSBakeLutOFX"
-#define kPluginGrouping "CMSPlugin"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-    "Generate a 3D LUT from a CMS pattern."
+#define kPluginGrouping "CMSPlugins"
+#define kPluginDescription "Generate a 3D LUT from a CMS pattern."
 
 #define kPluginIdentifier "net.sf.openfx.CMSBakeLut"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
-
-#define kSupportsByte true
-#define kSupportsUShort true
-#define kSupportsHalf false
-#define kSupportsFloat true
 
 #define kSupportsTiles 0
 #define kSupportsMultiResolution 0
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
-#define kRenderThreadSafety eRenderFullySafe
+
+#define kParamEnableShaperLut "enable_shaper_lut"
+#define kParamLogMinmax "log2 min max"
+#define kParamShaperSize "lut1dsize"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -56,9 +52,9 @@ public:
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
 
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        _logScale = fetchBooleanParam("enable_shaper_lut");
-        _logminmax = fetchDouble2DParam("log2 min max");
-        _lut1dsize = fetchChoiceParam("lut1dsize");
+        _logScale = fetchBooleanParam(kParamEnableShaperLut);
+        _logminmax = fetchDouble2DParam(kParamLogMinmax);
+        _lut1dsize = fetchChoiceParam(kParamShaperSize);
     }
 
 private:
@@ -67,6 +63,7 @@ private:
     virtual void getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences) OVERRIDE FINAL;
     bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
     void changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName) OVERRIDE FINAL;
+    virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
 
 private:
     int _lutSize;
@@ -79,6 +76,15 @@ private:
     OFX::Clip* _inputClip;
 };
 
-mDeclarePluginFactory(CMSBakeLutPluginFactory, { OFX::ofxsThreadSuiteCheck(); }, {});
+class CMSBakeLutPluginFactory : public OFX::PluginFactoryHelper<CMSBakeLutPluginFactory> { 
+    public:
+    CMSBakeLutPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<CMSBakeLutPluginFactory>(id, verMaj, verMin)
+    {}
+        virtual void load() { OFX::ofxsThreadSuiteCheck(); }
+        virtual void unload() {} ;
+        virtual void describe(OFX::ImageEffectDescriptor &desc);
+        virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
+        virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT

@@ -6,6 +6,7 @@
 #include <CL/opencl.hpp>
 #include "ofxsImageEffect.h"
 #include "ofxsMacros.h"
+#include "ofxsThreadSuite.h"
 #include <map>
 
 #define kUseOpenCL "UseOpenCL"
@@ -26,10 +27,12 @@ public:
     {
         _openCLDevices = fetchChoiceParam(kOpenCLDevice);
         _useOpenCL = fetchBooleanParam(kUseOpenCL);
+        _gThreadHost->mutexCreate(&_OclMutex, 0);
     }
 
-    ~OpenCLBase()
+    virtual ~OpenCLBase()
     {
+        _gThreadHost->mutexDestroy(_OclMutex);
     }
 
     bool addProgram(std::string program_path, std::string program_name);
@@ -42,8 +45,11 @@ protected:
     void setupOpenCL();
     cl::Device& getCurrentCLDevice(){return _current_cldevice;}
     cl::Context& getCurrentCLContext(){return _current_clcontext;}
+    OfxMultiThreadSuiteV1 *_gThreadHost = 0;
 
 private:
+    OfxMutexHandle _OclMutex;
+
     std::map<std::string, cl::Program> _programs;
     std::vector<std::pair<std::string, std::string>> _program_paths;
     OFX::ChoiceParam* _openCLDevices;

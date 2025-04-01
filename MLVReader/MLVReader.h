@@ -2,12 +2,10 @@
 
 #include <cstdlib>
 #include "ofxsProcessing.H"
-#include "ofxsLut.h"
 #include "ofxsCoords.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
 #endif
-#include "ofxsThreadSuite.h"
 
 
 #include <mlv_video.h>
@@ -18,8 +16,7 @@
 
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
-#define kPluginDescription                                                                                                                                                                                                                                             \
-"Magic lantern MLV reader plugin"
+#define kPluginDescription "Magic lantern MLV reader plugin"
 
 #define kPluginIdentifier "net.sf.openfx.MLVReader"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
@@ -72,13 +69,13 @@ public:
     /** @brief ctor */
     MLVReaderPlugin(OfxImageEffectHandle handle) : OpenCLBase(handle)
     {
+        _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
         _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
         _darkframeRange = fetchInt2DParam(kDarkframeRange);
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _mlv_audiofilename = fetchStringParam(kAudioFilename);
         _audioExportButton = fetchPushButtonParam(kAudioExport);
-        _outputClip = fetchClip(kOfxImageEffectOutputClipName);
         _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
         _highlightMode = fetchChoiceParam(kHighlightMode);
@@ -124,15 +121,15 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
     virtual bool isVideoStream(const std::string& filename){return true;};
     virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
+    virtual void changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName) OVERRIDE FINAL;
 
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
-    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img, OfxRectD rodd);
+    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img);
     void setMlvFile(std::string file);
     void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor);
 
 private:
-    OfxMultiThreadSuiteV1 *_gThreadHost = 0;
     OfxMutexHandle _videoMutex;
 
     unsigned int _numThreads;
@@ -167,12 +164,12 @@ class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFa
     public:
     MLVReaderPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<MLVReaderPluginFactory>(id, verMaj, verMin)
     {}
-        virtual void load() { loadPlugin(); } ;
+        virtual void load() { loadPlugin(); }
         virtual void unload() {} ;
         virtual void describe(OFX::ImageEffectDescriptor &desc);
         virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
         virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
-     };
+};
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
 

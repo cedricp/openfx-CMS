@@ -63,12 +63,15 @@ inline void invert_matrix(const float *mat, float *result)
 inline void get_matrix_cam2rec709(float colormatrix[9], float result[9])
 {
     float rgb2cam[9];
+    // RGB2CAM = REC709TOXYZ * RGB2XYZ(colormatrix)
     mat_mat_mult(colormatrix, rec709toxyzD50, rgb2cam);
     float sum[3] = {rgb2cam[0] + rgb2cam[1] + rgb2cam[2],
         rgb2cam[3] + rgb2cam[4] + rgb2cam[5],
         rgb2cam[6] + rgb2cam[7] + rgb2cam[8]};
+    // Normalize rows
     rgb2cam[0] /= sum[0];rgb2cam[1] /= sum[0];rgb2cam[2] /= sum[0];
     rgb2cam[3] /= sum[1];rgb2cam[4] /= sum[1];rgb2cam[5] /= sum[1];
     rgb2cam[6] /= sum[2];rgb2cam[7] /= sum[2];rgb2cam[8] /= sum[2];
+    // Invert RGB2CAM matrix
     invert_matrix(rgb2cam, result);
 }
