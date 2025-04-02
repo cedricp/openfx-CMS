@@ -25,6 +25,7 @@
 #include <climits>
 #include <cfloat>
 #include <atomic>
+#include <gfx.h>
 
 #include "CMSVectorScope.h"
 
@@ -37,66 +38,14 @@ inline void RGB_BT709_2_YUV(const float rgb[3], float out[3])
     out[2] = 0.615f * rgb[0] - 0.55861f * rgb[1] - 0.05639f * rgb[2];
 }
 
-class VectorScopeProcessor : public OFX::ImageProcessor
+inline uint16_t color16(char r, char g, char b)
 {
-public:
-    VectorScopeProcessor(OFX::ImageEffect &instance) : ImageProcessor(instance)
-    {
-
-    }
-
-    ~VectorScopeProcessor()
-    {
-    }
-
-    void setValues(OFX::Image *src, OFX::Image *dst)
-    {
-        _srcimg = src;
-        _dstimg = dst;
-        _nComponentsSrc = _srcimg->getPixelComponentCount();
-        _nComponentsDst = _dstimg->getPixelComponentCount();
-    }
-
-    OFX::Image *_srcimg, *_dstimg;
-private:
-    int _nComponentsSrc;
-    int _nComponentsDst;
-
-    void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
-    {
-        OFX::unused(rs);
-
-        int alphaDst = _nComponentsDst == 4;
-
-        for (int y = procWindow.y1; y < procWindow.y2; ++y){
-            const float *srcPix = (float *)_srcimg->getPixelAddress(procWindow.x1, y);
-            if (!srcPix) continue;
-            for (int x = procWindow.x1; x < procWindow.x2; ++x){
-                float yuv[3];
-                RGB_BT709_2_YUV(srcPix, yuv);
-                int vx = 255. + (yuv[1]*127.);
-                int vy = 255. + -(yuv[2]*127.);
-
-                float *dstPix = (float *)_dstimg->getPixelAddress(vx, vy);
-                if (!dstPix) continue;
-                // std::atomic<float> Rin(dstPix[0]);
-                // float Rout = Rin.load() + .1;
-                // Rin.store(Rout);
-                // std::atomic<float> Gin(dstPix[1]);
-                // float Gout = Gin.load() + .1;
-                // Rin.store(Gout);
-                // std::atomic<float> Bin(dstPix[2]);
-                // float Bout = Bin.load() + .1;
-                // Rin.store(Bout);
-                dstPix[0] += srcPix[0] * .1f;
-                dstPix[1] += srcPix[1] * .1f;
-                dstPix[2] += srcPix[2] * .1f;
-
-                srcPix += _nComponentsSrc;
-            }
-        }
-    }
-};
+    uint16_t color;
+    color = (r >> 3) << 11;
+    color |= (g >> 2) << 5;
+    color |= (b >> 3);
+    return color;
+}
 
 bool CMSVectorScope::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
 {
@@ -145,36 +94,124 @@ void CMSVectorScope::render(const OFX::RenderArguments &args)
     }
 
     OfxRectI window = args.renderWindow;
-    //_inputClip->getFormat(window);
-
-    // VectorScopeProcessor processor(*this);
-    // processor.setRenderWindow(window, args.renderScale);
-    // processor.setValues(src.get(), dst.get());
-    // processor.process();
-    OFX::Image *_srcimg = src.get();
+    int scope_buffer_size = _scopeResolution.x * _scopeResolution.x * 3;
+    std::vector<float> scope_buffer;
+    scope_buffer.resize(scope_buffer_size);
+    create_scope(src.get(), scope_buffer.data());
     OFX::Image *_dstimg = dst.get();
+    OFX::Image *_srcimg = src.get();
 
+    int _nComponentsDst = _outputClip->getPixelComponentCount();
     int _nComponentsSrc = _inputClip->getPixelComponentCount();
 
     for (int y = window.y1; y < window.y2; ++y){
+        float *dstPix = (float *)_dstimg->getPixelAddress(window.x1, y);
         const float *srcPix = (float *)_srcimg->getPixelAddress(window.x1, y);
-        if (!srcPix) continue;
+        if (!dstPix || !srcPix) continue;
         for (int x = window.x1; x < window.x2; ++x){
-            float yuv[3];
-            RGB_BT709_2_YUV(srcPix, yuv);
-            int vx = 255. + (yuv[1]*128);
-            int vy = 255. + -(yuv[2]*128);
+            int scopeCoordX = x - 30;
+            int scopeCoordY = y - 30;
 
-            float *dstPix = (float *)_dstimg->getPixelAddress(vx, vy);
-            if (!dstPix) continue;
-            dstPix[0] += srcPix[0] * .1f;
-            dstPix[1] += srcPix[1] * .1f;
-            dstPix[2] += srcPix[2] * .1f;
-            dstPix[3] = 1.f;
-
+            if (scopeCoordX >= 0 && scopeCoordX < _scopeResolution.x && scopeCoordY >= 0 && scopeCoordY < _scopeResolution.y){
+                // Borders of the scope are gray
+                if (scopeCoordX == 0 || scopeCoordY == 0 || scopeCoordX == _scopeResolution.x - 1 || scopeCoordY == _scopeResolution.y - 1){
+                    dstPix[0] = .6f;
+                    dstPix[1] = .6f;
+                    dstPix[2] = .6f;
+                    if (_nComponentsDst > 3){
+                        dstPix[3] = 1.f;
+                    }
+                } else {
+                    float *scopePix = scope_buffer.data() + ((y - 30) * _scopeResolution.x + (x - 30)) * 3;
+                    for (int i = 0; i < 3; ++i){
+                        dstPix[i] = scopePix[i];
+                    }
+                    if (_nComponentsDst > 3) dstPix[3] = 1.f;
+                }
+            } else {
+                for (int i = 0; i < 3; ++i){
+                    dstPix[i] = srcPix[i];
+                }
+                if (_nComponentsDst > 3) dstPix[3] = _nComponentsSrc > 3 ? srcPix[3] : 1.f;
+            }
             srcPix += _nComponentsSrc;
+            dstPix += _nComponentsDst;
+        }   
+    }
+}
+
+void CMSVectorScope::create_scope(OFX::Image *input, float* buffer)
+{
+    GFXcanvasFloat scopeCanvas(_scopeResolution.x, _scopeResolution.y, buffer);
+
+    scopeCanvas.fillCircle(scopeCanvas.width() / 2, scopeCanvas.height() / 2, scopeCanvas.width() / 2.5, color16(50, 50, 50));
+    scopeCanvas.drawLine(   scopeCanvas.width() / 2, scopeCanvas.height() / 2 + scopeCanvas.height() / 2.5,
+                            scopeCanvas.width() / 2, scopeCanvas.height() / 2 - scopeCanvas.height() / 2.5, color16(100,100,100));
+    scopeCanvas.drawLine(   scopeCanvas.width() / 2 + scopeCanvas.width() / 2.5, scopeCanvas.height() / 2,
+                            scopeCanvas.width() / 2 - scopeCanvas.height() / 2.5, scopeCanvas.height() / 2, color16(100,100,100));
+
+    int input_width = input->getBounds().x2;
+    int input_height = input->getBounds().y2;
+    int input_components = input->getPixelComponentCount();
+    float yuv[3];
+    float red[3] = {1,0,0};
+    float green[3] = {0,1,0};
+    float blue[3] = {0,0,1};
+    float yellow[3] = {1,1,0};
+    float magenta[4] = {1,0,1};
+    float cyan[4] = {0,1,1};
+
+    for(int y = 0; y < input_height; ++y){
+        const float *srcPix = (float *)input->getPixelAddress(0, y);
+
+        for(int x = 0; x < input_width; ++x){
+            RGB_BT709_2_YUV(srcPix, yuv);
+            // Clamp
+            int vx = 255. + (yuv[1]*255);
+            int vy = 255. + (yuv[2]*255);
+            if (vx > 0 && vx < _scopeResolution.x && vy > 0 && vy < _scopeResolution.y){
+                float* destPix = buffer + (vy * _scopeResolution.x + vx) * 3;
+                if (destPix[0] < 1 && destPix[1] < 1 && destPix[2] < 1){
+                    destPix[0] += srcPix[0] * .1f;
+                    destPix[1] += srcPix[1] * .1f;
+                    destPix[2] += srcPix[2] * .1f;
+                }
+            }
+            srcPix += input_components;
         }
     }
+
+    int posx, posy;
+    RGB_BT709_2_YUV(red, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'R', color16(100,100,100), color16(100,100,100), 1);
+    RGB_BT709_2_YUV(green, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'G', color16(100,100,100), color16(100,100,100), 1);
+    RGB_BT709_2_YUV(blue, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'B', color16(100,100,100), color16(100,100,100), 1);
+    RGB_BT709_2_YUV(yellow, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'Y', color16(100,100,100), color16(100,100,100), 1);
+    RGB_BT709_2_YUV(cyan, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'C', color16(100,100,100), color16(100,100,100), 1);
+    RGB_BT709_2_YUV(magenta, yuv);
+    posx = 250 + (yuv[1]*255);
+    posy = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(posx, posy - 6, 'M', color16(100,100,100), color16(100,100,100), 1);
 }
 
 
@@ -185,12 +222,11 @@ void CMSVectorScope::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferen
     }
     OfxRectI format;
     _inputClip->getFormat(format);
-    format.x2 = format.y2 = 512;
-    format.x1 = format.y1 = 0;
     clipPreferences.setOutputFormat(format);
     clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
+    clipPreferences.setOutputPremultiplication(OFX::eImageOpaque);
 
 
     // output is continuous

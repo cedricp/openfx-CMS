@@ -89,7 +89,6 @@ public:
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
-        _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         if (_mlvfilename_param->getValue().empty() == false) {

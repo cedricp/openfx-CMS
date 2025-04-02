@@ -25,6 +25,7 @@ public:
     /** @brief ctor */
     OpenCLBase(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
     {
+        _gThreadHost = (OfxMultiThreadSuiteV1 *) OFX::fetchSuite(kOfxMultiThreadSuite, 1);
         _openCLDevices = fetchChoiceParam(kOpenCLDevice);
         _useOpenCL = fetchBooleanParam(kUseOpenCL);
         _gThreadHost->mutexCreate(&_OclMutex, 0);

@@ -18,12 +18,7 @@
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.
 #define kPluginVersionMinor 0 // Increment this when you have fixed a bug or made it faster.
 
-#define kSupportsByte true
-#define kSupportsUShort true
-#define kSupportsHalf false
-#define kSupportsFloat true
-
-#define kSupportsTiles 1
+#define kSupportsTiles 0
 #define kSupportsMultiResolution 0
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
@@ -49,6 +44,8 @@ public:
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
+        _scopeResolution.x = 512;
+        _scopeResolution.y = 512;
     }
 
 private:
@@ -60,7 +57,9 @@ private:
     bool isIdentity(const OFX::IsIdentityArguments &args, OFX::Clip * &identityClip, double &identityTime, int&view, std::string& plane) OVERRIDE FINAL;
 
 private:
+    void create_scope(OFX::Image *input, float* buffer);
     int _lutSize;
+    OfxPointI _scopeResolution;
     OFX::Clip* _inputClip;
     OFX::Clip* _outputClip;
 };
