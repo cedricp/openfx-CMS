@@ -4,6 +4,57 @@
 
 #include <stdint.h>
 
+template <class T>
+class vec2
+{
+public:
+    T x, y;
+    vec2(){
+        x = y = 0;
+    }
+    vec2(const T& X, const T& Y){
+        x = X; y = Y;
+    }
+    T norm(){
+        return sqrt(x*x+y*y);
+    }
+    vec2 operator + (const vec2<T>& b){
+        return vec2(x+b.x, y+b.y);
+    }
+    vec2 operator * (const vec2<T>& b){
+        return vec2(x*b.x, y*b.y);
+    }
+    vec2 operator * (const T& b){
+        return vec2(x*b, y*b);
+    }
+    vec2 operator / (const T& b){
+      return vec2(x/b, y/b);
+    }
+
+    vec2& operator *= (const vec2<T>& b){
+      x *= b.x;
+      y *= b.y;
+      return *this;
+    }
+    vec2& operator *= (const T& b){
+      x *= b;
+      y *= b;
+      return *this;
+    }
+
+    vec2& operator /= (const vec2<T>& b){
+      x /= b.x;
+      y /= b.y;
+      return *this;
+    }
+
+    vec2& operator /= (const T& b){
+      x /= b;
+      y /= b;
+      return *this;
+    }
+};
+
 typedef struct
 {
   uint16_t bitmapOffset; ///< Pointer into GFXfont->bitmap
