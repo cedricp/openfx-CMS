@@ -187,7 +187,7 @@ void CMSVectorScope::create_scope(OFX::Image *input, float* buffer)
     float magenta[3] = {1,0,1};
     float cyan[3] = {0,1,1};
     float fleshtone[3] = {1., 0.7731, 0.67};
-    int posx, posy;
+    vec2f pos;
 
     for (int i = 0; i < 360; i+=10){
         float size = i % 20 ? 6 : 12;
@@ -202,50 +202,50 @@ void CMSVectorScope::create_scope(OFX::Image *input, float* buffer)
 
     // Draw skin tone
     RGB_BT709_2_YUV(fleshtone, yuv);
-    vec2<float> uv(yuv[1], -yuv[2]);
+    vec2f uv(yuv[1], -yuv[2]);
     float norm = uv.norm();
     uv /= norm;
     uv *= circle_size;
-    posx = centerx + uv.x;
-    posy = centery + uv.y;
-    scopeCanvas.drawLine(centerx, centery, posx, posy, color16(70,70,70));
+    pos.x = centerx + uv.x;
+    pos.y = centery + uv.y;
+    scopeCanvas.drawLine(centerx, centery, pos.x, pos.y, color16(70,70,70));
 
     // Draw color components
     RGB_BT709_2_YUV(red, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'R', color16(100,0,0), color16(100,100,100), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'R', color16(100,0,0), color16(100,100,100), 1);
 
     RGB_BT709_2_YUV(green, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'G', color16(0,100,0), color16(100,100,0), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'G', color16(0,100,0), color16(100,100,0), 1);
 
     RGB_BT709_2_YUV(blue, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'B', color16(0,0,100), color16(160,100,100), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'B', color16(0,0,100), color16(160,100,100), 1);
 
     RGB_BT709_2_YUV(yellow, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'Y', color16(100,100,0), color16(100,100,100), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'Y', color16(100,100,0), color16(100,100,100), 1);
     
     RGB_BT709_2_YUV(cyan, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'C', color16(0,100,100), color16(100,100,100), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'C', color16(0,100,100), color16(100,100,100), 1);
 
     RGB_BT709_2_YUV(magenta, yuv);
-    posx = 250 + (yuv[1]*255);
-    posy = 250 + (-yuv[2]*255);
-    scopeCanvas.drawRect(posx, posy, 10, 10, color16(100,100,100));
-    scopeCanvas.drawChar(posx, posy - 6, 'M', color16(100,0,100), color16(100,100,100), 1);
+    pos.x = 250 + (yuv[1]*255);
+    pos.y = 250 + (-yuv[2]*255);
+    scopeCanvas.drawRect(pos.x, pos.y, 10, 10, color16(100,100,100));
+    scopeCanvas.drawChar(pos.x, pos.y - 6, 'M', color16(100,0,100), color16(100,100,100), 1);
 }
 
 

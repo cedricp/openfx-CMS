@@ -17,7 +17,6 @@ struct mlv_imp
 {
 	mlvObject_t* mlv_object = NULL;
 	dngObject_t* dng_object = NULL;
-	mlv_wbal_hdr_t original_wbal;
 	std::string mlvfilename;
 };
 
@@ -31,13 +30,14 @@ std::string get_map_name(mlvObject_t* mvl_object)
 
 Mlv_video::Mlv_video(std::string filename)
 {
+	_shared = false;
 	_imp = new mlv_imp;
 	_imp->mlvfilename = filename;
 
 	int err;
 	char err_mess[512];
 
-	_imp->mlv_object = initMlvObjectWithClip(filename.c_str(), MLV_OPEN_FULL, &err, err_mess);
+	_imp->mlv_object = initMlvObjectWithClip(filename.c_str(), &err, err_mess);
 	_imp->dng_object = NULL;
 
 	
@@ -51,8 +51,31 @@ Mlv_video::Mlv_video(std::string filename)
 
 	int par[4] = {1,1,1,1};
 	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
+}
 
-	memcpy(&_imp->original_wbal, &_imp->mlv_object->WBAL, sizeof(mlv_wbal_hdr_t));
+Mlv_video::Mlv_video(const Mlv_video& mlv)
+{
+	_shared = true;
+	_imp = new mlv_imp;
+	_imp->mlvfilename = mlv._imp->mlvfilename;
+
+	_imp->mlv_object = (mlvObject_t*)malloc(sizeof(mlvObject_t));
+
+	memcpy(_imp->mlv_object, mlv._imp->mlv_object, sizeof(mlvObject_t));
+	initMlvFiles(_imp->mlvfilename.c_str(), _imp->mlv_object);
+
+	_imp->dng_object = NULL;
+	_valid = true;
+
+	int par[4] = {1,1,1,1};
+	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
+}
+
+Mlv_video::~Mlv_video()
+{
+	freeMlvObject(_imp->mlv_object, _shared);
+	freeDngObject(_imp->dng_object);
+	delete _imp;
 }
 
 void* Mlv_video::get_mlv_object()
@@ -238,13 +261,6 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 	}
 	free(avg_buf);
 	return true;
-}
-
-Mlv_video::~Mlv_video()
-{
-	freeMlvObject(_imp->mlv_object);
-	freeDngObject(_imp->dng_object);
-	delete _imp;
 }
 
 void Mlv_video::free_dng_buffer()

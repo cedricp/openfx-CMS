@@ -56,7 +56,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 extern "C"
 {
-    extern char FOCUSPIXELMAPFILE[256];
+    extern char FOCUSPIXELMAP_DIRECTORY[256];
 }
 
 void loadPlugin();
@@ -98,7 +98,7 @@ public:
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         std::string debayer_program = _pluginPath + "/Contents/Resources/debayer_ppg.cl";
 
-        strcpy(FOCUSPIXELMAPFILE, focusPixelMap.c_str());
+        strcpy(FOCUSPIXELMAP_DIRECTORY, focusPixelMap.c_str());
         addProgram(debayer_program, "debayer_ppg");
     }
 
@@ -161,8 +161,8 @@ private:
 
 class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFactory> { 
     public:
-    MLVReaderPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<MLVReaderPluginFactory>(id, verMaj, verMin)
-    {}
+        MLVReaderPluginFactory(const std::string& id, unsigned int verMaj, unsigned int verMin)  :OFX::PluginFactoryHelper<MLVReaderPluginFactory>(id, verMaj, verMin)
+        {}
         virtual void load() { loadPlugin(); }
         virtual void unload() {} ;
         virtual void describe(OFX::ImageEffectDescriptor &desc);

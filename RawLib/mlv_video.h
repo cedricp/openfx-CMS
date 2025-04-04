@@ -26,11 +26,13 @@ public:
 private:
 	bool _valid = false;
 	bool _locked = false;
+	bool _shared = false;
 
 public:
 
 
 	Mlv_video(std::string filename);
+	Mlv_video(const Mlv_video&);
 	~Mlv_video();
 
 	void lock(){_locked = true;}

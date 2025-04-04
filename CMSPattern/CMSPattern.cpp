@@ -69,21 +69,29 @@ private:
         int lut_cub = lut_sqr * _lutsize;
         int num_x = _res.x / 7;
 
+        bool alpha = _dstImg->getPixelComponents() == OFX::ePixelComponentRGBA;
+
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
             if (_effect.abort())
             {
                 break;
             }
-            if (y > _res.y) continue;
-            int curr_y = y / 7 * num_x;
             float *dstPix = static_cast<float*>(_dstImg->getPixelAddress(procWindow.x1, y));
+            if (y > _res.y){
+                *dstPix++ = 0;
+                *dstPix++ = 0;
+                *dstPix++ = 0;
+                if (alpha) *dstPix++ = 0;
+            }
+            int curr_y = y / 7 * num_x;
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 if (x > _res.x){
                     *dstPix++ = 0;
                     *dstPix++ = 0;
                     *dstPix++ = 0;
+                    if (alpha) *dstPix++ = 0;
                     continue;
                 } 
                 int curr_x = x / 7;
@@ -93,6 +101,7 @@ private:
                     *dstPix++ = 0;
                     *dstPix++ = 0;
                     *dstPix++ = 0;
+                    if (alpha) *dstPix++ = 0;
                 } else {
                     float curr_red = float(curr_pos % _lutsize) / (_lutsize - 1);
                     float curr_green = float((curr_pos / _lutsize) % _lutsize) / (_lutsize - 1);
@@ -105,7 +114,7 @@ private:
                     *dstPix++ = curr_red;
                     *dstPix++ = curr_green;  
                     *dstPix++ = curr_blue;
-                    *dstPix++ = 1;
+                    if (alpha) *dstPix++ = 1;
                 }
             }
         }
@@ -123,7 +132,7 @@ bool CMSPatternPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgume
 
         return false;
     }
-    
+
     auto resolution = getCMSResolution();
     rod.x1 = 0;
     rod.x2 = resolution.x;
@@ -150,8 +159,6 @@ void CMSPatternPlugin::render(const OFX::RenderArguments &args)
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
 
     assert(OFX_COMPONENTS_OK(dstComponents));
-
-    //checkComponents(dstBitDepth, dstComponents);
 
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
 
@@ -216,9 +223,6 @@ bool CMSPatternPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Cli
 
 void CMSPatternPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-    if (!_dstClip->isConnected()){
-        return;
-    }
     OfxPointI res = getCMSResolution();
     OfxRectI format;
     format.x1 = 0;
@@ -255,10 +259,6 @@ void CMSPatternPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setSupportsMultipleClipDepths(kSupportsMultipleClipDepths);
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
-#ifdef OFX_EXTENSIONS_NATRON
-    desc.setChannelSelector(OFX::ePixelComponentRGB);
-#endif
-
 }
 
 void CMSPatternPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,

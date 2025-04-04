@@ -55,6 +55,8 @@ public:
     }
 };
 
+typedef vec2<float> vec2f;
+
 typedef struct
 {
   uint16_t bitmapOffset; ///< Pointer into GFXfont->bitmap

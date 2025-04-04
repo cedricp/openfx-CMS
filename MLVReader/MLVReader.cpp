@@ -427,6 +427,7 @@ bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip
 void MLVReaderPlugin::setMlvFile(std::string file)
 {
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+
     for (Mlv_video* mlv : _mlv_video){
         if (mlv){
             // Wait for the videostream to be released by renderer
@@ -441,23 +442,26 @@ void MLVReaderPlugin::setMlvFile(std::string file)
     // As mlv-lib does not support multi threading
     // because of file operations, I just create
     // multiples instances
-    for (int i = 0; i < _numThreads; ++i){
-        Mlv_video* mlv_video = new Mlv_video(file);
-        _mlvfilename = file;
-        if (!mlv_video->valid()){
-            delete mlv_video;
-        } else {
-            if (i == 0){
-                _maxValue = pow(2, mlv_video->bpp());
-                OfxPointI tr;
-                tr.x = 0;
-                tr.y = mlv_video->frame_count();
-                _timeRange->setValue(tr);
-                _mlv_fps->setValue(mlv_video->fps());
-            }
-            _mlv_video.push_back(mlv_video);
-        }
+    Mlv_video* mlv_video = new Mlv_video(file);
+    _mlvfilename = file;
+    if (!mlv_video->valid()){
+        delete mlv_video;
+    } else {
+        _maxValue = pow(2, mlv_video->bpp());
+        OfxPointI tr;
+        tr.x = 0;
+        tr.y = mlv_video->frame_count();
+        _timeRange->setValue(tr);
+        _mlv_fps->setValue(mlv_video->fps());
+        _mlv_video.push_back(mlv_video);
     }
+
+    for (int i = 0; i < _numThreads-1; ++i){
+        // Copy video stream, fast way
+        Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
+        _mlv_video.push_back(mlv_videodup);
+    }
+
     _gThreadHost->mutexUnLock(_videoMutex);
 }
 
@@ -483,6 +487,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
     clipPreferences.setOutputFrameRate(_mlv_video[0]->fps());
+    clipPreferences.setOutputPremultiplication(OFX::eImageUnPreMultiplied);
 
     clipPreferences.setOutputHasContinuousSamples(false);
 
@@ -523,6 +528,7 @@ void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 
 void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
 {
+    
     if (paramName == kMLVfileParamter)
     {
         std::string filename = _mlvfilename_param->getValue();

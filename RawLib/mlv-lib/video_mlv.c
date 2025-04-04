@@ -310,11 +310,11 @@ void getMlvRawFrameFloat(mlvObject_t * video, uint64_t frameIndex, float * outpu
 
 /* To initialise mlv object with a clip
  * Two functions in one */
-mlvObject_t * initMlvObjectWithClip(const char * mlvPath, int preview, int * err, char * error_message)
+mlvObject_t * initMlvObjectWithClip(const char * mlvPath, int * err, char * error_message)
 {
     mlvObject_t * video = initMlvObject();
     char error_message_tmp[256];
-    int err_tmp =  openMlvClip(video, mlvPath, preview, error_message_tmp);
+    int err_tmp =  openMlvClip(video, mlvPath, error_message_tmp);
     if (err != NULL) *err = err_tmp;
     if (error_message != NULL) strcpy(error_message, error_message_tmp);
     return video;
@@ -346,26 +346,26 @@ mlvObject_t * initMlvObject()
 }
 
 /* Free all memory and close file */
-void freeMlvObject(mlvObject_t * video)
+void freeMlvObject(mlvObject_t * video, int shared)
 {
     isMlvActive(video) = 0;
 
     /* Close all MLV file chunks */
     if(video->file) close_all_chunks(video->file, video->filenum);
     /* Free all memory */
-    if(video->video_index) free(video->video_index);
-    if(video->audio_index) free(video->audio_index);
-    if(video->vers_index) free(video->vers_index);
+    if(video->video_index && !shared) free(video->video_index);
+    if(video->audio_index && !shared) free(video->audio_index);
+    if(video->vers_index && !shared) free(video->vers_index);
 
     /* Free audio buffer */
-    if(video->audio_data)
+    if(video->audio_data && !shared)
     {
         free(video->audio_data);
         video->audio_data = NULL;
     }
 
     if(video->path) free(video->path);
-    freeLLRawProcObject(video);
+    if (!shared) freeLLRawProcObject(video);
 
     /* Main 1 */
     free(video);
@@ -476,199 +476,6 @@ static int save_mapp(mlvObject_t * video)
     fclose(mappf);
     free(mapp_buf);
     return 0;
-}
-
-/* Load MLV App map file (.MAPP) */
-static int load_mapp(mlvObject_t * video)
-{
-    int mapp_name_len = strlen(video->path);
-    char * mapp_filename = alloca(mapp_name_len + 4);
-    memset(mapp_filename, 0x00, mapp_name_len + 4);
-    memcpy(mapp_filename, video->path, mapp_name_len);
-    char * dot = strrchr(mapp_filename, '.');
-    memcpy(dot, ".MAPP\0", 6);
-
-    /* open .MAPP file for reading */
-    FILE* mappf = fopen(mapp_filename, "rb");
-    if (!mappf)
-    {
-        DEBUG( printf("Could not open mapp : %s\n\n", mapp_filename); )
-        return 1;
-    }
-
-    /* Read .MAPP header */
-    mapp_header_t mapp_header = { 0 };
-    if ( fread(&mapp_header, sizeof(mapp_header_t), 1, mappf) != 1 )
-    {
-        DEBUG( printf("Could not read header from %s\n", mapp_filename); )
-        goto mapp_error;
-    }
-    DEBUG( printf("Header loaded from %s\n", mapp_filename); )
-
-    DEBUG(
-        printf("Magic %s, Size %lu, Version %d, Total Blocks %d, Total VIDF %d, Total AUDF %d, Total VERS %d, Audio Size %lu, DF Offset %lu\n",
-        mapp_header.fileMagic, mapp_header.mapp_size, mapp_header.mapp_version, mapp_header.block_num, mapp_header.video_frames,
-        mapp_header.audio_frames, mapp_header.vers_blocks, mapp_header.audio_size, mapp_header.df_offset);
-    )
-
-    /* Check MAPP validity */
-    if( memcmp(mapp_header.fileMagic, "MAPP", 4) != 0 )
-    {
-        DEBUG( printf("Not a valid MAPP file: %s\n", mapp_filename); )
-        goto mapp_error;
-    }
-    /* Check MAPP version */
-    if( mapp_header.mapp_version != MAPP_VERSION )
-    {
-        DEBUG( printf("Wrong MAPP version: %d. Please rebuild all MAPPs\n", mapp_header.mapp_version); )
-        goto mapp_error;
-    }
-
-    uint64_t mark_pos = file_get_pos(mappf);
-    file_set_pos(mappf, 0, SEEK_END);
-    uint64_t mapp_file_size = file_get_pos(mappf);
-    file_set_pos(mappf, mark_pos, SEEK_SET);
-    if( mapp_header.mapp_size != mapp_file_size )
-    {
-        DEBUG( printf("MAPP file size is wrong: %s\n", mapp_filename); )
-        goto mapp_error;
-    }
-
-    /* Read MLV block headers */
-    int ret = 0;
-    ret += fread(&(video->MLVI), sizeof(mlv_file_hdr_t), 1, mappf);
-    ret += fread(&(video->RAWI), sizeof(mlv_rawi_hdr_t), 1, mappf);
-    ret += fread(&(video->RAWC), sizeof(mlv_rawc_hdr_t), 1, mappf);
-    ret += fread(&(video->IDNT), sizeof(mlv_idnt_hdr_t), 1, mappf);
-    ret += fread(&(video->EXPO), sizeof(mlv_expo_hdr_t), 1, mappf);
-    ret += fread(&(video->LENS), sizeof(mlv_lens_hdr_t), 1, mappf);
-    ret += fread(&(video->ELNS), sizeof(mlv_elns_hdr_t), 1, mappf);
-    ret += fread(&(video->RTCI), sizeof(mlv_rtci_hdr_t), 1, mappf);
-    ret += fread(&(video->WBAL), sizeof(mlv_wbal_hdr_t), 1, mappf);
-    ret += fread(&(video->STYL), sizeof(mlv_styl_hdr_t), 1, mappf);
-    ret += fread(&(video->WAVI), sizeof(mlv_wavi_hdr_t), 1, mappf);
-    ret += fread(&(video->DISO), sizeof(mlv_diso_hdr_t), 1, mappf);
-    ret += fread(&(video->DARK), sizeof(mlv_dark_hdr_t), 1, mappf);
-    if(ret != 13)
-    {
-        DEBUG( printf("ret = %d, could not read metadata from %s\n", ret, mapp_filename); )
-        goto mapp_error;
-    }
-    DEBUG( printf("Metadata loaded from %s\n", mapp_filename); )
-
-    /* Read video index */
-    if(mapp_header.video_frames)
-    {
-        size_t video_index_size = mapp_header.video_frames * sizeof(frame_index_t);
-
-        video->video_index = malloc(video_index_size);
-        if(!video->video_index)
-        {
-            DEBUG( printf("Malloc error: video index\n"); )
-            goto mapp_error;
-        }
-
-        if ( fread(video->video_index, video_index_size, 1, mappf) != 1 )
-        {
-            DEBUG( printf("Could not read video index from %s\n", mapp_filename); )
-            goto mapp_error;
-        }
-        DEBUG( printf("Video index loaded from %s\n", mapp_filename); )
-    }
-
-    /* Read audio index */
-    if(mapp_header.audio_frames)
-    {
-        size_t audio_index_size = mapp_header.audio_frames * sizeof(frame_index_t);
-
-        video->audio_index = malloc(audio_index_size);
-        if(!video->audio_index)
-        {
-            DEBUG( printf("Malloc error: audio index\n"); )
-            goto mapp_error;
-        }
-
-        if ( fread(video->audio_index, audio_index_size, 1, mappf) != 1 )
-        {
-            DEBUG( printf("Could not read audio index from %s\n", mapp_filename); )
-            goto mapp_error;
-        }
-        DEBUG( printf("Audio index loaded from %s\n", mapp_filename); )
-    }
-
-    /* Read vers index */
-    if(mapp_header.vers_blocks)
-    {
-        size_t vers_index_size = mapp_header.vers_blocks * sizeof(frame_index_t);
-
-        video->vers_index = malloc(vers_index_size);
-        if(!video->vers_index)
-        {
-            DEBUG( printf("Malloc error: VERS index\n"); )
-            goto mapp_error;
-        }
-
-        if ( fread(video->vers_index, vers_index_size, 1, mappf) != 1 )
-        {
-            DEBUG( printf("Could not read VERS index from %s\n", mapp_filename); )
-            goto mapp_error;
-        }
-        DEBUG( printf("VERS index loaded from %s\n", mapp_filename); )
-    }
-
-    /* Read audio data */
-    if(mapp_header.audio_size)
-    {
-        video->audio_buffer_size = mapp_header.audio_size;
-        video->audio_size = mapp_header.audio_size;
-        video->audio_data = malloc(mapp_header.audio_size);
-        if ( fread(video->audio_data, mapp_header.audio_size, 1, mappf) != 1 )
-        {
-            DEBUG( printf("Could not read audio data from %s\n", mapp_filename); )
-            goto mapp_error;
-        }
-        DEBUG( printf("Audio data loaded from %s\n", mapp_filename); )
-    }
-
-    /* Set video and audio frame counts */
-    video->frames = mapp_header.video_frames;
-    video->audios = mapp_header.audio_frames;
-
-    /* Set some required values */
-    video->block_num = mapp_header.block_num;
-    video->dark_frame_offset = mapp_header.df_offset;
-    video->vers_blocks = mapp_header.vers_blocks;
-
-    DEBUG( printf("MAPP version %u loaded: %s\n", mapp_header.mapp_version, mapp_filename); )
-
-    fclose(mappf);
-    return 0;
-
-mapp_error:
-
-    if(video->video_index)
-    {
-        free(video->video_index);
-        video->video_index = NULL;
-    }
-    if(video->audio_index)
-    {
-        free(video->audio_index);
-        video->audio_index = NULL;
-    }
-    if(video->vers_index)
-    {
-        free(video->vers_index);
-        video->vers_index = NULL;
-    }
-    if(video->audio_data)
-    {
-        free(video->audio_data);
-        video->audio_data = NULL;
-    }
-    if(mappf) fclose(mappf);
-
-    return 1;
 }
 
 /* Save MLV headers */
@@ -1233,10 +1040,20 @@ int saveMlvAVFrame(mlvObject_t * video, FILE * output_mlv, int export_audio, int
     return 0;
 }
 
+void initMlvFiles(const char* path, mlvObject_t * videodest)
+{
+    // No need to reparse files, just create new file pointers
+    videodest->filenum = 0;
+    videodest->path = malloc( strlen(path) + 1 );
+    memcpy(videodest->path, path, strlen(path));
+    videodest->path[strlen(path)] = 0x0;
+    videodest->file = load_all_chunks(path, &videodest->filenum); 
+}
+
 /* Reads an MLV file in to a mlv object(mlvObject_t struct) 
  * only puts metadata in to the mlvObject_t, 
  * no debayering or bit unpacking */
-int openMlvClip(mlvObject_t * video, const char * mlvPath, int open_mode, char * error_message)
+int openMlvClip(mlvObject_t * video, const char * mlvPath, char * error_message)
 {
     video->path = malloc( strlen(mlvPath) + 1 );
     memcpy(video->path, mlvPath, strlen(mlvPath));
@@ -1247,12 +1064,6 @@ int openMlvClip(mlvObject_t * video, const char * mlvPath, int open_mode, char *
         sprintf(error_message, "openMlvClip : Could not open file:  %s", video->path);
         DEBUG( printf("\n%s\n", error_message); )
         return MLV_ERR_OPEN; // can not open file
-    }
-
-    /* In preview mode we don't need to waste time on audio loading from MAPP */
-    if(open_mode != MLV_OPEN_PREVIEW)
-    {
-        if(!load_mapp(video)) goto short_cut;
     }
 
     uint64_t block_num = 0; /* Number of blocks in file */
@@ -1371,13 +1182,6 @@ int openMlvClip(mlvObject_t * video, const char * mlvPath, int open_mode, char *
                 /* Count actual video frames */
                 video_frames++;
 
-                /* In preview mode exit loop after first videf read */
-                if(open_mode == MLV_OPEN_PREVIEW)
-                {
-                    video->frames = video_frames;
-                    video->audios = audio_frames;
-                    goto preview_out;
-                }
             }
             else if ( memcmp(block_header.blockType, "AUDF", 4) == 0 )
             {
@@ -1610,9 +1414,6 @@ int openMlvClip(mlvObject_t * video, const char * mlvPath, int open_mode, char *
      * set full audio buffer size (video->audio_buffer_size) and
      * aligned usable audio data size (video->audio_size) */
     readMlvAudioData(video);
-
-    /* Save mapp file if this feature is on */
-    if(open_mode == MLV_OPEN_MAPP) save_mapp(video);
 
 short_cut:
 
