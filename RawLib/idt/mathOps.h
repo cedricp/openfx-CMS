@@ -55,12 +55,14 @@
 #ifndef _MATHOPS_h__
 #define _MATHOPS_h__
 
+#define GLOG_NO_EXPORT
+
 #include "define.h"
 
 #include <cfloat>
 
 #include <Eigen/Core>
-#include <ceres/ceres.h>
+//#include <ceres/ceres.h>
 
 using namespace Eigen;
 
@@ -585,34 +587,34 @@ vector<vector<T>> getCAT( const vector<T> &src, const vector<T> &des )
     return vkm;
 }
 
-template <typename T> vector<vector<T>> XYZtoLAB( const vector<vector<T>> &XYZ )
-{
-    assert( XYZ.size() == 190 );
-    T add = T( 16.0 / 116.0 );
+// template <typename T> vector<vector<T>> XYZtoLAB( const vector<vector<T>> &XYZ )
+// {
+//     assert( XYZ.size() == 190 );
+//     T add = T( 16.0 / 116.0 );
 
-    vector<vector<T>> tmpXYZ( XYZ.size(), vector<T>( 3, T( 1.0 ) ) );
-    FORIJ( XYZ.size(), 3 )
-    {
-        tmpXYZ[i][j] = XYZ[i][j] / XYZ_w[j];
-        if ( tmpXYZ[i][j] > T( e ) )
-            tmpXYZ[i][j] = ceres::pow( tmpXYZ[i][j], T( 1.0 / 3.0 ) );
-        else
-            tmpXYZ[i][j] = T( k ) * tmpXYZ[i][j] + add;
-    }
+//     vector<vector<T>> tmpXYZ( XYZ.size(), vector<T>( 3, T( 1.0 ) ) );
+//     FORIJ( XYZ.size(), 3 )
+//     {
+//         tmpXYZ[i][j] = XYZ[i][j] / XYZ_w[j];
+//         if ( tmpXYZ[i][j] > T( e ) )
+//             tmpXYZ[i][j] = ceres::pow( tmpXYZ[i][j], T( 1.0 / 3.0 ) );
+//         else
+//             tmpXYZ[i][j] = T( k ) * tmpXYZ[i][j] + add;
+//     }
 
-    vector<vector<T>> outCalcLab( XYZ.size(), vector<T>( 3 ) );
-    FORI( XYZ.size() )
-    {
-        outCalcLab[i][0] = T( 116.0 ) * tmpXYZ[i][1] - T( 16.0 );
-        outCalcLab[i][1] = T( 500.0 ) * ( tmpXYZ[i][0] - tmpXYZ[i][1] );
-        outCalcLab[i][2] = T( 200.0 ) * ( tmpXYZ[i][1] - tmpXYZ[i][2] );
-    }
+//     vector<vector<T>> outCalcLab( XYZ.size(), vector<T>( 3 ) );
+//     FORI( XYZ.size() )
+//     {
+//         outCalcLab[i][0] = T( 116.0 ) * tmpXYZ[i][1] - T( 16.0 );
+//         outCalcLab[i][1] = T( 500.0 ) * ( tmpXYZ[i][0] - tmpXYZ[i][1] );
+//         outCalcLab[i][2] = T( 200.0 ) * ( tmpXYZ[i][1] - tmpXYZ[i][2] );
+//     }
 
-    // not necessary, just want to show we clean stuff
-    clearVM( tmpXYZ );
+//     // not necessary, just want to show we clean stuff
+//     clearVM( tmpXYZ );
 
-    return outCalcLab;
-};
+//     return outCalcLab;
+// };
 
 template <typename T>
 vector<vector<T>> getCalcXYZt( const vector<vector<T>> &RGB, const T B[6] )

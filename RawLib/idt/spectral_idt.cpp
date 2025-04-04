@@ -1,5 +1,3 @@
-#define GLOG_NO_EXPORT
-
 #include "mathOps.h"
 #include "spectral_idt.h"
 #include <boost/property_tree/ptree.hpp>
