@@ -421,7 +421,7 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 
 bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
 {
-    return true;
+    return false;
 }
 
 void MLVReaderPlugin::setMlvFile(std::string file)
@@ -463,19 +463,19 @@ void MLVReaderPlugin::setMlvFile(std::string file)
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-    // MLV clip is a video stream
     
     if (_mlv_video.size() == 0){
         return;
     }
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
-
+    
     OfxRectI format;
     format.x1 = 0;
     format.x2 = _mlv_video[0]->raw_resolution_x();
     format.y1 = 0;
     format.y2 = _mlv_video[0]->raw_resolution_y();
     
+    // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
     clipPreferences.setOutputFormat(format);
     
@@ -484,7 +484,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
     clipPreferences.setOutputFrameRate(_mlv_video[0]->fps());
 
-    clipPreferences.setOutputHasContinuousSamples(true);
+    clipPreferences.setOutputHasContinuousSamples(false);
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }
@@ -519,9 +519,6 @@ void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
     desc.setRenderTwiceAlways(false);
     desc.setRenderThreadSafety(OFX::kRenderThreadSafety);
     desc.setUsesMultiThreading(true);
-#ifdef OFX_EXTENSIONS_NATRON
-    desc.setChannelSelector(OFX::ePixelComponentRGB);
-#endif
 }
 
 void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
@@ -681,6 +678,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->appendOption("DCB", "", "dcb");
         //param->appendOption("DHT", "", "dht");
         //param->appendOption("Modifier AHD", "", "mahd");
+        param->setHint("The demosaic algorithm to use (CPU only)");
         param->setDefault(1);
         if (page_debayer)
         {
@@ -862,6 +860,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         OFX::Int2DParamDescriptor *param = desc.defineInt2DParam(kDarkframeRange);
         param->setLabel("Darkframe frame range");
         param->setHint("Darkframe export frame range");
+        param->setDefault(0,0);
         if (page_raw)
         {
             page_raw->addChild(*param);

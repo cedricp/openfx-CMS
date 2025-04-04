@@ -182,6 +182,7 @@ void OpenCLBase::describeInContextCL(OFX::ImageEffectDescriptor &desc, OFX::Cont
     { 
         OFX::BooleanParamDescriptor* param = desc.defineBooleanParam(kUseOpenCL);
         param->setLabel("OpenCL acceleration");
+        param->setHint("Use OpenCL GPU acceleration (Only PPG demosaic supported)");
         param->setDefault(0);
         if (page)
         {
@@ -193,6 +194,7 @@ void OpenCLBase::describeInContextCL(OFX::ImageEffectDescriptor &desc, OFX::Cont
         // linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kOpenCLDevice);
         param->setLabel("OpenCL device");
+        param->setHint("The device that will be used for acceleration");
         for (auto cldev : g_cldevices){
             param->appendOption(cldev.getInfo<CL_DEVICE_NAME>(), "", cldev.getInfo<CL_DEVICE_NAME>());
         }
