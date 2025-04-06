@@ -41,30 +41,6 @@ DNGIdt::DNGIdt() {
 	_baseExpo              = 1.0;
 }
 
-DNGIdt::DNGIdt ( libraw_rawdata_t* R ) {
-	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
-	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
-	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
-	_analogBalanceDNG      = vector < double > ( 3, 1.0 );
-	_neutralRGBDNG         = vector < double > ( 3, 1.0 );
-	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
-	_calibrateIllum        = vector < double > ( 2, 1.0 );
-
-    // TODO : check baseline exposure
-	_baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( R->color.dng_color[0].illuminant );
-	_calibrateIllum[1] = static_cast < double > ( R->color.dng_color[1].illuminant );
-
-	FORI(3) {
-		_neutralRGBDNG[i] = 1.0 / static_cast < double > ( R->color.cam_mul[i] );
-	}
-
-	FORIJ ( 3, 3 ) {
-		_xyz2rgbMatrix1DNG[i*3+j] = static_cast < double > ( R->color.dng_color[0].colormatrix[i][j] );
-		_xyz2rgbMatrix2DNG[i*3+j] = static_cast < double > ( R->color.dng_color[1].colormatrix[i][j] );
-	}
-}
-
 DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
     float matrix1[9], matrix2[9];
     mlv->get_camera_matrix1f(matrix1);

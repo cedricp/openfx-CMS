@@ -8,9 +8,6 @@ namespace DNGIdt{
 	class DNGIdt {
 		public:
 			DNGIdt();
-			#ifndef IDT_NOGNG
-			DNGIdt (libraw_rawdata_t* rawdata_type);
-			#endif
 			DNGIdt (Mlv_video* mlv, float *wbal);
 			virtual ~DNGIdt();
 

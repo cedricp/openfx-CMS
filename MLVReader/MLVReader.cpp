@@ -22,9 +22,7 @@
  */
 
 #include "MLVReader.h"
-#define IDT_NOGNG
 #include <RawLib/idt/dng_idt.h>
-#undef IDT_NOGNG
 
 #include <cmath>
 #include <climits>
