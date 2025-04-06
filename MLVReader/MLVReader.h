@@ -48,6 +48,9 @@
 #define kDarkframefilename "darkframeFilename"
 #define kDarkFrameButon "darkFrameButton"
 #define kDarkframeRange "darkframeRange"
+#define kBlackLevel "blackLevel"
+#define kWhiteLevel "whiteLevel"
+#define kBpp "bpp"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -89,10 +92,13 @@ public:
         _dualIsoAliasMap = fetchBooleanParam(kDualIsoAliasMap);
         _dualIsoFullresBlending = fetchBooleanParam(kDualIsoFullresBlending);
         _dualIsoAveragingMethod = fetchChoiceParam(kDualIsoAveragingMethod);
+        _blackLevel = fetchIntParam(kBlackLevel);
+        _whiteLevel = fetchIntParam(kWhiteLevel);
+        _bpp = fetchIntParam(kBpp);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         if (_mlvfilename_param->getValue().empty() == false) {
-            setMlvFile(_mlvfilename_param->getValue());
+            setMlvFile(_mlvfilename_param->getValue(), false);
         }
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
@@ -125,7 +131,7 @@ private:
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
     void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img);
-    void setMlvFile(std::string file);
+    void setMlvFile(std::string file, bool set = true);
     void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor);
 
 private:
@@ -154,6 +160,9 @@ private:
     OFX::BooleanParam* _dualIsoFullresBlending;
     OFX::BooleanParam* _dualIsoAliasMap;
     std::string _pluginPath;
+    OFX::IntParam* _blackLevel;
+    OFX::IntParam* _whiteLevel;
+    OFX::IntParam* _bpp;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;

@@ -63,6 +63,8 @@ typedef struct
     uint16_t * image_buf;           // pointer to image buffer
     uint16_t * image_buf_unpacked;  // pointer to bit packed image buffer
 
+    int black_level, white_level; // black and white levels
+
 } dngObject_t;
 
 /* routines to unpack, pack, decompress or compress raw data */
@@ -73,7 +75,7 @@ int dng_decompress_image(uint16_t * output_buffer, uint16_t * input_buffer, size
 void get_white_balance(mlv_wbal_hdr_t wbal_hdr, int32_t *wbal, uint32_t cam_id);
 
 /* routines to initialize, save and free DNG exporting struct */
-dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, int32_t par[4]);
+dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, int32_t par[4], int bl, int wl);
 int saveDngFrame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index, char * dng_filename);
 uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_t frame_index, int init_only);
 void freeDngObject(dngObject_t * dng_data);

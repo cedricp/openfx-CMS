@@ -157,7 +157,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
-        mlv_video->get_dng_buffer(time, info, dng_size, true);
+        mlv_video->get_dng_buffer(time, info, dng_size, -1, -1, true);
         uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
 
         for(int y=renderWin.y1; y < renderWin.y2; y++) {
@@ -194,7 +194,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-    mlv_video->get_dng_buffer(time, rawInfo, dng_size, true);
+    mlv_video->get_dng_buffer(time, rawInfo, dng_size, -1, -1, true);
     uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
     
     float wbrgb[4];
@@ -206,8 +206,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
 
     int colorspace = _colorSpaceFormat->getValue();
     
-    uint32_t black_level = mlv_video->black_level();
-    uint32_t white_level = mlv_video->white_level();
+    uint32_t black_level = _blackLevel->getValue();  
+    uint32_t white_level = _whiteLevel->getValue();
 
     if(colorspace <= ACES_AP1){
         float xyz[9], cam2rec709[9], xyz2cam[9];
@@ -346,7 +346,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size);
+    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size, _blackLevel->getValue(), _whiteLevel->getValue(), false);
     
     int color_temperature = _colorTemperature->getValue();
     
@@ -424,7 +424,7 @@ bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip
     return false;
 }
 
-void MLVReaderPlugin::setMlvFile(std::string file)
+void MLVReaderPlugin::setMlvFile(std::string file, bool set)
 {
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
 
@@ -454,6 +454,11 @@ void MLVReaderPlugin::setMlvFile(std::string file)
         _timeRange->setValue(tr);
         _mlv_fps->setValue(mlv_video->fps());
         _mlv_video.push_back(mlv_video);
+        if (set){
+            _blackLevel->setValue(mlv_video->raw_black_level());
+            _whiteLevel->setValue(mlv_video->raw_white_level());
+        }
+        _bpp->setValue(mlv_video->bpp());
     }
 
     for (int i = 0; i < _numThreads-1; ++i){
@@ -772,6 +777,44 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setLabel("Fix focus pixels");
         param->setHint("Fix focus pixels");
         param->setDefault(true);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
+    {
+        OFX::IntParamDescriptor *param = desc.defineIntParam(kBlackLevel);
+        param->setLabel("Black level");
+        param->setRange(0, 4095);
+        param->setDisplayRange(0, 4095);
+        param->setHint("Raw black level");
+        param->setDefault(0);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
+    {
+        OFX::IntParamDescriptor *param = desc.defineIntParam(kWhiteLevel);
+        param->setLabel("White level");
+        param->setRange(0, 65535);
+        param->setDisplayRange(0, 8192);
+        param->setHint("Raw white level");
+        param->setDefault(0);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
+    {
+        OFX::IntParamDescriptor *param = desc.defineIntParam(kBpp);
+        param->setLabel("Bits per pixel");
+        param->setHint("Raw white level");
+        param->setEnabled(false);
+        param->setDefault(14);
         if (page_raw)
         {
             page_raw->addChild(*param);

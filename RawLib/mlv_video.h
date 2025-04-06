@@ -42,7 +42,7 @@ public:
 	bool valid(){return _valid;}
 	void* get_mlv_object();
 
-	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer = false);
+	uint16_t* get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, int black, int white, bool no_buffer = false);
 	uint32_t get_dng_header_size();
 	void free_dng_buffer();
 	uint16_t* get_raw_image();

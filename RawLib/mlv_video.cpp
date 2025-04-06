@@ -50,7 +50,7 @@ Mlv_video::Mlv_video(std::string filename)
 	_valid = true;
 
 	int par[4] = {1,1,1,1};
-	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
+	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par, -1, -1);
 }
 
 Mlv_video::Mlv_video(const Mlv_video& mlv)
@@ -68,7 +68,7 @@ Mlv_video::Mlv_video(const Mlv_video& mlv)
 	_valid = true;
 
 	int par[4] = {1,1,1,1};
-	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par);
+	_imp->dng_object = initDngObject(_imp->mlv_object, UNCOMPRESSED_RAW, getMlvFramerateOrig(_imp->mlv_object), par, -1, -1);
 }
 
 Mlv_video::~Mlv_video()
@@ -311,9 +311,11 @@ uint32_t Mlv_video::white_level()
 	return _imp->mlv_object->llrawproc->dng_white_level;
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, bool no_buffer)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, int black, int white, bool no_buffer)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
+	_imp->dng_object->black_level = black;
+	_imp->dng_object->white_level = white;
 
 	if (frame >= mlvob.frames){
 		frame = mlvob.frames - 1;

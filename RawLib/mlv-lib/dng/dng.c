@@ -588,6 +588,9 @@ static void dng_fill_header(mlvObject_t * mlv_data, dngObject_t * dng_data, uint
         char * ext_dot = strrchr(reel_name, '.');
         if(ext_dot) *ext_dot = '\000';
 
+        int black_level = dng_data->black_level > 0 ? dng_data->black_level : mlv_data->llrawproc->dng_black_level;
+        int white_level = dng_data->white_level > 0 ? dng_data->white_level : mlv_data->llrawproc->dng_white_level;
+
         /* Fill up IFD structs */
         struct directory_entry IFD0[IFD0_COUNT] =
         {
@@ -613,8 +616,8 @@ static void dng_fill_header(mlvObject_t * mlv_data, dngObject_t * dng_data, uint
             {tcExifIFD,                     ttLong,     1,      exif_ifd_offset},
             {tcDNGVersion,                  ttByte,     4,      0x00000401}, //1.4.0.0 in little endian
             {tcUniqueCameraModel,           ttAscii,    STRING_ENTRY(unique_model, header, &data_offset)},
-            {tcBlackLevel,                  ttLong,     1,      mlv_data->llrawproc->dng_black_level},
-            {tcWhiteLevel,                  ttLong,     1,      mlv_data->llrawproc->dng_white_level},
+            {tcBlackLevel,                  ttLong,     1,      black_level},
+            {tcWhiteLevel,                  ttLong,     1,      white_level},
             {tcDefaultScale,                ttRational, RATIONAL_ENTRY(par, header, &data_offset, 4)},
             {tcDefaultCropOrigin,           ttShort,    2,      PACK(mlv_data->RAWI.raw_info.crop.origin)},
             {tcDefaultCropSize,             ttShort,    2,      PACK2((mlv_data->RAWI.raw_info.active_area.x2 - mlv_data->RAWI.raw_info.active_area.x1), (mlv_data->RAWI.raw_info.active_area.y2 - mlv_data->RAWI.raw_info.active_area.y1))},
@@ -926,9 +929,12 @@ static int dng_get_frame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_
 }
 
 /* init DNG data struct */
-dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, int32_t par[4])
+dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, int32_t par[4], int black, int white)
 {
     dngObject_t * dng_data = calloc(1, sizeof(dngObject_t));
+
+    dng_data->black_level = black;
+    dng_data->white_level = white;
 
     dng_data->fps_float = fps;
     memcpy(dng_data->par, par, sizeof(int32_t) * 4);
