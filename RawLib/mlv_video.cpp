@@ -486,6 +486,19 @@ int Mlv_video::sampling_factor_y()
 {
 	return _imp->mlv_object->RAWC.binning_y + _imp->mlv_object->RAWC.skipping_y;
 }
+
+std::string Mlv_video::get_camera_make()
+{
+	std::string make = (const char*)_imp->mlv_object->IDNT.cameraName;
+	return make.substr(0, make.find(" "));
+}
+
+std::string Mlv_video::get_camera_model()
+{
+	std::string make = (const char*)_imp->mlv_object->IDNT.cameraName;
+	return make.substr(make.find(" ")+1, std::string::npos);
+}
+
 void Mlv_video::get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation,bool cam_wb)
 {
 	int32_t wbal[6];

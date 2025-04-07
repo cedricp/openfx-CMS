@@ -241,4 +241,8 @@ ELSE()
   INSTALL(FILES Info.plist
     DESTINATION CMS.ofx.bundle/Contents
   )
+
+  INSTALL(DIRECTORY resources/data
+    DESTINATION CMS.ofx.bundle/Contents
+  )
 ENDIF()

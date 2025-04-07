@@ -71,6 +71,9 @@ public:
 	void get_camera_matrix2f(float matrix[9]);
 	void get_camera_matrix1f(float matrix[9]);
 
+	std::string get_camera_make();
+	std::string get_camera_model();
+
 	void get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation, bool cam_wb = true);
 
 	int get_camid();

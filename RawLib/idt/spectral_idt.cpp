@@ -1494,6 +1494,11 @@ const vector<vector<double>> Idt::getIDT() const
     return _idt;
 }
 
+void Idt::getIdt(float matrix[9])
+{
+    FORIJ ( 3, 3 ) matrix[i*3+j] = _idt[i][j];
+}
+
 //	=====================================================================
 //  Get white balanced if calWB(...) succeeds
 //
@@ -1506,4 +1511,9 @@ const vector<vector<double>> Idt::getIDT() const
 const vector<double> Idt::getWB() const
 {
     return _wb;
+}
+
+void Idt::getWB(float wb[3])
+{
+    FORI(3) wb[i] = _wb[i];
 }

@@ -133,6 +133,7 @@ private:
     void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img);
     void setMlvFile(std::string file, bool set = true);
     void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor);
+    bool prepare_spectral_idt();
 
 private:
     OfxMutexHandle _videoMutex;

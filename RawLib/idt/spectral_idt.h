@@ -143,6 +143,9 @@ public:
     const vector<double>         getWB() const;
     const int                    getVerbosity() const;
 
+    void getIdt(float matrix[9]);
+    void getWB(float wb[3]);
+
 private:
     Spst  _cameraSpst;
     Illum _bestIllum;

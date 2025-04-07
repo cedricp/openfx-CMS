@@ -23,6 +23,8 @@
 
 #include "MLVReader.h"
 #include <RawLib/idt/dng_idt.h>
+#include <RawLib/idt/spectral_idt.h>
+#include <RawLib/idt/define.h>
 
 #include <cmath>
 #include <climits>
@@ -503,6 +505,45 @@ void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const 
     {
         
     }
+}
+
+bool MLVReaderPlugin::prepare_spectral_idt()
+{
+
+    std::string datapath = _pluginPath + "/Contents/Resources/data";
+    std::vector< std::string > jsonfiles = openDir(_pluginPath + "/camera");
+    Idt idt;
+
+    int ok = 0;
+    for (auto json : jsonfiles){
+        ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
+        if (ok) break;
+    }
+
+    if (!ok) return false;
+
+    float coeffs[3];
+    float compensation;
+    _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), coeffs, compensation, _cameraWhiteBalance->getValue());
+    std::vector< double > dcoeffs;
+    dcoeffs.push_back(coeffs[0]);
+    dcoeffs.push_back(coeffs[1]);
+    dcoeffs.push_back(coeffs[2]);
+
+    idt.loadTrainingData(datapath + "/training/training_spectral.json");
+    idt.loadCMF(datapath + "/cmf/cmf_1931.json");
+    //idt.chooseIllumType( "5500K", 1 /*highlight*/ );
+    idt.chooseIllumSrc( dcoeffs, 1/*_opts.highlight */);
+
+    if ( idt.calIDT() )
+    {
+        idt.getIDT();
+        // _wbv  = idt.getWB();
+
+        return true;
+    }
+
+    return false;
 }
 
 void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
