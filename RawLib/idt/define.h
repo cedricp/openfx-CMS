@@ -171,7 +171,7 @@ const double dmax = numeric_limits<double>::max();
 static const double XYZ_w[3] = {0.952646074569846, 1.0,    1.00882518435159};
 static const double d50  [3] = {0.9642,            1.0000, 0.8250};
 static const double d60  [3] = {0.952646074569846, 1.0000, 1.00882518435159};
-static const double d65  [3] = {0.9547,            1.0000, 1.0883};
+static const double d65  [3] = {0.95047,            1.0000, 1.0883};
 
 static const double neutral3[3][3] = {
     {1.0, 0.0, 0.0},

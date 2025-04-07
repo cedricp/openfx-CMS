@@ -1,10 +1,10 @@
 #include "dng_convert.h"
-#include <libraw.h>
 #include <sys/stat.h>
 #include <algorithm>
 #include "idt/dng_idt.h"
+#include <libraw.h>
 extern "C"{
-#include <dng/dng.h>
+	#include <dng/dng.h>
 }
 
 struct Dng_processor::dngc_impl{

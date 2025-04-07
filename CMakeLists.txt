@@ -54,20 +54,18 @@ if(NOT CMAKE_GENERATOR MATCHES "Xcode|Visual Studio")
   MESSAGE (STATUS "    Configuration:"  ${CMAKE_BUILD_TYPE})
 endif()
 
+
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCL REQUIRED)
 
+add_subdirectory(libs)
+
 message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
 message("Oencl lib dir: ${OpenCL_LIBRARIES}")
 
-set(LibRaw_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/include)
-set(LibRaw_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/libraw/lib/libraw.a)
-
 set(CERES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/include)
 set(CERES_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/lib/libceres.a)
-
-message("Using libRAW ${LibRaw_LIBRARIES}")
 
 add_subdirectory(RawLib)
 
@@ -156,7 +154,7 @@ FILE(GLOB CMS_RESOURCES
   "debayer_ppg.cl"
 )
 
-ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
+ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES}  $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
 SET_TARGET_PROPERTIES(CMS PROPERTIES PREFIX "")
 SET_TARGET_PROPERTIES(CMS PROPERTIES SUFFIX ".ofx")
 
@@ -176,7 +174,7 @@ set(TARGET_DEFS OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON
 
 INCLUDE_DIRECTORIES(CMS libs/GFX)
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE ${TARGET_DEFS})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} $<LINK_LIBRARY:WHOLE_ARCHIVE,${LibRaw_LIBRARIES}> ws2_32) #${CERES_LIBRARIES} cholmod openblas
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} libraw_static m ws2_32 Ceres::ceres) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html
