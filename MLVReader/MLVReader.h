@@ -51,6 +51,7 @@
 #define kBlackLevel "blackLevel"
 #define kWhiteLevel "whiteLevel"
 #define kBpp "bpp"
+#define kUseSpectralIdt "useSpectralIdt"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -95,17 +96,20 @@ public:
         _blackLevel = fetchIntParam(kBlackLevel);
         _whiteLevel = fetchIntParam(kWhiteLevel);
         _bpp = fetchIntParam(kBpp);
+        _useSpectralIdt = fetchBooleanParam(kUseSpectralIdt);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
-        if (_mlvfilename_param->getValue().empty() == false) {
-            setMlvFile(_mlvfilename_param->getValue(), false);
-        }
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         std::string debayer_program = _pluginPath + "/Contents/Resources/debayer_ppg.cl";
-
+        
         strcpy(FOCUSPIXELMAP_DIRECTORY, focusPixelMap.c_str());
         addProgram(debayer_program, "debayer_ppg");
+
+        if (_mlvfilename_param->getValue().empty() == false) {
+            setMlvFile(_mlvfilename_param->getValue(), false);
+            computeIDT();
+        }
     }
 
     ~MLVReaderPlugin()
@@ -134,6 +138,7 @@ private:
     void setMlvFile(std::string file, bool set = true);
     void compute_colorspace_xform_matrix(float idt_matrix[9],Dng_processor& dng_processor);
     bool prepare_spectral_idt();
+    void computeIDT();
 
 private:
     OfxMutexHandle _videoMutex;
@@ -160,10 +165,15 @@ private:
     OFX::BooleanParam* _fixFocusPixel;
     OFX::BooleanParam* _dualIsoFullresBlending;
     OFX::BooleanParam* _dualIsoAliasMap;
+    OFX::BooleanParam* _useSpectralIdt;
     std::string _pluginPath;
     OFX::IntParam* _blackLevel;
     OFX::IntParam* _whiteLevel;
     OFX::IntParam* _bpp;
+    float _idt[9];
+    float _asShotNeutral[3];
+    float _wbcompensation;
+    bool _spectralIdt;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;

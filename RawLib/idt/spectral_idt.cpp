@@ -916,7 +916,7 @@ int Idt::loadIlluminant( const vector<string> &paths, string type )
 void Idt::loadTrainingData( const string &path )
 {
     struct stat st;
-    assert( !stat( path.c_str(), &st ) );
+    //assert( !stat( path.c_str(), &st ) );
 
     if ( _trainingSpec.size() > 0 )
     {
@@ -963,7 +963,7 @@ void Idt::loadTrainingData( const string &path )
 void Idt::loadCMF( const string &path )
 {
     struct stat st;
-    assert( !stat( path.c_str(), &st ) );
+    //assert( !stat( path.c_str(), &st ) );
 
     try
     {
@@ -1494,7 +1494,7 @@ const vector<vector<double>> Idt::getIDT() const
     return _idt;
 }
 
-void Idt::getIdt(float matrix[9])
+void Idt::getIdtF(float matrix[9]) const
 {
     FORIJ ( 3, 3 ) matrix[i*3+j] = _idt[i][j];
 }
@@ -1513,7 +1513,7 @@ const vector<double> Idt::getWB() const
     return _wb;
 }
 
-void Idt::getWB(float wb[3])
+void Idt::getWBF(float wb[3]) const
 {
     FORI(3) wb[i] = _wb[i];
 }

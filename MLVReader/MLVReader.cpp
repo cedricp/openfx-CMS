@@ -109,6 +109,97 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     return true;
 }
 
+bool MLVReaderPlugin::prepare_spectral_idt()
+{
+    // matMethod0
+    // No color space conversion
+    // no camera matrix
+    _useSpectralIdt->setEnabled(false);
+
+    vector<string> paths;
+    std::string datapath = _pluginPath + "/Contents/data";
+    std::vector< std::string > jsonfiles = openDir(datapath + "/camera");
+    Idt idt;
+
+    vector<string> iFiles = openDir( datapath + "/illuminant" );
+    for ( auto& file : iFiles)
+    {
+        string fn( file );
+        if ( fn.find( ".json" ) == std::string::npos )
+            continue;
+        paths.push_back( fn );
+    }
+
+    
+    int ok = 0;
+
+    ok = idt.loadIlluminant( paths, "na" );
+    if (!ok)
+    {
+        return false;
+    }
+
+    ok = 0;
+    for (auto json : jsonfiles){
+        //ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
+        ok = idt.loadCameraSpst(json, "canon", "eos 5d mark ii");
+        
+        if (ok) break;
+    }
+
+    if (!ok) return false;
+
+    _useSpectralIdt->setEnabled(true);
+
+    if (!_useSpectralIdt->getValue()){
+        // Don't use this IDT, but we know it's possible
+        return false;
+    }
+
+    std::vector< double > dcoeffs;
+    dcoeffs.push_back(_asShotNeutral[0]);
+    dcoeffs.push_back(_asShotNeutral[1]);
+    dcoeffs.push_back(_asShotNeutral[2]);
+
+    idt.loadTrainingData(datapath + "/training/training_spectral.json");
+    idt.loadCMF(datapath + "/cmf/cmf_1931.json");
+    //idt.chooseIllumType( "5500K", 1 /*highlight*/ );
+    idt.chooseIllumSrc( dcoeffs, 0/*_opts.highlight */);
+
+    if ( idt.calIDT() )
+    {
+        idt.getIdtF(_idt);
+        idt.getWBF(_asShotNeutral);
+        return true;
+    }
+
+    _useSpectralIdt->setValue(false);
+
+    return false;
+}
+
+void MLVReaderPlugin::computeIDT()
+{
+    int colorspace = _colorSpaceFormat->getValue();
+
+    if (colorspace == 3){
+        return;
+    }
+
+    if (_mlv_video.empty()){
+        return;
+    }
+
+    // Thread safe...
+    _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral, _wbcompensation, _cameraWhiteBalance->getValue());
+
+    if (!prepare_spectral_idt()){
+        // No spectral sensitivities IDT, fall back to DNG IDT
+        DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
+        idt.getDNGIDTMatrix(_idt, colorspace);
+    }
+}
+
 // the overridden render function
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
@@ -197,10 +288,6 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     mlv_video->get_dng_buffer(time, rawInfo, dng_size, -1, -1, true);
     uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
     
-    float wbrgb[4];
-    float wb_compensation;
-    mlv_video->get_white_balance_coeffs(_colorTemperature->getValue(), wbrgb, wb_compensation, _cameraWhiteBalance->getValue());
-
     float cam_matrix[18] = {0};
     cam_matrix[0] = cam_matrix[4] = cam_matrix [8] = 1;
 
@@ -209,31 +296,33 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
 
-    if(colorspace <= ACES_AP1){
+    if (_spectralIdt && _useSpectralIdt->getValue()){
+        for (int i=0; i < 9; ++i){
+            cam_matrix[i+9] = _idt[i];
+        }
+    } else if(colorspace <= ACES_AP1){
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
+        mat_mat_mult(rec709toxyzD65, cam2rec709, cam_matrix);
 
-        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix(cam_matrix + 9, colorspace == ACES_AP1 ? 1 : 0);
+        for (int i=0; i < 9; ++i){
+            cam_matrix[i+9] = _idt[i];
+        }
     } else if (colorspace == REC709){
-        // float cam2rec709[9], xyz2cam[9];
-        // mlv_video->get_camera_matrix2f(xyz2cam);
-        // get_matrix_cam2rec709(xyz2cam, cam_matrix+9);
-
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
+        mat_mat_mult(rec709toxyzD65, cam2rec709, cam_matrix);
 
-        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix(cam_matrix + 9, 2);
+        for (int i=0; i < 9; ++i){
+            cam_matrix[i+9] = _idt[i];
+        }
     } else {
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
         get_matrix_cam2rec709(xyz2cam, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix+9);
+        mat_mat_mult(rec709toxyzD65, cam2rec709, cam_matrix+9);
     }
 
     int width = mlv_video->raw_resolution_x();
@@ -268,8 +357,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_border.setArg(5, 3);
         kernel_demosaic_border.setArg(6, black_level);
         kernel_demosaic_border.setArg(7, white_level);
-        kernel_demosaic_border.setArg(8, wbrgb[0]);
-        kernel_demosaic_border.setArg(9, wbrgb[2]);
+        kernel_demosaic_border.setArg(8, _asShotNeutral[0]);
+        kernel_demosaic_border.setArg(9, _asShotNeutral[2]);
 
         cl::NDRange sizes(width, height);
         
@@ -299,8 +388,8 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(5, black_level);
         kernel_demosaic_green.setArg(6, white_level);
         kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
-        kernel_demosaic_green.setArg(8, wbrgb[0]);
-        kernel_demosaic_green.setArg(9, wbrgb[2]);
+        kernel_demosaic_green.setArg(8, _asShotNeutral[0]);
+        kernel_demosaic_green.setArg(9, _asShotNeutral[2]);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
     }
@@ -375,12 +464,11 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_camera_wb(cam_wb);
     dng_processor.set_highlight(highlight_mode);
     dng_processor.set_color_temperature(color_temperature);
-    dng_processor.setColorspace(colorspace);
 
     float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
     
-    // Get raw buffer in XYZ-D50 colorspace
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, colorspace <= 2);
+    // Get raw buffer in XYZ (D65) colorspace
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, _asShotNeutral);
     free(dng_buffer);
     
     ColorProcessor processor(*this);
@@ -399,7 +487,7 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
     int colorspace = _colorSpaceFormat->getValue();
 
     if(colorspace <= REC709){
-        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
+        memcpy(idt_matrix, _idt, 9*sizeof(float));
     } else {
         // XYZD50 -- Return identity matrix
         idt_matrix[1] = idt_matrix[2] = idt_matrix [3] = idt_matrix[5] = idt_matrix[6] = idt_matrix [7] = 0;
@@ -511,71 +599,6 @@ void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const 
     }
 }
 
-bool MLVReaderPlugin::prepare_spectral_idt()
-{
-    // matMethod0
-    // No color space conversion
-    // no camera matrix
-
-    std::string datapath = _pluginPath + "/Contents/Resources/data";
-    std::vector< std::string > jsonfiles = openDir(_pluginPath + "/camera");
-    Idt idt;
-
-    vector<string> paths;
-
-    vector<string> iFiles =
-        openDir( datapath + "/illuminant" );
-    for ( vector<string>::iterator file = iFiles.begin();
-            file != iFiles.end();
-            ++file )
-    {
-        string fn( *file );
-        if ( fn.find( ".json" ) == std::string::npos )
-            continue;
-        paths.push_back( fn );
-    }
-
-    
-    int ok = 0;
-
-    ok = idt.loadIlluminant( paths, "na" );
-    if (!ok)
-    {
-        return false;
-    }
-
-    ok = 0;
-    for (auto json : jsonfiles){
-        ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
-        if (ok) break;
-    }
-
-    if (!ok) return false;
-
-    float coeffs[3];
-    float compensation;
-    _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), coeffs, compensation, _cameraWhiteBalance->getValue());
-    std::vector< double > dcoeffs;
-    dcoeffs.push_back(coeffs[0]);
-    dcoeffs.push_back(coeffs[1]);
-    dcoeffs.push_back(coeffs[2]);
-
-    idt.loadTrainingData(datapath + "/training/training_spectral.json");
-    idt.loadCMF(datapath + "/cmf/cmf_1931.json");
-    //idt.chooseIllumType( "5500K", 1 /*highlight*/ );
-    idt.chooseIllumSrc( dcoeffs, 1/*_opts.highlight */);
-
-    if ( idt.calIDT() )
-    {
-        idt.getIDT();
-        // _wbv  = idt.getWB();
-
-        return true;
-    }
-
-    return false;
-}
-
 void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 {
     desc.setLabel(kPluginName);
@@ -622,6 +645,11 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
 
     if (paramName == kCameraWhiteBalance){
         _colorTemperature->setEnabled(_cameraWhiteBalance->getValue() == false);
+        computeIDT();
+    }
+
+    if (paramName == kColorSpaceFormat || paramName == kColorTemperature || paramName == kUseSpectralIdt){
+        computeIDT();
     }
 
     if (paramName == kDualIso){
@@ -773,16 +801,27 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kColorSpaceFormat);
         param->setLabel("Color space");
         param->setHint("Output colorspace (output is always linear)");
-        param->appendOption("ACES AP0 - Raw2Aces IDT", "", "aces");
-        param->appendOption("ACES AP1 - Raw2Aces IDT", "", "acesap1");
+        param->appendOption("ACES AP0 - rawtoaces IDT", "", "aces");
+        param->appendOption("ACES AP1 - rawtoaces IDT", "", "acesap1");
         param->appendOption("Rec.709", "", "rec709");
-        param->appendOption("XYZ-D50", "", "xyz");
+        param->appendOption("XYZ-D65", "", "xyz");
         param->setDefault(0);
         if (page_colors)
         {
             page_colors->addChild(*param);
         }
     }
+
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kUseSpectralIdt);
+        param->setLabel("Use spectral IDT");
+        param->setHint("Use spectral sensitivities IDT (AP0 only)");
+        param->setDefault(false);
+        if (page_colors)
+        {
+            page_colors->addChild(*param);
+        }
+    }  
 
     { 
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020

@@ -1,7 +1,6 @@
 #include "dng_convert.h"
 #include <sys/stat.h>
 #include <algorithm>
-#include "idt/dng_idt.h"
 #include <libraw.h>
 extern "C"{
 	#include <dng/dng.h>
@@ -39,7 +38,7 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	}
 }
 
-uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, bool compute_aces_matrix)
+uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, float wbrgb[4])
 {
 	//_imp->libraw->recycle();
 
@@ -74,21 +73,12 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	// Highlight mode is highlight reconstruction
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
 
-	float wbrgb[3];// = {float(wbal[1]) / 1000000., float(wbal[3]) / 1000000., float(wbal[5]) / 1000000.};
-	_mlv_video->get_white_balance_coeffs(_color_temperature, wbrgb, _wb_compensation, _camera_wb);
-
-
 	if (!_camera_wb){
 		// Set white balance coefficients
 		_imp->libraw->imgdata.params.user_mul[0] = wbrgb[0];
 		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
 		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
 		_imp->libraw->imgdata.params.user_mul[3] = wbrgb[1];
-	}
-
-	if (compute_aces_matrix){
-		DNGIdt::DNGIdt idt(_mlv_video, wbrgb);
-		idt.getDNGIDTMatrix(_idt_matrix, _colorspace);
 	}
 
 	unpack(buffer, buffersize);

@@ -167,14 +167,14 @@ vector < double > DNGIdt::XYZtoCameraWeightedMatrix ( const double & mir0,
 	return result;
 }
 
-vector < double > DNGIdt::findXYZtoCameraMtx ( const vector < double > & neutralRGB ) const {
+vector < double > DNGIdt::findXYZtoCameraMtx (  ) const {
 
 	if ( _calibrateIllum.size() == 0 ) {
 		fprintf ( stderr, " No calibration illuminants were found. \n " );
 		return _xyz2rgbMatrix1DNG;
 	}
 
-	if ( neutralRGB.size() == 0 ) {
+	if ( _neutralRGBDNG.size() == 0 ) {
 		fprintf ( stderr, " no neutral RGB values were found. \n " );
 		return _xyz2rgbMatrix1DNG;
 	}
@@ -277,7 +277,7 @@ vector < double > DNGIdt::matrixRGBtoXYZ ( const double chromaticities[][2] ) co
 }
 
 void DNGIdt::getCameraXYZMtxAndWhitePoint ( ) {
-	_cameraToXYZMtx = invertV ( findXYZtoCameraMtx ( _neutralRGBDNG ) );
+	_cameraToXYZMtx = invertV ( findXYZtoCameraMtx ( ) );
 	assert ( std::fabs ( sumVector ( _cameraToXYZMtx ) - 0.0 ) > 1e-09 );
 
 	scaleVector ( _cameraToXYZMtx, std::pow ( 2.0, _baseExpo ) );

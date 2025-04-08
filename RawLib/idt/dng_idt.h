@@ -21,7 +21,7 @@ namespace DNGIdt{
 														const double & mir1,
 														const double & mir2 ) const;
 
-			std::vector < double > findXYZtoCameraMtx ( const std::vector < double > & neutralRGB ) const;
+			std::vector < double > findXYZtoCameraMtx (  ) const;
 			std::vector < double > colorTemperatureToXYZ ( const double & cct ) const;
 			std::vector < double > matrixRGBtoXYZ ( const double chromaticities[][2] ) const;
 

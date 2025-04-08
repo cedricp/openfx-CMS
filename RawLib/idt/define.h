@@ -56,7 +56,8 @@
 
 #include <string>
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <vector>
+#include <filesystem>
 
 #ifndef WIN32
 #    include <sys/stat.h>
@@ -344,21 +345,73 @@ static const double cat02[3][3] = {
     {  0.0030, 0.0136,  0.9834 }
 };
 
-// clang-format on
-
 // Function to Open Directories
-inline vector<string> openDir( string path = "." )
+// inline vector<string> openDir( string path = "." )
+// {
+//     vector<string> paths;
+
+//     auto dir_iter = std::filesystem::directory_iterator( path );
+//     for ( auto &i:  dir_iter)
+//     {
+//         if ( i.status().type() != std::filesystem::file_type::directory )
+//             paths.push_back( i.path().string() );
+//     }
+
+//     return paths;
+// };
+
+inline vector<string> openDir(const string &directory)
 {
-    vector<string> paths;
+    std::vector<string> out;
+#ifdef WIN32
+    HANDLE dir;
+    WIN32_FIND_DATA file_data;
 
-    for ( auto &i: boost::filesystem::directory_iterator( path ) )
-    {
-        if ( i.status().type() != boost::filesystem::file_type::directory_file )
-            paths.push_back( i.path().string() );
+    if ((dir = FindFirstFile((directory + "/*").c_str(), &file_data)) == INVALID_HANDLE_VALUE)
+        return out; /* No files found */
+
+    do {
+        const string file_name = file_data.cFileName;
+        const string full_file_name = directory + "/" + file_name;
+        const bool is_directory = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+        if (file_name[0] == '.')
+            continue;
+
+        if (is_directory)
+            continue;
+
+        out.push_back(full_file_name);
+    } while (FindNextFile(dir, &file_data));
+
+    FindClose(dir);
+#else
+    DIR *dir;
+    class dirent *ent;
+    class stat st;
+
+    dir = opendir(directory);
+    while ((ent = readdir(dir)) != NULL) {
+        const string file_name = ent->d_name;
+        const string full_file_name = directory + "/" + file_name;
+
+        if (file_name[0] == '.')
+            continue;
+
+        if (stat(full_file_name.c_str(), &st) == -1)
+            continue;
+
+        const bool is_directory = (st.st_mode & S_IFDIR) != 0;
+
+        if (is_directory)
+            continue;
+
+        out.push_back(full_file_name);
     }
-
-    return paths;
-};
+    closedir(dir);
+#endif
+    return out;
+} 
 
 // Function to clear the memories occupied by vectors
 template <typename T> inline void clearVM( vector<T> vct )

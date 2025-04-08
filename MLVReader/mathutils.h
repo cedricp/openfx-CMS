@@ -1,13 +1,13 @@
 #pragma once
 
 
-const float xyzD50_rec709D65[9] = {
+const float xyzD65_rec709D65[9] = {
     3.2404542, -1.5371385, -0.4985314,
     -0.9692660 , 1.8760108, 0.0415560,
      0.0556434, -0.2040259, 1.0572252
 };
 
-const float rec709toxyzD50[9] = {
+const float rec709toxyzD65[9] = {
     0.4124564, 0.3575761, 0.1804375,
     0.2126729, 0.7151522, 0.0721750,
     0.0193339, 0.1191920, 0.9503041
@@ -64,7 +64,7 @@ inline void get_matrix_cam2rec709(float colormatrix[9], float result[9])
 {
     float rgb2cam[9];
     // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    mat_mat_mult(colormatrix, rec709toxyzD50, rgb2cam);
+    mat_mat_mult(colormatrix, rec709toxyzD65, rgb2cam);
     float sum[3] = {rgb2cam[0] + rgb2cam[1] + rgb2cam[2],
         rgb2cam[3] + rgb2cam[4] + rgb2cam[5],
         rgb2cam[6] + rgb2cam[7] + rgb2cam[8]};

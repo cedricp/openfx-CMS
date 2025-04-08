@@ -10,14 +10,13 @@ public:
 	~Dng_processor();
 
 	void unpack(uint8_t* buffer, size_t buffersize);
-	uint16_t* get_processed_image(uint8_t* buffer, size_t buffersize, bool compute_aces_matrix);
+	uint16_t* get_processed_image(uint8_t* buffer, size_t buffersize, float wbrgb[4]);
 	int width(){return _w;}
 	int height(){return _h;}
 	void set_interpolation(int i){_interpolation_mode = i;}
 	void set_highlight(int i){_highlight_mode = i;}
 	void set_camera_wb(bool wb){_camera_wb = wb;}
 	void free_buffer();
-	void setColorspace(int cs){_colorspace = cs;}
 	float* get_idt_matrix(){return _idt_matrix;}
 	float get_wbratio(){return _wb_compensation;}
 	void set_color_temperature(int color_temp){_color_temperature = color_temp;}
