@@ -25,9 +25,8 @@ namespace DNGIdt{
 			std::vector < double > colorTemperatureToXYZ ( const double & cct ) const;
 			std::vector < double > matrixRGBtoXYZ ( const double chromaticities[][2] ) const;
 
-			std::vector < std::vector < double > > getDNGCATMatrix ( );
-			std::vector < std::vector < double > > getDNGIDTMatrix ( );
-			void getDNGIDTMatrix2 ( float* out_matrix, bool AP1 );
+			std::vector < std::vector < double > > getDNGCATMatrix ( bool rec709 = false );
+			void getDNGIDTMatrix ( float* out_matrix, int colorspace );
 			void getCameraXYZMtxAndWhitePoint ( );
 
 		private:

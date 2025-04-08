@@ -88,7 +88,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 
 	if (compute_aces_matrix){
 		DNGIdt::DNGIdt idt(_mlv_video, wbrgb);
-		idt.getDNGIDTMatrix2(_idt_matrix, _ap1_matrix);
+		idt.getDNGIDTMatrix(_idt_matrix, _colorspace);
 	}
 
 	unpack(buffer, buffersize);

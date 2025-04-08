@@ -216,11 +216,19 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
 
         DNGIdt::DNGIdt idt(mlv_video, wbrgb);
-        idt.getDNGIDTMatrix2(cam_matrix + 9, colorspace == ACES_AP1);
+        idt.getDNGIDTMatrix(cam_matrix + 9, colorspace == ACES_AP1 ? 1 : 0);
     } else if (colorspace == REC709){
-        float cam2rec709[9], xyz2cam[9];
+        // float cam2rec709[9], xyz2cam[9];
+        // mlv_video->get_camera_matrix2f(xyz2cam);
+        // get_matrix_cam2rec709(xyz2cam, cam_matrix+9);
+
+        float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
-        get_matrix_cam2rec709(xyz2cam, cam_matrix+9);
+        get_matrix_cam2rec709(xyz2cam, cam2rec709);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, cam_matrix);
+
+        DNGIdt::DNGIdt idt(mlv_video, wbrgb);
+        idt.getDNGIDTMatrix(cam_matrix + 9, 2);
     } else {
         float xyz[9], cam2rec709[9], xyz2cam[9];
         mlv_video->get_camera_matrix2f(xyz2cam);
@@ -367,13 +375,12 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_camera_wb(cam_wb);
     dng_processor.set_highlight(highlight_mode);
     dng_processor.set_color_temperature(color_temperature);
-    dng_processor.setAP1IDT(colorspace == ACES_AP1);
-    bool apply_wb = colorspace <= ACES_AP1;
+    dng_processor.setColorspace(colorspace);
 
     float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
     
     // Get raw buffer in XYZ-D50 colorspace
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, apply_wb);
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, colorspace <= 2);
     free(dng_buffer);
     
     ColorProcessor processor(*this);
@@ -391,14 +398,11 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
 {
     int colorspace = _colorSpaceFormat->getValue();
 
-    if(colorspace == ACES_AP0){
+    if(colorspace <= REC709){
         memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-    } else if (colorspace == ACES_AP1){
-        memcpy(idt_matrix, dng_processor.get_idt_matrix(), 9*sizeof(float));
-    } else if (colorspace == REC709){
-        memcpy(idt_matrix, xyzD50_rec709D65, 9*sizeof(float));
     } else {
         // XYZD50 -- Return identity matrix
+        idt_matrix[1] = idt_matrix[2] = idt_matrix [3] = idt_matrix[5] = idt_matrix[6] = idt_matrix [7] = 0;
         idt_matrix[0] = idt_matrix[4] = idt_matrix [8] = 1;
     }
 }
@@ -509,12 +513,38 @@ void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const 
 
 bool MLVReaderPlugin::prepare_spectral_idt()
 {
+    // matMethod0
+    // No color space conversion
+    // no camera matrix
 
     std::string datapath = _pluginPath + "/Contents/Resources/data";
     std::vector< std::string > jsonfiles = openDir(_pluginPath + "/camera");
     Idt idt;
 
+    vector<string> paths;
+
+    vector<string> iFiles =
+        openDir( datapath + "/illuminant" );
+    for ( vector<string>::iterator file = iFiles.begin();
+            file != iFiles.end();
+            ++file )
+    {
+        string fn( *file );
+        if ( fn.find( ".json" ) == std::string::npos )
+            continue;
+        paths.push_back( fn );
+    }
+
+    
     int ok = 0;
+
+    ok = idt.loadIlluminant( paths, "na" );
+    if (!ok)
+    {
+        return false;
+    }
+
+    ok = 0;
     for (auto json : jsonfiles){
         ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
         if (ok) break;

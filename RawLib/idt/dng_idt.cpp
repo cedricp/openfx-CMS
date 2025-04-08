@@ -18,10 +18,18 @@ using namespace std;
 
 namespace DNGIdt{
 
+
+// D65 illum
 static const double XYZ_acesrgb_3[3][3] = {
     { 1.0634731317028,      0.00639793641966071,   -0.0157891874506841 },
     { -0.492082784686793,   1.36823709310019,      0.0913444629573544  },
     { -0.0028137154424595,  0.00463991165243123,   0.91649468506889    }
+};
+
+static const double XYZ_rec709rgb[3][3] = {
+    { 3.2409613, -1.5372608, -0.4986214 },
+    { -0.9692159,  1.8758931,  0.0415554  },
+    { 0.0556270, -0.2039677,  1.0571218    }
 };
 
 static const double AP0toAP1[3][3] = {
@@ -286,46 +294,33 @@ void DNGIdt::getCameraXYZMtxAndWhitePoint ( ) {
 	return;
 }
 
-vector < vector < double > > DNGIdt::getDNGCATMatrix ( ) {
+vector < vector < double > > DNGIdt::getDNGCATMatrix ( bool rec709 ) {
 	vector < double > deviceWhiteV ( 3, 1.0 );
 	getCameraXYZMtxAndWhitePoint ( );
-	vector < double > outputRGBtoXYZMtx = matrixRGBtoXYZ ( chromaticitiesACES );
+	vector < double > outputRGBtoXYZMtx = matrixRGBtoXYZ ( rec709 ? chromaticitiesREC709 : chromaticitiesACES );
 	vector < double > outputXYZWhitePoint = mulVector ( outputRGBtoXYZMtx, deviceWhiteV );
 	vector < vector < double > > chadMtx = getCAT ( _cameraXYZWhitePoint, outputXYZWhitePoint );
 
 	return chadMtx;
 }
 
-vector < vector < double > > DNGIdt::getDNGIDTMatrix ( ) {
-	vector < vector < double > > chadMtx = getDNGCATMatrix ( );
-	vector < double > XYZ_acesrgb (9), CAT (9);
-	FORIJ ( 3, 3 ) {
-		XYZ_acesrgb[i*3+j] = XYZ_acesrgb_3[i][j];
-		CAT[i*3+j] = chadMtx[i][j];
-	}
-
-	vector < double > matrix = mulVector ( XYZ_acesrgb, CAT, 3 );
-	vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
-	FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrix[i*3+j];
-
-	assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
-
-	return DNGIDTMatrix;
-}
-
-void DNGIdt::getDNGIDTMatrix2 (float* mat, bool AP1)
+// Colorspace
+// 0 : AP0
+// 1 : AP1
+// 2 : rec.709
+void DNGIdt::getDNGIDTMatrix (float* mat, int colorspace)
 {
-	vector < vector < double > > chadMtx = getDNGCATMatrix ( );
+	vector < vector < double > > chadMtx = getDNGCATMatrix ( colorspace == 2 );
 	vector < double > XYZ_acesrgb (9), CAT (9);
 
 	FORIJ ( 3, 3 ) {
-		XYZ_acesrgb[i*3+j] = XYZ_acesrgb_3[i][j];
+		XYZ_acesrgb[i*3+j] = colorspace == 2 ? XYZ_rec709rgb[i][j] : XYZ_acesrgb_3[i][j];
 		CAT[i*3+j] = chadMtx[i][j];
 	}
 
 	vector < double > matrixAP0 = mulVector ( XYZ_acesrgb, CAT, 3 );
     vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
-    if(AP1){
+    if(colorspace == 1){
         vector < double > ap0toap1(9);
         FORIJ ( 3, 3 ) ap0toap1[i*3+j] = AP0toAP1[i][j];
 

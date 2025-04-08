@@ -279,6 +279,14 @@ static const double chromaticitiesACES[4][2] = {
     { 0.32168,  0.33767 }
 };
 
+static const double chromaticitiesREC709[4][2] = {
+    { 0.64000, 0.33000 },
+    { 0.30000, 0.60000 },
+    { 0.15000, 0.06000 },
+    { 0.31270, 0.32900 }
+};
+
+
 // Roberson UV Table
 static const double Robertson_uvtTable[][3] = {
     { 0.18006,  0.26352,   -0.24341 },
