@@ -113,13 +113,14 @@ bool MLVReaderPlugin::prepare_spectral_idt()
 {
     // matMethod0
     // No color space conversion
-    // no camera matrix
+    // No camera matrix
     _useSpectralIdt->setEnabled(false);
 
     vector<string> paths;
     std::string datapath = _pluginPath + "/Contents/data";
     std::vector< std::string > jsonfiles = openDir(datapath + "/camera");
     Idt idt;
+    idt.setVerbosity(1);
 
     vector<string> iFiles = openDir( datapath + "/illuminant" );
     for ( auto& file : iFiles)
@@ -132,7 +133,6 @@ bool MLVReaderPlugin::prepare_spectral_idt()
 
     
     int ok = 0;
-
     ok = idt.loadIlluminant( paths, "na" );
     if (!ok)
     {
@@ -146,7 +146,6 @@ bool MLVReaderPlugin::prepare_spectral_idt()
         
         if (ok) break;
     }
-
     if (!ok) return false;
 
     _useSpectralIdt->setEnabled(true);
@@ -156,14 +155,19 @@ bool MLVReaderPlugin::prepare_spectral_idt()
         return false;
     }
 
+    float daylight_mul[3];
+    
+    // Set the user white balance coeffs
     std::vector< double > dcoeffs;
     dcoeffs.push_back(_asShotNeutral[0]);
     dcoeffs.push_back(_asShotNeutral[1]);
     dcoeffs.push_back(_asShotNeutral[2]);
 
+    // Reset the as neutral shot to daylight (d65)
+    _mlv_video[0]->get_white_balance_coeffs(6500, _asShotNeutral, _wbcompensation, 0);
+
     idt.loadTrainingData(datapath + "/training/training_spectral.json");
     idt.loadCMF(datapath + "/cmf/cmf_1931.json");
-    //idt.chooseIllumType( "5500K", 1 /*highlight*/ );
     idt.chooseIllumSrc( dcoeffs, 0/*_opts.highlight */);
 
     if ( idt.calIDT() )
@@ -192,7 +196,7 @@ void MLVReaderPlugin::computeIDT()
 
     // Thread safe...
     _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral, _wbcompensation, _cameraWhiteBalance->getValue());
-
+    
     if (!prepare_spectral_idt()){
         // No spectral sensitivities IDT, fall back to DNG IDT
         DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
@@ -464,6 +468,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_camera_wb(cam_wb);
     dng_processor.set_highlight(highlight_mode);
     dng_processor.set_color_temperature(color_temperature);
+    dng_processor.set_raw_colors(_useSpectralIdt->getValue());
 
     float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
     
@@ -486,7 +491,7 @@ void MLVReaderPlugin::compute_colorspace_xform_matrix(float idt_matrix[9], Dng_p
 {
     int colorspace = _colorSpaceFormat->getValue();
 
-    if(colorspace <= REC709){
+    if(colorspace <= REC709 || _useSpectralIdt->getValue()){
         memcpy(idt_matrix, _idt, 9*sizeof(float));
     } else {
         // XYZD50 -- Return identity matrix
@@ -648,7 +653,19 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         computeIDT();
     }
 
-    if (paramName == kColorSpaceFormat || paramName == kColorTemperature || paramName == kUseSpectralIdt){
+    if (paramName == kColorSpaceFormat || paramName == kColorTemperature)
+    {
+        computeIDT();
+    }
+
+    if (paramName == kUseSpectralIdt)
+    {
+        if (_useSpectralIdt->getValue()){
+            _colorSpaceFormat->setValue(0);
+            _colorSpaceFormat->setEnabled(false);
+        } else {
+            _colorSpaceFormat->setEnabled(true);
+        }
         computeIDT();
     }
 
