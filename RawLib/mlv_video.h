@@ -43,7 +43,7 @@ public:
 	void* get_mlv_object();
 
 	void low_level_process(RawInfo& ri);
-	uint16_t* get_dng_buffer(uint32_t frame, int& dng_size, int black, int white, bool no_buffer);
+	uint16_t* get_dng_buffer(uint32_t frame, int& dng_size, bool no_buffer);
 	uint32_t get_dng_header_size();
 	void free_dng_buffer();
 	uint16_t* get_raw_image();
@@ -52,6 +52,7 @@ public:
 
 	uint32_t black_level();
 	uint32_t white_level();
+	void set_levels(int black, int white);
 
 	float fps();
 	uint32_t frame_count();

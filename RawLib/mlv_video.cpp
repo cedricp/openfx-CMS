@@ -367,16 +367,13 @@ void Mlv_video::low_level_process(RawInfo& ri)
 	}
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, int& dng_size, int black, int white, bool no_buffer)
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, int& dng_size, bool no_buffer)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
 	
 	if (frame >= mlvob.frames){
 		frame = mlvob.frames - 1;
 	}
-
-	_imp->dng_object->black_level = black;
-	_imp->dng_object->white_level = white;
 
 	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame, no_buffer ? 1 : 0);
 	
@@ -390,6 +387,14 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, int& dng_size, int black, in
 	dng_size = size;
 
 	return (uint16_t*)buffer;
+}
+
+void Mlv_video::set_levels(int black, int white)
+{
+	mlvObject_t mlvob = *_imp->mlv_object;
+
+	_imp->dng_object->black_level = black;
+	_imp->dng_object->white_level = white;
 }
 
 uint16_t* Mlv_video::postprocecessed_raw_buffer()
