@@ -554,10 +554,11 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         _timeRange->setValue(tr);
         _mlv_fps->setValue(mlv_video->fps());
         _mlv_video.push_back(mlv_video);
+        _bpp->setValue(mlv_video->bpp());
+        _levelsDirty = false; 
         if (set){
             _levelsDirty = true;
         }
-        _bpp->setValue(mlv_video->bpp());
     }
 
     for (int i = 0; i < _numThreads-1; ++i){
