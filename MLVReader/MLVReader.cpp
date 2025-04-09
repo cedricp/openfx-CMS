@@ -555,9 +555,12 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         _mlv_fps->setValue(mlv_video->fps());
         _mlv_video.push_back(mlv_video);
         _bpp->setValue(mlv_video->bpp());
-        _levelsDirty = false; 
+        _levelsDirty = false;
         if (set){
             _levelsDirty = true;
+        } else {
+            _blackLevel->setDisplayRange(0, _blackLevel->getValue() * 4);
+            _whiteLevel->setDisplayRange(0, _whiteLevel->getValue() * 4);
         }
     }
 
