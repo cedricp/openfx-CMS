@@ -141,9 +141,7 @@ bool MLVReaderPlugin::prepare_spectral_idt()
 
     ok = 0;
     for (auto json : jsonfiles){
-        //ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
-        ok = idt.loadCameraSpst(json, "canon", "eos 5d mark ii");
-        
+        ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
         if (ok) break;
     }
     if (!ok) return false;
@@ -164,7 +162,7 @@ bool MLVReaderPlugin::prepare_spectral_idt()
     dcoeffs.push_back(_asShotNeutral[2]);
 
     // Reset the as neutral shot to daylight (d65)
-    _mlv_video[0]->get_white_balance_coeffs(6500, _asShotNeutral, _wbcompensation, 0);
+    _mlv_video[0]->get_white_balance_coeffs(5500, _asShotNeutral, _wbcompensation, 0);
 
     idt.loadTrainingData(datapath + "/training/training_spectral.json");
     idt.loadCMF(datapath + "/cmf/cmf_1931.json");
@@ -198,6 +196,7 @@ void MLVReaderPlugin::computeIDT()
     _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral, _wbcompensation, _cameraWhiteBalance->getValue());
     
     if (!prepare_spectral_idt()){
+        _useSpectralIdt->setValue(false);
         // No spectral sensitivities IDT, fall back to DNG IDT
         DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
         idt.getDNGIDTMatrix(_idt, colorspace);
@@ -300,7 +299,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
 
-    if (_spectralIdt && _useSpectralIdt->getValue()){
+    if (_useSpectralIdt->getValue()){
         for (int i=0; i < 9; ++i){
             cam_matrix[i+9] = _idt[i];
         }
@@ -552,8 +551,8 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         _mlv_fps->setValue(mlv_video->fps());
         _mlv_video.push_back(mlv_video);
         if (set){
-            _blackLevel->setValue(mlv_video->raw_black_level());
-            _whiteLevel->setValue(mlv_video->raw_white_level());
+            _blackLevel->setValue(mlv_video->black_level());
+            _whiteLevel->setValue(mlv_video->white_level());
         }
         _bpp->setValue(mlv_video->bpp());
     }
@@ -563,6 +562,8 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
         _mlv_video.push_back(mlv_videodup);
     }
+
+    computeIDT();
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }
@@ -718,6 +719,13 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         _dualIsoAliasMap->setEnabled(enabled);
         _dualIsoAveragingMethod->setEnabled(enabled);
         _dualIsoFullresBlending->setEnabled(enabled);
+    }
+
+    if (paramName == kResetLevels){
+        if (_mlv_video.size()){
+            _blackLevel->setValue(_mlv_video[0]->black_level());
+            _whiteLevel->setValue(_mlv_video[0]->white_level());
+        }
     }
 
     if (OpenCLBase::changedParamCL(this, args, paramName))
@@ -911,8 +919,8 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kBlackLevel);
         param->setLabel("Black level");
-        param->setRange(0, 4095);
-        param->setDisplayRange(0, 4095);
+        param->setRange(0, 65535);
+        param->setDisplayRange(0, 32767);
         param->setHint("Raw black level");
         param->setDefault(0);
         if (page_raw)
@@ -925,9 +933,18 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         OFX::IntParamDescriptor *param = desc.defineIntParam(kWhiteLevel);
         param->setLabel("White level");
         param->setRange(0, 65535);
-        param->setDisplayRange(0, 8192);
+        param->setDisplayRange(0, 65535);
         param->setHint("Raw white level");
         param->setDefault(0);
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
+    {
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kResetLevels);
+        param->setLabel("Reset levels");
         if (page_raw)
         {
             page_raw->addChild(*param);

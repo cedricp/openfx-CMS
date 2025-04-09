@@ -52,6 +52,7 @@
 #define kWhiteLevel "whiteLevel"
 #define kBpp "bpp"
 #define kUseSpectralIdt "useSpectralIdt"
+#define kResetLevels "resetLevels"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -97,6 +98,7 @@ public:
         _whiteLevel = fetchIntParam(kWhiteLevel);
         _bpp = fetchIntParam(kBpp);
         _useSpectralIdt = fetchBooleanParam(kUseSpectralIdt);
+        _resetLevels = fetchPushButtonParam(kResetLevels);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         _pluginPath = getPluginFilePath();
@@ -108,7 +110,6 @@ public:
 
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue(), false);
-            computeIDT();
         }
     }
 
@@ -170,10 +171,10 @@ private:
     OFX::IntParam* _blackLevel;
     OFX::IntParam* _whiteLevel;
     OFX::IntParam* _bpp;
+    OFX::PushButtonParam* _resetLevels;
     float _idt[9];
     float _asShotNeutral[3];
     float _wbcompensation;
-    bool _spectralIdt;
     int _maxValue=0;
 
     std::vector<Mlv_video*> _mlv_video;

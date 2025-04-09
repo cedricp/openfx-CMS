@@ -32,7 +32,7 @@ if(MINGW)
 set(PC_LIBRAW_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64")
 endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+# set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 # ========================== build platform ==========================
 
@@ -63,9 +63,6 @@ add_subdirectory(libs)
 
 message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
 message("Oencl lib dir: ${OpenCL_LIBRARIES}")
-
-set(CERES_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/include)
-set(CERES_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/lib/libceres.a)
 
 add_subdirectory(RawLib)
 
