@@ -228,7 +228,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         computeIDT();
         _idtDirty = false;
     }
-    
+
     const int time = floor(args.time+0.5);
     
     bool cam_wb = _cameraWhiteBalance->getValue();
@@ -256,7 +256,8 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
-        mlv_video->get_dng_buffer(time, info, dng_size, -1, -1, true);
+        mlv_video->low_level_process(info);
+        mlv_video->get_dng_buffer(time, dng_size, -1, -1, true);
         uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
 
         for(int y=renderWin.y1; y < renderWin.y2; y++) {
@@ -293,12 +294,22 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-    mlv_video->get_dng_buffer(time, rawInfo, dng_size, -1, -1, true);
+    mlv_video->low_level_process(rawInfo);
+    mlv_video->get_dng_buffer(time, dng_size, -1, -1, true);
     uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
     
     float cam_matrix[9] = {0};
 
     int colorspace = _colorSpaceFormat->getValue();
+
+    if (_levelsDirty){
+        _blackLevel->setValue(mlv_video->black_level());
+        _whiteLevel->setValue(mlv_video->white_level());
+        _blackLevel->setDisplayRange(0, mlv_video->white_level());
+        _whiteLevel->setDisplayRange(0, mlv_video->white_level() * 2);
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
     
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
@@ -423,10 +434,20 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
     rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
     rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
-    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, rawInfo, dng_size, _blackLevel->getValue(), _whiteLevel->getValue(), false);
+    mlv_video->low_level_process(rawInfo);
+    if (_levelsDirty){
+        _blackLevel->setValue(mlv_video->black_level());
+        _whiteLevel->setValue(mlv_video->white_level());
+        _blackLevel->setDisplayRange(0, mlv_video->white_level());
+        _whiteLevel->setDisplayRange(0, mlv_video->white_level() * 2);
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
+    uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, dng_size, _blackLevel->getValue(), _whiteLevel->getValue(), false);
     
     int color_temperature = _colorTemperature->getValue();
-    
+
+   
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
@@ -443,7 +464,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_camera_wb(cam_wb);
     dng_processor.set_highlight(highlight_mode);
     dng_processor.set_color_temperature(color_temperature);
-    dng_processor.set_raw_colors(true);//_useSpectralIdt->getValue());
+    dng_processor.set_raw_colors(true);
 
     float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
     
@@ -533,8 +554,7 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         _mlv_fps->setValue(mlv_video->fps());
         _mlv_video.push_back(mlv_video);
         if (set){
-            _blackLevel->setValue(mlv_video->black_level());
-            _whiteLevel->setValue(mlv_video->white_level());
+            _levelsDirty = true;
         }
         _bpp->setValue(mlv_video->bpp());
     }
@@ -651,14 +671,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         }
         _idtDirty = true;
     }
-
-    if (paramName == kDualIso){
-        bool enabled = _dualIsoMode->getValue() > 0;
-        _dualIsoAliasMap->setEnabled(enabled);
-        _dualIsoAveragingMethod->setEnabled(enabled);
-        _dualIsoFullresBlending->setEnabled(enabled);
-    }
-
+    
     if (paramName == kAudioExport){
         std::string filename = _mlv_audiofilename->getValue();
         if (filename.empty()) return;
@@ -697,6 +710,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     }
 
     if (paramName == kDualIso){
+        _levelsDirty = true;
         bool enabled = _dualIsoMode->getValue() > 0;
         _dualIsoAliasMap->setEnabled(enabled);
         _dualIsoAveragingMethod->setEnabled(enabled);
@@ -704,10 +718,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     }
 
     if (paramName == kResetLevels){
-        if (_mlv_video.size()){
-            _blackLevel->setValue(_mlv_video[0]->black_level());
-            _whiteLevel->setValue(_mlv_video[0]->white_level());
-        }
+        _levelsDirty = true;
     }
 
     if (OpenCLBase::changedParamCL(this, args, paramName))
@@ -925,7 +936,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     }
 
     {
-        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kResetLevels);
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kResetLevels);
         param->setLabel("Reset levels");
         if (page_raw)
         {

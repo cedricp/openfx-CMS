@@ -98,7 +98,7 @@ public:
         _whiteLevel = fetchIntParam(kWhiteLevel);
         _bpp = fetchIntParam(kBpp);
         _useSpectralIdt = fetchBooleanParam(kUseSpectralIdt);
-        _resetLevels = fetchPushButtonParam(kResetLevels);
+        _resetLevels = fetchBooleanParam(kResetLevels);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         _pluginPath = getPluginFilePath();
@@ -171,12 +171,13 @@ private:
     OFX::IntParam* _blackLevel;
     OFX::IntParam* _whiteLevel;
     OFX::IntParam* _bpp;
-    OFX::PushButtonParam* _resetLevels;
+    OFX::BooleanParam* _resetLevels;
     float _idt[9];
     float _asShotNeutral[3];
     float _wbcompensation;
     int _maxValue=0;
     bool _idtDirty = true;
+    bool _levelsDirty = false;
 
     std::vector<Mlv_video*> _mlv_video;
 };

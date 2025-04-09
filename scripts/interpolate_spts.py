@@ -1,5 +1,5 @@
 # training data found at : https://color-lab-eilat.github.io/Spectral-sensitivity-estimation-web/
-
+# Cedric PAILLE 2025
 
 import csv
 import datetime
@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import json
 import uuid
 
+showonly = True
 model = "eos m"
 specsens_csv = "data/Canon-EOS-M.csv"
 
@@ -44,17 +45,22 @@ with open(datapath+template_doc, "r") as jsonfile:
         
         x_ = np.linspace(380, 780, 81)
 
-        spline_red      = interp1d(wl, red, kind="quadratic", fill_value=(red[0]/2, red[-1]/2,), bounds_error=False)
-        spline_green    = interp1d(wl, green, kind="quadratic", fill_value=(green[0]/2, green[-1]/2,), bounds_error=False)
-        spline_blue     = interp1d(wl, blue, kind="quadratic", fill_value=(blue[0]/2, blue[-1]/2,), bounds_error=False)
+        spline_red      = interp1d(wl, red,     kind="quadratic", fill_value=(red[0]/2, red[-1]/2,), bounds_error=False)
+        spline_green    = interp1d(wl, green,   kind="quadratic", fill_value=(green[0]/2, green[-1]/2,), bounds_error=False)
+        spline_blue     = interp1d(wl, blue,    kind="quadratic", fill_value=(blue[0]/2, blue[-1]/2,), bounds_error=False)
 
         for wavelength in x_:
             camera_data["spectral_data"]["data"]["main"][str(int(wavelength))] = [float(spline_red(wavelength)), float(spline_green(wavelength)), float(spline_blue(wavelength))]
 
-        with open(new_name, 'w', encoding='utf-8') as f:
-            json.dump(camera_data, f, ensure_ascii=False, indent=4)
+        if not showonly:
+            with open(new_name, 'w', encoding='utf-8') as f:
+                json.dump(camera_data, f, ensure_ascii=False, indent=4)
 
-        plt.plot(x_, spline_red(x_))
-        plt.plot(x_, spline_green(x_))
-        plt.plot(x_, spline_blue(x_))
+        plt.plot(x_, spline_red(x_), color='red')
+        plt.plot(x_, spline_green(x_), color='green')
+        plt.plot(x_, spline_blue(x_), color='blue')
+
+        plt.plot(wl, red, color='red')
+        plt.plot(wl, green, color='green')
+        plt.plot(wl, blue, color='blue')
         plt.show()

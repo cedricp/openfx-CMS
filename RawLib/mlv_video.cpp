@@ -311,15 +311,9 @@ uint32_t Mlv_video::white_level()
 	return _imp->mlv_object->llrawproc->dng_white_level;
 }
 
-uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, int black, int white, bool no_buffer)
+void Mlv_video::low_level_process(RawInfo& ri)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
-	_imp->dng_object->black_level = black;
-	_imp->dng_object->white_level = white;
-
-	if (frame >= mlvob.frames){
-		frame = mlvob.frames - 1;
-	}
 
 	int cs = 0;
 	switch (ri.chroma_smooth){
@@ -371,6 +365,18 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, RawInfo& ri, int& dng_size, 
 	} else {
 		llrpSetFocusPixelMode(&mlvob, FP_OFF);
 	}
+}
+
+uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, int& dng_size, int black, int white, bool no_buffer)
+{
+	mlvObject_t mlvob = *_imp->mlv_object;
+	
+	if (frame >= mlvob.frames){
+		frame = mlvob.frames - 1;
+	}
+
+	_imp->dng_object->black_level = black;
+	_imp->dng_object->white_level = white;
 
 	uint8_t *buffer = getDngFrameBuffer(&mlvob, _imp->dng_object, frame, no_buffer ? 1 : 0);
 	
