@@ -177,7 +177,7 @@ private:
     float _wbcompensation;
     int _maxValue=0;
     bool _idtDirty = true;
-    bool _levelsDirty = false;
+    bool _levelsDirty = true;
 
     std::vector<Mlv_video*> _mlv_video;
 };

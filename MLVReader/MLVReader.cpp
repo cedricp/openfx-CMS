@@ -253,15 +253,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     int width_img = (int)(renderWin.x2 - renderWin.x1);
     int height_img = (int)(renderWin.y2 - renderWin.y1);
 
-    if (_levelsDirty){
-        _blackLevel->setValue(mlv_video->black_level());
-        _whiteLevel->setValue(mlv_video->white_level());
-        _blackLevel->setDisplayRange(0, mlv_video->white_level());
-        _whiteLevel->setDisplayRange(0, mlv_video->white_level() * 2);
-        _resetLevels->setValue(false);
-        _levelsDirty = false;
-    }
-
     if (_debayerType->getValue() == 0){
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
@@ -306,6 +297,15 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     mlv_video->low_level_process(rawInfo);
     mlv_video->get_dng_buffer(time, dng_size, true);
     uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
+
+    if (_levelsDirty){
+        _blackLevel->setValue(mlv_video->black_level());
+        _whiteLevel->setValue(mlv_video->white_level());
+        _blackLevel->setDisplayRange(0, mlv_video->white_level());
+        _whiteLevel->setDisplayRange(0, mlv_video->white_level() * 2);
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
     
     float cam_matrix[9] = {0};
 
@@ -437,6 +437,15 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     mlv_video->low_level_process(rawInfo);
     mlv_video->set_levels(_blackLevel->getValue(), _whiteLevel->getValue());
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, dng_size, false);
+
+    if (_levelsDirty){
+        _blackLevel->setValue(mlv_video->black_level());
+        _whiteLevel->setValue(mlv_video->white_level());
+        _blackLevel->setDisplayRange(0, mlv_video->white_level());
+        _whiteLevel->setDisplayRange(0, mlv_video->white_level() * 2);
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
     
     int color_temperature = _colorTemperature->getValue();
    
