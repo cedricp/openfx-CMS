@@ -81,7 +81,7 @@ public:
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _mlv_audiofilename = fetchStringParam(kAudioFilename);
         _audioExportButton = fetchPushButtonParam(kAudioExport);
-        _colorSpaceFormat = fetchChoiceParam(kColorSpaceFormat);
+        _ouptutColorSpace = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
         _highlightMode = fetchChoiceParam(kHighlightMode);
         _chromaSmooth = fetchChoiceParam(kChromaSmooth);
@@ -135,10 +135,10 @@ private:
 
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
-    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img);
+    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int time, int height_img, int width_img);
     void setMlvFile(std::string file, bool set = true);
-    void compute_colorspace_xform_matrix(float out_matrix[9]);
-    bool prepare_spectral_idt();
+    void computeColorspaceMatrix(float out_matrix[9]);
+    bool prepareSprectralSensIDT();
     void computeIDT();
 
 private:
@@ -153,7 +153,7 @@ private:
     OFX::PushButtonParam* _audioExportButton;
     OFX::PushButtonParam* _darkFrameButton;
     OFX::DoubleParam* _mlv_fps;
-    OFX::ChoiceParam* _colorSpaceFormat;
+    OFX::ChoiceParam* _ouptutColorSpace;
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;
     OFX::ChoiceParam* _chromaSmooth;

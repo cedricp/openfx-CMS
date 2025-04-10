@@ -109,37 +109,26 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     return true;
 }
 
-bool MLVReaderPlugin::prepare_spectral_idt()
+bool MLVReaderPlugin::prepareSprectralSensIDT()
 {
     // matMethod0
     // No color space conversion
     // No camera matrix
-    _useSpectralIdt->setEnabled(false);
-
-    vector<string> paths;
     std::string datapath = _pluginPath + "/Contents/data";
-    std::vector< std::string > jsonfiles = openDir(datapath + "/camera");
-    Idt idt;
-    idt.setVerbosity(1);
 
-    vector<string> iFiles = openDir( datapath + "/illuminant" );
-    for ( auto& file : iFiles)
-    {
-        string fn( file );
-        if ( fn.find( ".json" ) == std::string::npos )
-            continue;
-        paths.push_back( fn );
-    }
-
+    _useSpectralIdt->setEnabled(false);
     
+    SSIDT::Idt idt;
     int ok = 0;
-    ok = idt.loadIlluminant( paths, "na" );
+    //idt.setVerbosity(1);
+    ok = idt.loadIlluminant( vector<string>(), "na" );
     if (!ok)
     {
         return false;
     }
-
+    
     ok = 0;
+    std::vector< std::string > jsonfiles = openDir(datapath + "/camera");
     for (auto json : jsonfiles){
         ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
         if (ok) break;
@@ -153,20 +142,11 @@ bool MLVReaderPlugin::prepare_spectral_idt()
         return false;
     }
 
-    float daylight_mul[3];
+    idt.loadTrainingData(datapath + "/training/training_spectral.json");
     
     // Set the user white balance coeffs
-    std::vector< double > dcoeffs;
-    dcoeffs.push_back(_asShotNeutral[0]);
-    dcoeffs.push_back(_asShotNeutral[1]);
-    dcoeffs.push_back(_asShotNeutral[2]);
-
-    // Reset the as neutral shot to daylight
-    _mlv_video[0]->get_white_balance_coeffs(5500, _asShotNeutral, _wbcompensation, 0);
-
-    idt.loadTrainingData(datapath + "/training/training_spectral.json");
-    idt.loadCMF(datapath + "/cmf/cmf_1931.json");
-    idt.chooseIllumSrc( dcoeffs, 0/*_opts.highlight */);
+    std::vector< double > dcoeffs (_asShotNeutral, _asShotNeutral + 3);
+    idt.chooseIllumSrc( dcoeffs, 0 );
 
     if ( idt.calIDT() )
     {
@@ -182,7 +162,7 @@ bool MLVReaderPlugin::prepare_spectral_idt()
 
 void MLVReaderPlugin::computeIDT()
 {
-    int colorspace = _colorSpaceFormat->getValue();
+    int colorspace = _ouptutColorSpace->getValue();
 
     if (colorspace == 3){
         return;
@@ -195,11 +175,13 @@ void MLVReaderPlugin::computeIDT()
     // Thread safe...
     _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral, _wbcompensation, _cameraWhiteBalance->getValue());
     
-    if (!prepare_spectral_idt()){
-        _useSpectralIdt->setValue(false);
+    if (!prepareSprectralSensIDT()){
         // No spectral sensitivities IDT, fall back to DNG IDT
         DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
         idt.getDNGIDTMatrix(_idt, colorspace);
+
+        // Clear checkbox
+        _useSpectralIdt->setValue(false);
     }
 }
 
@@ -231,29 +213,28 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 
     const int time = floor(args.time+0.5);
     
-    bool cam_wb = _cameraWhiteBalance->getValue();
-    int dng_size = 0;
-
+    
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
     assert(OFX_COMPONENTS_OK(dstComponents));
-
+    
     OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
-
+    
     if (!dst)
     {
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
-
+    
     float maxval = _maxValue;
     int mlv_width = mlv_video->raw_resolution_x();
     int mlv_height = mlv_video->raw_resolution_y();
-
+    
     OfxRectI renderWin = args.renderWindow;
     int width_img = (int)(renderWin.x2 - renderWin.x1);
     int height_img = (int)(renderWin.y2 - renderWin.y1);
-
+    
     if (_debayerType->getValue() == 0){
+        int dng_size = 0;
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
         mlv_video->low_level_process(info);
@@ -275,10 +256,12 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         mlv_video->unlock();
     } else if (getUseOpenCL()){
         renderCL(dst.get(), mlv_video, time);
-        mlv_video->unlock();
+        
     } else {
-        renderCPU(args, dst.get(), mlv_video, cam_wb, dng_size, time, mlv_height, mlv_width);
+        bool cam_wb = _cameraWhiteBalance->getValue();
+        renderCPU(args, dst.get(), mlv_video, cam_wb, time, mlv_height, mlv_width);
     }
+    mlv_video->unlock();
 }
 
 void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
@@ -309,12 +292,12 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     
     float cam_matrix[9] = {0};
 
-    int colorspace = _colorSpaceFormat->getValue();
+    int colorspace = _ouptutColorSpace->getValue();
 
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
 
-    compute_colorspace_xform_matrix(cam_matrix);
+    computeColorspaceMatrix(cam_matrix);
 
     int width = mlv_video->raw_resolution_x();
     int height = mlv_video->raw_resolution_y();
@@ -423,8 +406,9 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
     queue.finish();
 }
 
-void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int dng_size, int time, int height_img, int width_img)
+void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int time, int height_img, int width_img)
 {
+    int dng_size = 0;
     Mlv_video::RawInfo rawInfo;
     rawInfo.dual_iso_mode = _dualIsoMode->getValue();
     rawInfo.chroma_smooth = _chromaSmooth->getValue();
@@ -448,6 +432,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     }
     
     int color_temperature = _colorTemperature->getValue();
+    int colorspace = _ouptutColorSpace->getValue();
    
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -456,9 +441,6 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
 
     // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
     Dng_processor dng_processor(mlv_video);
-
-    // Release MLV reader
-    mlv_video->unlock();
 
     int highlight_mode = _highlightMode->getValue();
     dng_processor.set_interpolation(_debayerType->getValue()-1);
@@ -480,17 +462,17 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.scale = scale;
     processor.raw_width = width_img;
     processor.raw_height = height_img;
-    compute_colorspace_xform_matrix(processor.idt_matrix);
+    computeColorspaceMatrix(processor.idt_matrix);
 
     processor.process();
 }
 
-void MLVReaderPlugin::compute_colorspace_xform_matrix(float out_matrix[9])
+void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
 {
     if(_mlv_video.empty()){
         return;
     } 
-    int colorspace = _colorSpaceFormat->getValue();
+    int colorspace = _ouptutColorSpace->getValue();
 
     float cam2xyz[9];
     _mlv_video[0]->get_camera_forward_matrix2f(cam2xyz);
@@ -669,10 +651,10 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kUseSpectralIdt)
     {
         if (_useSpectralIdt->getValue()){
-            _colorSpaceFormat->setValue(0);
-            _colorSpaceFormat->setEnabled(false);
+            _ouptutColorSpace->setValue(0);
+            _ouptutColorSpace->setEnabled(false);
         } else {
-            _colorSpaceFormat->setEnabled(true);
+            _ouptutColorSpace->setEnabled(true);
         }
         _idtDirty = true;
     }

@@ -20,13 +20,13 @@ namespace DNGIdt{
 
 
 // D65 illum
-static const double XYZ_acesrgb_3[3][3] = {
+static const double XYZD65_acesrgb_3[3][3] = {
     { 1.0634731317028,      0.00639793641966071,   -0.0157891874506841 },
     { -0.492082784686793,   1.36823709310019,      0.0913444629573544  },
     { -0.0028137154424595,  0.00463991165243123,   0.91649468506889    }
 };
 
-static const double XYZ_rec709rgb[3][3] = {
+static const double XYZD65_rec709rgb[3][3] = {
     { 3.2409613, -1.5372608, -0.4986214 },
     { -0.9692159,  1.8758931,  0.0415554  },
     { 0.0556270, -0.2039677,  1.0571218    }
@@ -45,7 +45,7 @@ DNGIdt::DNGIdt() {
 	_analogBalanceDNG      = vector < double > ( 3, 1.0 );
 	_neutralRGBDNG         = vector < double > ( 3, 1.0 );
 	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
-	_calibrateIllum        = vector < double > ( 2, 1.0 );
+	_calibrateIllum        = vector < unsigned short > ( 2, 1.0 );
 	_baseExpo              = 1.0;
 }
 
@@ -60,11 +60,11 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	_analogBalanceDNG      = vector < double > ( 3, 1.0 );
 	_neutralRGBDNG         = vector < double > ( 3, 1.0 );
 	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
-	_calibrateIllum        = vector < double > ( 2, 1.0 );
+	_calibrateIllum        = vector < unsigned short > ( 2, 1.0 );
 
     _baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
-	_calibrateIllum[0] = static_cast < double > ( lsStandardLightA ); // 2856K - lsStandardLightA  
-	_calibrateIllum[1] = static_cast < double > ( lsD65 ); // 6500K - lsD65
+	_calibrateIllum[0] = lsStandardLightA; // 2856K - lsStandardLightA  
+	_calibrateIllum[1] = lsD65; // 6500K - lsD65
 
     FORI ( 3 ){
          _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
@@ -179,8 +179,8 @@ vector < double > DNGIdt::findXYZtoCameraMtx (  ) const {
 		return _xyz2rgbMatrix1DNG;
 	}
 
-	double cct1 = lightSourceToColorTemp ( static_cast < const unsigned short > ( _calibrateIllum[0] ) );
-	double cct2 = lightSourceToColorTemp ( static_cast < const unsigned short > ( _calibrateIllum[1] ) );
+	double cct1 = lightSourceToColorTemp (  _calibrateIllum[0] );
+	double cct2 = lightSourceToColorTemp (  _calibrateIllum[1] );
 
 	double mir1 = ccttoMired ( cct1 );
 	double mir2 = ccttoMired ( cct2 );
@@ -304,36 +304,31 @@ vector < vector < double > > DNGIdt::getDNGCATMatrix ( bool rec709 ) {
 	return chadMtx;
 }
 
-// Colorspace
-// 0 : AP0
-// 1 : AP1
-// 2 : rec.709
 void DNGIdt::getDNGIDTMatrix (float* mat, int colorspace)
 {
-	vector < vector < double > > chadMtx = getDNGCATMatrix ( colorspace == 2 );
-	vector < double > XYZ_acesrgb (9), CAT (9);
+	bool rec709 = colorspace == 2;
+	bool ap0 = colorspace == 0;
+	bool ap1 = colorspace == 1;
+
+	vector < vector < double > > chadMtx = getDNGCATMatrix ( rec709 );
+	vector < double > XYZD65_rgb (9), CAT (9);
 
 	FORIJ ( 3, 3 ) {
-		XYZ_acesrgb[i*3+j] = colorspace == 2 ? XYZ_rec709rgb[i][j] : XYZ_acesrgb_3[i][j];
+		XYZD65_rgb[i*3+j] = rec709 ? XYZD65_rec709rgb[i][j] : XYZD65_acesrgb_3[i][j];
 		CAT[i*3+j] = chadMtx[i][j];
 	}
 
-	vector < double > matrixAP0 = mulVector ( XYZ_acesrgb, CAT, 3 );
+	vector < double > matrixAP0 = mulVector ( XYZD65_rgb, CAT, 3 );
     vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
-    if(colorspace == 1){
+    if(ap1){
         vector < double > ap0toap1(9);
         FORIJ ( 3, 3 ) ap0toap1[i*3+j] = AP0toAP1[i][j];
 
         vector< double > matrixAP1 = mulVector ( ap0toap1, matrixAP0, 3 );
-        // assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
-        // FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrixAP1[i*3+j];
         FORI(9) mat[i] = matrixAP1[i];
     } else {
-        // FORIJ ( 3, 3 ) DNGIDTMatrix[i][j] = matrixAP0[i*3+j];
-        // assert ( std::fabs( sumVectorM ( DNGIDTMatrix ) - 0.0 ) > 1e-09 );
         FORI(9) mat[i] = matrixAP0[i];
     }
-
-
 }
+
 }

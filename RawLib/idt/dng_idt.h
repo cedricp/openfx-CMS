@@ -36,7 +36,7 @@ namespace DNGIdt{
 			std::vector < double >  _analogBalanceDNG;
 			std::vector < double >  _neutralRGBDNG;
 			std::vector < double >  _cameraXYZWhitePoint;
-			std::vector < double >  _calibrateIllum;
+			std::vector < unsigned short >  _calibrateIllum;
 			double _baseExpo;
 	};
 }

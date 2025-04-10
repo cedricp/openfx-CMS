@@ -1,5 +1,6 @@
 #include "mathOps.h"
 #include "spectral_idt.h"
+#include "color_data.h"
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/foreach.hpp>
@@ -11,7 +12,7 @@
 
 using namespace boost::property_tree;
 
-
+namespace SSIDT {
 Illum::Illum()
 {
     _inc = 5;
@@ -77,6 +78,14 @@ void Illum::setIllumIndex( const double &index )
     return;
 }
 
+void Illum::loadDefaultSPD(){
+    for (int i = 380, j = 0; j <= 780; i+=5, j++)
+    {
+        _data.push_back(iso7589_stutung_380_780[j]);
+        if (i == 550) _index = iso7589_stutung_380_780[j];
+    }
+}
+
 //	=====================================================================
 //	Read the Illuminant data from JSON file(s)
 //
@@ -90,8 +99,6 @@ void Illum::setIllumIndex( const double &index )
 
 int Illum::readSPD( const string &path, const string &type )
 {
-    assert( path.length() > 0 && type.length() > 0 );
-
     try
     {
         // using libraries from boost::property_tree
@@ -137,10 +144,6 @@ int Illum::readSPD( const string &path, const string &type )
                 if ( wavs[wavs.size() - 1] == 550 )
                     _index = cell.second.get_value<double>();
             }
-
-            //                printf ( "\"%i\": [ %18.13f ], \n",
-            //                         wavs[wavs.size()-1],
-            //                        _bestIllum._data[_bestIllum.data.size()-1] );
         }
 
         _inc = dis;
@@ -748,6 +751,14 @@ Idt::Idt()
         _cmf.push_back( CMF() );
     }
 
+    // Init CMF data
+    for (int j = 0, i = 380; i <= 780; i+=5, j+=1){
+        _cmf[j]._wl = i;
+        _cmf[j]._xbar = cmf_1931_data[j*15];
+        _cmf[j]._ybar = cmf_1931_data[j*15+1];
+        _cmf[j]._zbar = cmf_1931_data[j*15+2];
+    }
+
     _idt.resize( 3 );
     _wb.resize( 3 );
     FORI( 3 )
@@ -893,11 +904,24 @@ int Idt::loadIlluminant( const vector<string> &paths, string type )
             _Illuminants.push_back( illumBB );
         }
 
+        if (paths.empty()){
+            Illum IllumDefault;
+            IllumDefault.loadDefaultSPD();
+            _Illuminants.push_back(IllumDefault);
+        }
+
         FORI( paths.size() )
         {
             Illum IllumJson;
             if ( IllumJson.readSPD( paths[i], type ) )
                 _Illuminants.push_back( IllumJson );
+        }
+
+        if (_Illuminants.empty()){
+            // Add default hard coded illuminant
+            Illum IllumDefault;
+            IllumDefault.loadDefaultSPD();
+            _Illuminants.push_back(IllumDefault);
         }
     }
 
@@ -941,54 +965,6 @@ void Idt::loadTrainingData( const string &path )
                     cell.second.get_value<double>() );
 
             assert( _trainingSpec[i]._data.size() == 190 );
-
-            i += 1;
-        }
-    }
-    catch ( std::exception const &e )
-    {
-        std::cerr << e.what() << std::endl;
-    }
-}
-
-//	=====================================================================
-//	Load the CIE 1931 Color Matching Functions data
-//
-//	inputs:
-//		string : path to the CIE 1931 Color Matching Functions data
-//
-//	outputs:
-//		_cmf: If successufully parsed, _cmf will be filled
-
-void Idt::loadCMF( const string &path )
-{
-    struct stat st;
-    //assert( !stat( path.c_str(), &st ) );
-
-    try
-    {
-        ptree pt;
-        read_json( path, pt );
-
-        int i = 0;
-        BOOST_FOREACH (
-            ptree::value_type &row, pt.get_child( "spectral_data.data.main" ) )
-        {
-            _cmf[i]._wl = atoi( ( row.first ).c_str() );
-
-            if ( _cmf[i]._wl < 380 || _cmf[i]._wl % 5 )
-                continue;
-            else if ( _cmf[i]._wl > 780 )
-                break;
-
-            vector<double> data;
-            BOOST_FOREACH ( ptree::value_type &cell, row.second )
-                data.push_back( cell.second.get_value<double>() );
-
-            assert( data.size() == 3 );
-            _cmf[i]._xbar = data[0];
-            _cmf[i]._ybar = data[1];
-            _cmf[i]._zbar = data[2];
 
             i += 1;
         }
@@ -1517,3 +1493,5 @@ void Idt::getWBF(float wb[3]) const
 {
     FORI(3) wb[i] = _wb[i];
 }
+
+}// namespace

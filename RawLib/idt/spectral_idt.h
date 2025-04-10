@@ -6,6 +6,8 @@
 
 using namespace std;
 
+namespace SSIDT {
+
 struct trainSpec
 {
     uint16_t       _wl;
@@ -53,6 +55,7 @@ public:
     vector<double>       cctToxy( const double &cctd ) const;
 
     int readSPD( const string &path, const string &type );
+    void loadDefaultSPD();
 
     void calDayLightSPD( const int &cct );
     void calBlackBodySPD( const int &cct );
@@ -115,7 +118,6 @@ public:
     int loadIlluminant( const vector<string> &paths, string type = "na" );
 
     void loadTrainingData( const string &path );
-    void loadCMF( const string &path );
     void chooseIllumSrc( const vector<double> &src, int highlight );
     void chooseIllumType( const char *type, int highlight );
     void setIlluminants( const Illum &Illuminant );
@@ -157,3 +159,5 @@ private:
     vector<double>         _wb;
     vector<vector<double>> _idt;
 };
+
+} // namespace
