@@ -470,7 +470,7 @@ uint32_t Mlv_video::iso()
 
 int Mlv_video::bpp()
 {
-	return _imp->mlv_object->RAWI.raw_info.bits_per_pixel;
+	return _imp->mlv_object->lossless_bpp;//raw_info.bits_per_pixel;
 }
 
 uint32_t Mlv_video::shutter_speed()

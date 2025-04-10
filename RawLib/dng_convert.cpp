@@ -55,7 +55,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	*/
 
 	// output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
-	_imp->libraw->imgdata.params.output_color = _raw_colors ? 0 : 5; // XYZ is the one we want -> every colorspaces can be converted from it
+	_imp->libraw->imgdata.params.output_color =  0; // Raw RGB
 	_imp->libraw->imgdata.params.output_bps = 16;
 	_imp->libraw->imgdata.params.gamm[0] = 1.0;
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;

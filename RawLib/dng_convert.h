@@ -15,12 +15,10 @@ public:
 	int height(){return _h;}
 	void set_interpolation(int i){_interpolation_mode = i;}
 	void set_highlight(int i){_highlight_mode = i;}
-	void set_camera_wb(bool wb){_camera_wb = wb;}
 	void free_buffer();
 	float* get_idt_matrix(){return _idt_matrix;}
 	float get_wbratio(){return _wb_compensation;}
 	void set_color_temperature(int color_temp){_color_temperature = color_temp;}
-	void set_raw_colors(bool raw_colors){_raw_colors = raw_colors;}
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;
@@ -34,6 +32,5 @@ private:
 	float _idt_matrix[9];
 	int _colorspace;
 	int _color_temperature;
-	bool _raw_colors = false;
 	Mlv_video* _mlv_video;
 };

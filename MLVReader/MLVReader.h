@@ -101,6 +101,7 @@ public:
         _resetLevels = fetchBooleanParam(kResetLevels);
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
+        _gThreadHost->mutexCreate(&_idtMutex, 0);
         _pluginPath = getPluginFilePath();
         std::string focusPixelMap = _pluginPath + "/Contents/fpm";
         std::string debayer_program = _pluginPath + "/Contents/Resources/debayer_ppg.cl";
@@ -121,6 +122,7 @@ public:
             }
         }
         _gThreadHost->mutexDestroy(_videoMutex);
+        _gThreadHost->mutexDestroy(_idtMutex);
     }
 
 private:
@@ -135,14 +137,14 @@ private:
 
     void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
     void renderCLTest(OFX::Image* destimg, int width, int height);
-    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, bool cam_wb, int time, int height_img, int width_img);
+    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
     void setMlvFile(std::string file, bool set = true);
     void computeColorspaceMatrix(float out_matrix[9]);
     bool prepareSprectralSensIDT();
     void computeIDT();
 
 private:
-    OfxMutexHandle _videoMutex;
+    OfxMutexHandle _videoMutex, _idtMutex;
 
     unsigned int _numThreads;
     OFX::Clip* _outputClip;

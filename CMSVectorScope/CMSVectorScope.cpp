@@ -163,7 +163,7 @@ void CMSVectorScope::create_scope(OFX::Image *input, float* buffer)
 
     for(int y = 0; y < input_height; ++y){
         const float *srcPix = (float *)input->getPixelAddress(0, y);
-
+        if (!srcPix) continue;
         for(int x = 0; x < input_width; ++x){
             RGB_BT709_2_YUV(srcPix, yuv);
             int vx = centerx + (yuv[1]*255);
