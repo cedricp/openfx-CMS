@@ -26,7 +26,6 @@ private:
 	int _w, _h;
 	int _interpolation_mode = 3;
 	int _highlight_mode = 0;
-	int _camera_wb;
 	int _interp = 0;
 	float _wb_compensation = 1;
 	float _idt_matrix[9];

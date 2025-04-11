@@ -68,6 +68,7 @@ public:
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
         OFX::unused(rs);
+        scale = 1. / (wl - bl);
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
             if (y >= raw_height) break;
@@ -76,7 +77,10 @@ public:
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 if (x > raw_width) break;
-                float in[3] = { float(*srcPix++) * scale, float(*srcPix++) * scale, float(*srcPix++) * scale };
+                float in[3];
+                in[0] = ((*srcPix++)) * cam_mult[0] * scale;
+                in[1] = ((*srcPix++)) * cam_mult[1] * scale;
+                in[2] = ((*srcPix++)) * cam_mult[2] * scale;
                 dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
                 dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
                 dstPix[2] = idt_matrix[6]*in[0] + idt_matrix[7]*in[1] + idt_matrix[8]*in[2];
@@ -88,8 +92,9 @@ public:
 
     float idt_matrix[9];
     OFX::Image *srcImg;
-    float scale;
+    float scale, wl, bl;
     uint16_t *raw_buffer;
+    float *cam_mult;
     int raw_width, raw_height;
 };
 
@@ -440,7 +445,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_highlight(highlight_mode);
     dng_processor.set_color_temperature(color_temperature);
 
-    float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
+    //float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
     
     // Get raw buffer -> raw colors
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, _asShotNeutral);
@@ -450,9 +455,11 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.setDstImg(dst);
     processor.raw_buffer = processed_buffer;
     processor.setRenderWindow(args.renderWindow, args.renderScale);
-    processor.scale = scale;
+    processor.wl =_whiteLevel->getValue();
+    processor.bl = _blackLevel->getValue();
     processor.raw_width = width_img;
     processor.raw_height = height_img;
+    processor.cam_mult = _asShotNeutral;
     computeColorspaceMatrix(processor.idt_matrix);
 
     processor.process();

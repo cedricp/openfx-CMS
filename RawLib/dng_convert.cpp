@@ -61,25 +61,22 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	_imp->libraw->imgdata.params.gamm[1] = 1.0;
 	// See debayer method above
 	_imp->libraw->imgdata.params.user_qual = _interpolation_mode < 5 ? _interpolation_mode : _interpolation_mode + 6;
-	_imp->libraw->imgdata.params.use_camera_matrix = 1;
+	_imp->libraw->imgdata.params.use_camera_matrix = 0;
 	_imp->libraw->imgdata.params.use_auto_wb = 0;
 	// threshold-> Parameter for noise reduction through wavelet denoising.
 	_imp->libraw->imgdata.params.threshold = 0.; 
 	_imp->libraw->imgdata.params.bright = 1.;
 	_imp->libraw->imgdata.params.no_auto_bright = 1.;
 	_imp->libraw->imgdata.params.half_size = 0;
-	_imp->libraw->imgdata.params.use_camera_wb = _camera_wb;
 	_imp->libraw->imgdata.params.no_interpolation= 0;
 	// Highlight mode is highlight reconstruction
 	_imp->libraw->imgdata.params.highlight = _highlight_mode;
+	_imp->libraw->imgdata.params.no_auto_scale = 1;
 
-	if (!_camera_wb){
-		// Set white balance coefficients
-		_imp->libraw->imgdata.params.user_mul[0] = wbrgb[0];
-		_imp->libraw->imgdata.params.user_mul[1] = wbrgb[1];
-		_imp->libraw->imgdata.params.user_mul[2] = wbrgb[2];
-		_imp->libraw->imgdata.params.user_mul[3] = wbrgb[1];
-	}
+	_imp->libraw->imgdata.params.user_mul[0] = 1.;
+	_imp->libraw->imgdata.params.user_mul[1] = 1.;
+	_imp->libraw->imgdata.params.user_mul[2] = 1.;
+	_imp->libraw->imgdata.params.user_mul[3] = 1.;
 
 	unpack(buffer, buffersize);
 	if (!buffer){
