@@ -28,8 +28,14 @@ static const double XYZD65_acesrgb_3[3][3] = {
 
 static const double XYZD65_rec709rgb[3][3] = {
     { 3.2409613, -1.5372608, -0.4986214 },
-    { -0.9692159,  1.8758931,  0.0415554  },
-    { 0.0556270, -0.2039677,  1.0571218    }
+    { -0.9692159,  1.8758931,  0.0415554},
+    { 0.0556270, -0.2039677,  1.0571218 }
+};
+
+static const double XYZD65_XYZD50[3][3] = {
+    { 1.0144665,  0.0000000,  0.0000000 },
+    { 0.0000000,  1.0000000,  0.0000000 },
+    { 0.0000000,  0.0000000,  0.7578869 }
 };
 
 static const double AP0toAP1[3][3] = {
@@ -317,7 +323,7 @@ void DNGIdt::getDNGIDTMatrix (float* mat, int colorspace)
 		XYZD65_rgb[i*3+j] = rec709 ? XYZD65_rec709rgb[i][j] : XYZD65_acesrgb_3[i][j];
 		CAT[i*3+j] = chadMtx[i][j];
 	}
-
+	
 	vector < double > matrixAP0 = mulVector ( XYZD65_rgb, CAT, 3 );
     vector < vector < double > > DNGIDTMatrix ( 3, vector < double > (3) );
     if(ap1){
@@ -331,4 +337,4 @@ void DNGIdt::getDNGIDTMatrix (float* mat, int colorspace)
     }
 }
 
-}
+} // namespace

@@ -195,12 +195,11 @@ void MLVReaderPlugin::computeIDT()
     IDT_MUTEX_UNLOCK
 }
 
-// the overridden render function
-void MLVReaderPlugin::render(const OFX::RenderArguments &args)
+Mlv_video* MLVReaderPlugin::getMlv()
 {
     Mlv_video *mlv_video = nullptr;
     {
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
         for (int i = 0; i < _mlv_video.size(); ++i){
             if (!_mlv_video[i]->locked()){
                 _mlv_video[i]->lock();
@@ -209,7 +208,14 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             }
         }
         _gThreadHost->mutexUnLock(_videoMutex);
-    }
+    } 
+    return mlv_video;
+}
+
+// the overridden render function
+void MLVReaderPlugin::render(const OFX::RenderArguments &args)
+{
+    Mlv_video *mlv_video = getMlv();
 
     if (mlv_video == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -487,16 +493,12 @@ void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
 {
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
-
-    if (_mlv_video.empty()){
-        _gThreadHost->mutexUnLock(_videoMutex);
-        return false;
-    }
+    Mlv_video* mlv = getMlv();
+    if (!mlv) return false;
 
     range.min = 1;
-    range.max = _mlv_video[0]->frame_count();
-    _gThreadHost->mutexUnLock(_videoMutex);
+    range.max = mlv->frame_count();
+    mlv->unlock();
 
     return true;
 }
@@ -558,17 +560,14 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-    
-    if (_mlv_video.size() == 0){
-        return;
-    }
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
+    Mlv_video* mlv = getMlv();
+    if (!mlv) return;
     
     OfxRectI format;
     format.x1 = 0;
-    format.x2 = _mlv_video[0]->raw_resolution_x();
+    format.x2 = mlv->raw_resolution_x();
     format.y1 = 0;
-    format.y2 = _mlv_video[0]->raw_resolution_y();
+    format.y2 = mlv->raw_resolution_y();
     
     // MLV clip is a video stream
     clipPreferences.setOutputFrameVarying(true);
@@ -577,12 +576,11 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
-    clipPreferences.setOutputFrameRate(_mlv_video[0]->fps());
+    clipPreferences.setOutputFrameRate(mlv->fps());
     clipPreferences.setOutputPremultiplication(OFX::eImageUnPreMultiplied);
-
     clipPreferences.setOutputHasContinuousSamples(false);
 
-    _gThreadHost->mutexUnLock(_videoMutex);
+    mlv->unlock();
 }
 
 void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName)
@@ -663,16 +661,12 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         if (filename.empty()) return;
         if (_mlv_video.empty()) return;
         
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
-        Mlv_video  *mlv_video = nullptr;
-        for(Mlv_video *mlv: _mlv_video){
-            if (!mlv->locked()){
-                mlv_video = mlv;
-                break;
-            }
-        }
-        if (mlv_video) mlv_video->write_audio(filename);
-        _gThreadHost->mutexUnLock(_videoMutex);
+        Mlv_video  *mlv_video = getMlv();
+
+        if (mlv_video){
+            mlv_video->write_audio(filename);
+            mlv_video->unlock();
+        } 
     }
 
     if (paramName == kDarkFrameButon){
@@ -683,16 +677,13 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         if (filename.empty()) return;
         if (_mlv_video.empty()) return;
         
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
-        Mlv_video  *mlv_video = nullptr;
-        for(Mlv_video *mlv: _mlv_video){
-            if (!mlv->locked()){
-                mlv_video = mlv;
-                break;
-            }
+        Mlv_video  *mlv_video = getMlv();
+
+        if (mlv_video)
+        {
+            mlv_video->generate_darkframe(filename.c_str(), sf, ef);
+            mlv_video->unlock();
         }
-        if (mlv_video) mlv_video->generate_darkframe(filename.c_str(), sf, ef);
-        _gThreadHost->mutexUnLock(_videoMutex);
     }
 
     if (paramName == kDualIso){

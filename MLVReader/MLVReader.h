@@ -135,15 +135,18 @@ private:
     virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
     virtual void changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName) OVERRIDE FINAL;
 
-    void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
+    
+    private:
     void renderCLTest(OFX::Image* destimg, int width, int height);
     void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
-    void setMlvFile(std::string file, bool set = true);
-    void computeColorspaceMatrix(float out_matrix[9]);
-    bool prepareSprectralSensIDT();
-    void computeIDT();
+    void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
 
-private:
+    Mlv_video* getMlv();
+    void computeIDT();
+    bool prepareSprectralSensIDT();
+    void computeColorspaceMatrix(float out_matrix[9]);
+    void setMlvFile(std::string file, bool set = true);
+
     OfxMutexHandle _videoMutex, _idtMutex;
 
     unsigned int _numThreads;

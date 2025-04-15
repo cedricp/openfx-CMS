@@ -28,6 +28,8 @@ PROJECT(OpenFXCMS CXX C)
 ENABLE_TESTING()
 set(CMAKE_CXX_STANDARD 17)
 
+SET(CMAKE_VERBOSE_MAKEFILE 1)
+
 # set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 # ========================== build platform ==========================
@@ -50,7 +52,6 @@ if(NOT CMAKE_GENERATOR MATCHES "Xcode|Visual Studio")
   MESSAGE (STATUS "    Configuration:"  ${CMAKE_BUILD_TYPE})
 endif()
 
-
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCL REQUIRED)
@@ -59,6 +60,7 @@ add_subdirectory(libs)
 
 message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
 message("Oencl lib dir: ${OpenCL_LIBRARIES}")
+message("pthread: ${PTHREAD}")
 
 add_subdirectory(RawLib)
 
@@ -142,20 +144,24 @@ FILE(GLOB CMS_RESOURCES
   "debayer_ppg.cl"
 )
 
-ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES}  $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static>)
+IF(MINGW)
+SET(LINKFLAGS "-static-libgcc -static-libstdc++")
+ENDIF(MINGW)
+
+ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static> )
 SET_TARGET_PROPERTIES(CMS PROPERTIES PREFIX "")
 SET_TARGET_PROPERTIES(CMS PROPERTIES SUFFIX ".ofx")
 
 # Add extra flags to the link step of the plugin
 if(APPLE)
-    set_target_properties(CMS PROPERTIES LINK_FLAGS "-fvisibility=hidden -exported_symbols_list,${OFX_SUPPORT_HEADER_DIR}/osxSymbols")
-    set_target_properties(CMS PROPERTIES INSTALL_RPATH "@loader_path/../Frameworks;@loader_path/../Libraries")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-fvisibility=hidden -exported_symbols_list,${OFX_SUPPORT_HEADER_DIR}/osxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES INSTALL_RPATH "@loader_path/../Frameworks;@loader_path/../Libraries")
 elseif(MINGW)
-    set_target_properties(CMS PROPERTIES LINK_FLAGS "-shared -fvisibility=hidden -Xlinker --version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "${LINKFLAGS} -shared -fvisibility=hidden -Xlinker --version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # Linux & FreeBSD
-    set_target_properties(CMS PROPERTIES LINK_FLAGS "-Wl,-fvisibility=hidden,--version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
-    set_target_properties(CMS PROPERTIES INSTALL_RPATH "$ORIGIN/../../Libraries")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-Wl,-fvisibility=hidden,--version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES INSTALL_RPATH "$ORIGIN/../../Libraries")
 endif()
 set(TARGET_DEFS OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON
       OFX_EXTENSIONS_RESOLVE OFX_EXTENSIONS_TUTTLE OFX_SUPPORTS_OPENGLRENDER NOMINMAX OFX_SUPPORTS_MULTITHREAD)
