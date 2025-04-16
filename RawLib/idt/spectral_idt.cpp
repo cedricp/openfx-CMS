@@ -79,10 +79,12 @@ void Illum::setIllumIndex( const double &index )
 }
 
 void Illum::loadDefaultSPD(){
-    for (int i = 380, j = 0; j <= 780; i+=5, j++)
+    _data.clear();
+    
+    for (int i = 380; i <= 780; i+=5)
     {
-        _data.push_back(iso7589_stutung_380_780[j]);
-        if (i == 550) _index = iso7589_stutung_380_780[j];
+        _data.push_back(iso7589_stutung_380_780[i]);
+        if (i == 550) _index = iso7589_stutung_380_780[i];
     }
 }
 
