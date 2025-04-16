@@ -470,30 +470,29 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
 
 void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
 {
-    IDT_MUTEX_LOCK
-    if(_mlv_video.empty()){
+    Mlv_video * mlv_video = getMlv();
+    if (mlv_video == nullptr){
         return;
-    } 
-    int colorspace = _ouptutColorSpace->getValue();
-
-    float cam2xyz[9];
-    _mlv_video[0]->get_camera_matrix2f(cam2xyz);
+    }
 
     if (_useSpectralIdt->getValue()){
         memcpy(out_matrix, _idt, 9*sizeof(float));
-    } else if (colorspace <= REC709){
-        float cam2rec709[9], xyz2cam[9];
-        get_matrix_cam2rec709(cam2xyz, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, xyz2cam);
-        
-        mat_mat_mult(_idt, xyz2cam, out_matrix);
     } else {
-        //memcpy(out_matrix, cam2xyz, 9*sizeof(float));
-        float cam2rec709[9];
+        float cam2xyz[9], cam2rec709[9], xyz2cam[9];
+        int colorspace = _ouptutColorSpace->getValue();
+
+        mlv_video->get_camera_matrix2f(cam2xyz);
         get_matrix_cam2rec709(cam2xyz, cam2rec709);
-        mat_mat_mult(rec709toxyzD50, cam2rec709, out_matrix);
+
+        if (colorspace <= REC709){
+            mat_mat_mult(rec709toxyzD50, cam2rec709, xyz2cam);
+            mat_mat_mult(_idt, xyz2cam, out_matrix);
+        } else {
+            mat_mat_mult(rec709toxyzD50, cam2rec709, out_matrix);
+        }
     }
-    IDT_MUTEX_UNLOCK
+
+    mlv_video->unlock();
 }
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
@@ -552,7 +551,8 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         }
     }
 
-    for (int i = 0; i < _numThreads-1; ++i){
+    // Reserve as MLV readers as threads + some extra for safety 
+    for (int i = 0; i < _numThreads+4; ++i){
         // Copy video stream, fast way
         Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
         _mlv_video.push_back(mlv_videodup);
