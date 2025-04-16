@@ -92,6 +92,7 @@ public:
     int sampling_factor_y();
 	int bpp();
 	void sensor_resolulion(int& x, int& y);
+	void get_baseline_exposure(int32_t& min, int32_t& max);
 
 	bool generate_darkframe(const char* path, int in, int out);
 	void write_audio(std::string path);

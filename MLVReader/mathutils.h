@@ -13,6 +13,12 @@ const float rec709toxyzD65[9] = {
     0.0193339, 0.1191920, 0.9503041
 };
 
+const float rec709toxyzD50[9] = {
+    0.4124564,  0.3575761,  0.1804375,
+    0.2126729,  0.7151522,  0.0721750,
+    0.0193339,  0.1191920,  0.9503041,
+};
+
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result)
 {
     for (int i = 0; i < 3; i++)

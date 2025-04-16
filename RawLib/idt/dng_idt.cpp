@@ -56,7 +56,11 @@ DNGIdt::DNGIdt() {
 }
 
 DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
+	// Fill values as for a DNG file
     float matrix1[9], matrix2[9];
+	int32_t expomin, expomax;
+
+	mlv->get_baseline_exposure ( expomin, expomax );
     mlv->get_camera_matrix1f(matrix1);
     mlv->get_camera_matrix2f(matrix2);
 
@@ -68,7 +72,7 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
 	_calibrateIllum        = vector < unsigned short > ( 2, 1.0 );
 
-    _baseExpo = 1;//static_cast < double > ( R.color.baseline_exposure );
+    _baseExpo = expomax;
 	_calibrateIllum[0] = lsStandardLightA; // 2856K - lsStandardLightA  
 	_calibrateIllum[1] = lsD65; // 6500K - lsD65
 

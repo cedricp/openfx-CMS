@@ -449,10 +449,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     int highlight_mode = _highlightMode->getValue();
     dng_processor.set_interpolation(_debayerType->getValue()-1);
     dng_processor.set_highlight(highlight_mode);
-    dng_processor.set_color_temperature(color_temperature);
 
-    //float scale = 1./65535. * (highlight_mode > 0 ? 2.f : 1.f);
-    
     // Get raw buffer -> raw colors
     uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, _asShotNeutral);
     free(dng_buffer);
@@ -480,13 +477,21 @@ void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
     int colorspace = _ouptutColorSpace->getValue();
 
     float cam2xyz[9];
-    _mlv_video[0]->get_camera_forward_matrix2f(cam2xyz);
+    _mlv_video[0]->get_camera_matrix2f(cam2xyz);
+
     if (_useSpectralIdt->getValue()){
         memcpy(out_matrix, _idt, 9*sizeof(float));
     } else if (colorspace <= REC709){
-        mat_mat_mult(_idt, cam2xyz, out_matrix);
+        float cam2rec709[9], xyz2cam[9];
+        get_matrix_cam2rec709(cam2xyz, cam2rec709);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, xyz2cam);
+        
+        mat_mat_mult(_idt, xyz2cam, out_matrix);
     } else {
-        memcpy(out_matrix, cam2xyz, 9*sizeof(float));
+        //memcpy(out_matrix, cam2xyz, 9*sizeof(float));
+        float cam2rec709[9];
+        get_matrix_cam2rec709(cam2xyz, cam2rec709);
+        mat_mat_mult(rec709toxyzD50, cam2rec709, out_matrix);
     }
     IDT_MUTEX_UNLOCK
 }

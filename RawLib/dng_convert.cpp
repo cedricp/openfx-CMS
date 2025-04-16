@@ -50,8 +50,6 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 	2 - PPG interpolation
 	3 - AHD interpolation
 	4 - DCB interpolation
-	11 - DHT intepolation
-	12 - Modified AHD intepolation (by Anton Petrusevich)
 	*/
 
 	// output_color -> linear, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020

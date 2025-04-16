@@ -135,6 +135,16 @@ void Mlv_video::get_camera_forward_matrix1f(float matrix[9])
 	}
 }
 
+void Mlv_video::get_baseline_exposure(int32_t& min, int32_t& max)
+{
+	min = _imp->mlv_object->RAWI.raw_info.exposure_bias[0];
+	max = _imp->mlv_object->RAWI.raw_info.exposure_bias[1];
+	if (max == 0)
+	{
+		min = 0;
+		max = 1;
+	}
+}
 
 bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
 {

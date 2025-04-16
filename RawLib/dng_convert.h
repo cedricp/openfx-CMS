@@ -16,9 +16,6 @@ public:
 	void set_interpolation(int i){_interpolation_mode = i;}
 	void set_highlight(int i){_highlight_mode = i;}
 	void free_buffer();
-	float* get_idt_matrix(){return _idt_matrix;}
-	float get_wbratio(){return _wb_compensation;}
-	void set_color_temperature(int color_temp){_color_temperature = color_temp;}
 private:
 	struct dngc_impl;
 	dngc_impl* _imp;
@@ -27,9 +24,5 @@ private:
 	int _interpolation_mode = 3;
 	int _highlight_mode = 0;
 	int _interp = 0;
-	float _wb_compensation = 1;
-	float _idt_matrix[9];
-	int _colorspace;
-	int _color_temperature;
 	Mlv_video* _mlv_video;
 };

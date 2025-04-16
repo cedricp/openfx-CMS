@@ -81,10 +81,12 @@ void Illum::setIllumIndex( const double &index )
 void Illum::loadDefaultSPD(){
     _data.clear();
     
-    for (int i = 380; i <= 780; i+=5)
+    for (int i = 380, j = 0; i <= 780; i+=5, j++)
     {
-        _data.push_back(iso7589_stutung_380_780[i]);
-        if (i == 550) _index = iso7589_stutung_380_780[i];
+        _data.push_back(iso7589_stutung_380_780[j]);
+        if (i == 550){
+            _index = iso7589_stutung_380_780[j];
+        }
     }
 }
 
@@ -1148,8 +1150,7 @@ vector<double> Idt::calWB( Illum &Illuminant, int highlight )
 
     scaleLSC( Illuminant );
 
-    vector<vector<double>> colRGB(
-        3, vector<double>( Illuminant._data.size(), 1.0 ) );
+    vector<vector<double>> colRGB(3, vector<double>( Illuminant._data.size(), 1.0 ) );
 
     FORI( Illuminant._data.size() )
     {
