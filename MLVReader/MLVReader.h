@@ -62,6 +62,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 extern "C"
 {
     extern char FOCUSPIXELMAP_DIRECTORY[256];
+    extern int FOCUSPIXELMAP_OK;
 }
 
 void loadPlugin();

@@ -228,7 +228,10 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     const int time = floor(args.time+0.5);
-    
+
+    if (FOCUSPIXELMAP_OK == 0 && _fixFocusPixel->getValue()){
+        setPersistentMessage(OFX::Message::eMessageWarning, "", std::string("Warning : Focus pixel map not found"));
+    }
     
     OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
@@ -413,7 +416,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix);
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
     }
-    clearPersistentMessage();
+    //clearPersistentMessage();
 
     // Fetch result from GPU
     cl::array<size_t, 3> origin = {0,0,0};
@@ -476,19 +479,21 @@ void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
     }
 
     if (_useSpectralIdt->getValue()){
+        // Spectral sensitivity based matrix
         memcpy(out_matrix, _idt, 9*sizeof(float));
     } else {
-        float cam2xyz[9], cam2rec709[9], xyz2cam[9];
+        float xyzd65tocam[9], rgb2rgb[9], cam2xyxd50[9];
         int colorspace = _ouptutColorSpace->getValue();
 
-        mlv_video->get_camera_matrix2f(cam2xyz);
-        get_matrix_cam2rec709(cam2xyz, cam2rec709);
-
+        mlv_video->get_camera_matrix2f(xyzd65tocam);
+        
+        get_matrix_cam2rec709(xyzd65tocam, rgb2rgb);
         if (colorspace <= REC709){
-            mat_mat_mult(rec709toxyzD50, cam2rec709, xyz2cam);
-            mat_mat_mult(_idt, xyz2cam, out_matrix);
+            // Using DNG IDT matrix
+            mat_mat_mult(rec709toxyzD50, rgb2rgb, cam2xyxd50);
+            mat_mat_mult(_idt, cam2xyxd50, out_matrix);
         } else {
-            mat_mat_mult(rec709toxyzD50, cam2rec709, out_matrix);
+            mat_mat_mult(rec709toxyzD50, rgb2rgb, out_matrix);
         }
     }
 

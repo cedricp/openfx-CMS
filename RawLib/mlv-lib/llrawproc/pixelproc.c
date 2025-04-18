@@ -33,6 +33,7 @@
 #include "pixelproc.h"
 
 char FOCUSPIXELMAP_DIRECTORY[256];
+int  FOCUSPIXELMAP_OK = 0;
 
 #define EV_RESOLUTION 65536
 
@@ -370,6 +371,7 @@ malloc_error:
 
 static int load_pixel_map(pixel_map * map, uint32_t camera_id, int raw_width, int raw_height)
 {
+    FOCUSPIXELMAP_OK = 0;
     const char * file_ext = ".fpm";
 #ifndef STDOUT_SILENT
     const char * map_type = "focus";
@@ -412,6 +414,8 @@ static int load_pixel_map(pixel_map * map, uint32_t camera_id, int raw_width, in
 #ifndef STDOUT_SILENT
     printf("\nUsing %s pixel map: '%s'\n"FMT_SIZE" pixels loaded\n", map_type, file_name, map->count);
 #endif
+
+    FOCUSPIXELMAP_OK = 1;
 
     fclose(f);
     return 1;

@@ -16,7 +16,19 @@ const float rec709toxyzD65[9] = {
 const float rec709toxyzD50[9] = {
     0.4124564,  0.3575761,  0.1804375,
     0.2126729,  0.7151522,  0.0721750,
-    0.0193339,  0.1191920,  0.9503041,
+    0.0193339,  0.1191920,  0.9503041
+};
+
+const float xyzD50toxyxD65[9] = {
+    0.9555766, -0.0230393,  0.0631636,
+    -0.0282895,  1.0099416,  0.0210077,
+     0.0122982, -0.0204830,  1.3299098
+};
+
+const float xyzD65toxyxD50[9] = {
+    1.0478112,  0.0228866, -0.0501270,
+    0.0295424,  0.9904844, -0.0170491,
+    -0.0092345,  0.0150436,  0.7521316
 };
 
 inline void matrix_vector_mult(const float *mat, const float *vec, float *result)
@@ -66,11 +78,11 @@ inline void invert_matrix(const float *mat, float *result)
     result[8] = (mat[0] * mat[4] - mat[1] * mat[3]) * det;
 }
 
-inline void get_matrix_cam2rec709(float colormatrix[9], float result[9])
+inline void get_matrix_cam2rec709(float xyzD65tocam[9], float result[9])
 {
     float rgb2cam[9];
     // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    mat_mat_mult(colormatrix, rec709toxyzD65, rgb2cam);
+    mat_mat_mult(xyzD65tocam, rec709toxyzD65, rgb2cam);
     float sum[3] = {rgb2cam[0] + rgb2cam[1] + rgb2cam[2],
         rgb2cam[3] + rgb2cam[4] + rgb2cam[5],
         rgb2cam[6] + rgb2cam[7] + rgb2cam[8]};
