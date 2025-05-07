@@ -69,6 +69,8 @@ public:
     {
         OFX::unused(rs);
         scale = 1. / (wl - bl);
+        float maxval = (wl - bl) * std::min(cam_mult[0], std::min(cam_mult[1], cam_mult[2]));
+        maxval *= scale;
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
             if (y >= raw_height) break;
@@ -78,9 +80,14 @@ public:
             {
                 if (x > raw_width) break;
                 float in[3];
-                in[0] = ((*srcPix++)) * cam_mult[0] * scale;
-                in[1] = ((*srcPix++)) * cam_mult[1] * scale;
-                in[2] = ((*srcPix++)) * cam_mult[2] * scale;
+                in[0] = ((*srcPix++)) * scale * cam_mult[0];
+                in[1] = ((*srcPix++)) * scale * cam_mult[1];
+                in[2] = ((*srcPix++)) * scale * cam_mult[2];
+                if (clip){
+                    if (in[0] > maxval) in[0] = maxval;
+                    if (in[1] > maxval) in[1] = maxval;
+                    if (in[2] > maxval) in[2] = maxval;
+                }
                 dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
                 dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
                 dstPix[2] = idt_matrix[6]*in[0] + idt_matrix[7]*in[1] + idt_matrix[8]*in[2];
@@ -96,6 +103,7 @@ public:
     uint16_t *raw_buffer;
     float *cam_mult;
     int raw_width, raw_height;
+    bool clip;
 };
 
 bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
@@ -286,7 +294,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         mlv_video->low_level_process(rawInfo);
 
         if (getUseOpenCL()){
-            renderCL(dst.get(), mlv_video, time);
+            renderCL(args, dst.get(), mlv_video, time);
             
         } else {
             renderCPU(args, dst.get(), mlv_video, time, mlv_height, mlv_width);
@@ -295,7 +303,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     mlv_video->unlock();
 }
 
-void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
+void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time)
 {
     int dng_size = 0;
 
@@ -308,13 +316,22 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         _resetLevels->setValue(false);
         _levelsDirty = false;
     }
-    
+
     float cam_matrix[9] = {0};
-
+    
     int colorspace = _ouptutColorSpace->getValue();
-
+    
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
+
+    // Compute clip values
+    float scale = 1. / float(white_level - black_level);
+    float maxval = float(white_level - black_level) * std::min(_asShotNeutral[0], std::min(_asShotNeutral[1], _asShotNeutral[2]));
+    maxval *= scale;
+
+    if (_highlightMode->getValue() > 0){
+        maxval = 10000.f;
+    }
 
     computeColorspaceMatrix(cam_matrix);
 
@@ -383,6 +400,7 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
         kernel_demosaic_green.setArg(8, _asShotNeutral[0]);
         kernel_demosaic_green.setArg(9, _asShotNeutral[2]);
+        kernel_demosaic_green.setArg(10, maxval);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
     }
@@ -416,11 +434,10 @@ void MLVReaderPlugin::renderCL(OFX::Image* dst, Mlv_video* mlv_video, int time)
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix);
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
     }
-    //clearPersistentMessage();
 
     // Fetch result from GPU
-    cl::array<size_t, 3> origin = {0,0,0};
-    cl::array<size_t, 3> size = {(size_t)width, (size_t)height, 1};
+    cl::array<size_t, 3> origin = {(size_t)args.renderWindow.x1, (size_t)args.renderWindow.y1, 0};
+    cl::array<size_t, 3> size = {(size_t)args.renderWindow.x2, (size_t)args.renderWindow.y2, 1};
     queue.enqueueReadImage(img_out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
     queue.finish();
 }
@@ -466,6 +483,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.raw_width = width_img;
     processor.raw_height = height_img;
     processor.cam_mult = _asShotNeutral;
+    processor.clip = _highlightMode->getValue() == 0;
     computeColorspaceMatrix(processor.idt_matrix);
 
     processor.process();
@@ -638,7 +656,6 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
             OFX::throwSuiteStatusException(kOfxStatFailed);
             return;
         }
-        clearPersistentMessage();
         if (filename != _mlvfilename){
             setMlvFile(filename);
             _mlvfilename = filename;
@@ -711,7 +728,6 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (OpenCLBase::changedParamCL(this, args, paramName))
     {
         _debayerType->setEnabled(getUseOpenCL() == false);
-        _highlightMode->setEnabled(getUseOpenCL() == false);
     }
 }
 
@@ -834,12 +850,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setLabel("HIghlight processing");
         param->appendOption("Clip", "", "clip");
         param->appendOption("Unclip", "", "unclip");
-        param->appendOption("Blend", "", "blend");
-        param->appendOption("Rebuild - 1", "", "rebuild1");
-        param->appendOption("Rebuild - 2", "", "rebuild2");
-        param->appendOption("Rebuild - 3", "", "rebuild3");
-        param->appendOption("Rebuild - 4", "", "rebuild4");
-        param->setDefault(1);
+        param->setDefault(0);
         if (page_colors)
         {
             page_colors->addChild(*param);

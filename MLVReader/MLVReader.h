@@ -140,7 +140,7 @@ private:
     private:
     void renderCLTest(OFX::Image* destimg, int width, int height);
     void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
-    void renderCL(OFX::Image* destimg, Mlv_video* mlv_video, int time);
+    void renderCL(const OFX::RenderArguments &args, OFX::Image* destimg, Mlv_video* mlv_video, int time);
 
     Mlv_video* getMlv();
     void computeIDT();

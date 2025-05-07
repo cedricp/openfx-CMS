@@ -140,8 +140,7 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
   "CMSMLVReader/net.sf.openfx.MLVReader.png"
-  "debayer_vng.cl"
-  "debayer_ppg.cl"
+  "resources/opencl/debayer_ppg.cl"
 )
 
 IF(MINGW)

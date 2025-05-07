@@ -249,10 +249,10 @@ static const double acesrgb_XYZ_3[3][3] = {
 };
 
 static const double chromaticitiesACES[4][2] = {
-    { 0.73470,  0.26530 },
-    { 0.00000,  1.00000 },
-    { 0.00010, -0.07700 },
-    { 0.32168,  0.33767 }
+    { 0.73470,  0.26530 }, // Red primary
+    { 0.00000,  1.00000 }, // Green primary
+    { 0.00010, -0.07700 }, // Blue primary
+    { 0.32168,  0.33767 }  // White point
 };
 
 static const double chromaticitiesREC709[4][2] = {

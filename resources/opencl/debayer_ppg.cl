@@ -60,7 +60,7 @@ test_pattern (write_only image2d_t out)
 kernel void
 ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
                     const unsigned int filters, const unsigned int black_level, const unsigned int white_level,
-                    local float *buffer, float rmult, float bmult)
+                    local float *buffer, float rmult, float bmult, float clip_value)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
@@ -159,6 +159,8 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
   }
 
   color.w = 1.f;
+
+  color = fmin(color, clip_value);
 
   write_imagef (out, (int2)(x,y), fmax(color, 0.0f));
 }
