@@ -6,7 +6,7 @@
 class Dng_processor
 {
 public:
-	Dng_processor(Mlv_video* mlv_video);
+	Dng_processor();
 	~Dng_processor();
 
 	void unpack(uint8_t* buffer, size_t buffersize);
@@ -24,5 +24,4 @@ private:
 	int _interpolation_mode = 3;
 	int _highlight_mode = 0;
 	int _interp = 0;
-	Mlv_video* _mlv_video;
 };

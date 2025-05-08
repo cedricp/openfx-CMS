@@ -23,10 +23,6 @@
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
 
-#define kParamEnableShaperLut "enable_shaper_lut"
-#define kParamLogMinmax "log2 min max"
-#define kParamShaperSize "lut1dsize"
-
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #ifdef OFX_EXTENSIONS_NATRON
@@ -52,9 +48,6 @@ public:
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
 
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        _logScale = fetchBooleanParam(kParamEnableShaperLut);
-        _logminmax = fetchDouble2DParam(kParamLogMinmax);
-        _lut1dsize = fetchChoiceParam(kParamShaperSize);
     }
 
 private:
@@ -69,8 +62,6 @@ private:
     int _lutSize;
     OFX::StringParam* _outputLutFile;
     std::vector<Color> _lut;
-    OFX::BooleanParam *_logScale;
-    OFX::Double2DParam *_logminmax;
     OFX::ChoiceParam *_lut1dsize;
     OFX::Clip * _dstClip;
     OFX::Clip* _inputClip;

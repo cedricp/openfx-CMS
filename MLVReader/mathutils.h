@@ -31,11 +31,12 @@ const float xyzD65toxyxD50[9] = {
     -0.0092345,  0.0150436,  0.7521316
 };
 
-inline void matrix_vector_mult(const float *mat, const float *vec, float *result)
+template <class T>
+inline void matrix_vector_mult(const T *mat, const T *vec, T *result)
 {
     for (int i = 0; i < 3; i++)
     {
-        float res = 0.0;
+        T res = 0.0;
         for (int j = 0; j < 3; j++)
         {
             res += mat[i*3+j] * vec[j];
@@ -44,13 +45,14 @@ inline void matrix_vector_mult(const float *mat, const float *vec, float *result
     }
 }
 
-inline void mat_mat_mult(const float *mat1, const float *mat2, float *result)
+template <class T>
+inline void mat_mat_mult(const T *mat1, const T *mat2, T *result)
 {
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            float res = 0.0;
+            T res = 0.0;
             for (int k = 0; k < 3; k++)
             {
                 res += mat1[i*3+k] * mat2[k*3+j];
@@ -60,9 +62,10 @@ inline void mat_mat_mult(const float *mat1, const float *mat2, float *result)
     }
 }
 
-inline void invert_matrix(const float *mat, float *result)
+template <class T>
+inline void invert_matrix(const T *mat, T *result)
 {
-    float det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7]) -
+    T det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7]) -
                 mat[1] * (mat[3] * mat[8] - mat[5] * mat[6]) +
                 mat[2] * (mat[3] * mat[7] - mat[4] * mat[6]);
     if (det == 0) return;
@@ -78,18 +81,77 @@ inline void invert_matrix(const float *mat, float *result)
     result[8] = (mat[0] * mat[4] - mat[1] * mat[3]) * det;
 }
 
-inline void get_matrix_cam2rec709(float xyzD65tocam[9], float result[9])
+template <class T>
+class Matrix3x3
 {
-    float rgb2cam[9];
-    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    mat_mat_mult(xyzD65tocam, rec709toxyzD65, rgb2cam);
-    float sum[3] = {rgb2cam[0] + rgb2cam[1] + rgb2cam[2],
-        rgb2cam[3] + rgb2cam[4] + rgb2cam[5],
-        rgb2cam[6] + rgb2cam[7] + rgb2cam[8]};
+  T mat[9];
+  public:
+
+  // Identity
+  Matrix3x3(){
+    mat[0] = 1; mat[1] = 0; mat[2] = 0;
+    mat[3] = 0; mat[4] = 0; mat[5] = 0;
+    mat[6] = 0; mat[7] = 0; mat[8] = 1;
+  }
+
+  Matrix3x3(const T* ref){
+    for(int i = 0; i < 9; ++i) mat[i] = ref[i];
+  }
+
+  Matrix3x3(const Matrix3x3& ref){
+    for(int i = 0; i < 9; ++i) mat[i] = ref.mat[i];
+  }
+
+  T* data(){
+    return mat;
+  }
+
+  T& operator[] (int i){
+    return mat[i];
+  }
+
+  Matrix3x3 operator * (const Matrix3x3& a) const {
+    Matrix3x3 res;
+    mat_mat_mult(mat, a.mat, res.mat);
+    return res;
+  }
+
+  void operator = (const Matrix3x3& a) {
+    for(int i = 0; i < 9; ++i) mat[i] = a.mat[i];
+  }
+
+  Matrix3x3 invert() const {
+    Matrix3x3 res;
+    invert_matrix(mat, res.mat);
+    return res;
+  }
+
+  void invert_in_place(){
+    Matrix3x3 res;
+    invert_matrix(mat, res.mat);
+    for(int i = 0; i < 9; ++i) mat[i] = res[i];
+  }
+
+  void normalize_rows(){
+    float sum[3] = {mat[0] + mat[1] + mat[2],
+                    mat[3] + mat[4] + mat[5],
+                    mat[6] + mat[7] + mat[8]};
     // Normalize rows
-    rgb2cam[0] /= sum[0];rgb2cam[1] /= sum[0];rgb2cam[2] /= sum[0];
-    rgb2cam[3] /= sum[1];rgb2cam[4] /= sum[1];rgb2cam[5] /= sum[1];
-    rgb2cam[6] /= sum[2];rgb2cam[7] /= sum[2];rgb2cam[8] /= sum[2];
+    mat[0] /= sum[0];mat[1] /= sum[0];mat[2] /= sum[0];
+    mat[3] /= sum[1];mat[4] /= sum[1];mat[5] /= sum[1];
+    mat[6] /= sum[2];mat[7] /= sum[2];mat[8] /= sum[2];
+  }
+};
+
+typedef Matrix3x3<float> Matrix3x3f;
+
+Matrix3x3f get_matrix_cam2rec709(const Matrix3x3f& xyzD65tocam)
+{
+    Matrix3x3f rgb2cam;
+    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
+    rgb2cam = xyzD65tocam * Matrix3x3f(rec709toxyzD65);
+    rgb2cam.normalize_rows();
     // Invert RGB2CAM matrix
-    invert_matrix(rgb2cam, result);
+    rgb2cam.invert_in_place();
+    return rgb2cam;
 }

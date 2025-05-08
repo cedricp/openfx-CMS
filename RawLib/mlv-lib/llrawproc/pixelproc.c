@@ -43,15 +43,15 @@ int  FOCUSPIXELMAP_OK = 0;
 #define ABS(a) ((a) > 0 ? (a) : -(a))
 
 #define CHROMA_SMOOTH_2X2
-#include "chroma_smooth.c"
+#include "chroma_smooth.inline"
 #undef CHROMA_SMOOTH_2X2
 
 #define CHROMA_SMOOTH_3X3
-#include "chroma_smooth.c"
+#include "chroma_smooth.inline"
 #undef CHROMA_SMOOTH_3X3
 
 #define CHROMA_SMOOTH_5X5
-#include "chroma_smooth.c"
+#include "chroma_smooth.inline"
 #undef CHROMA_SMOOTH_5X5
 
 #ifdef __WIN32

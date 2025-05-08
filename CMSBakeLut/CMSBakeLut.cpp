@@ -26,7 +26,7 @@
 #include <cfloat>
 
 #include "CMSBakeLut.h"
-#include "../utils.h"
+#include "../utils/utils.h"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -142,27 +142,6 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
             return;
         }
 
-        bool isLog = _logScale->getValue();
-        if (isLog){
-            double logmin, logmax;
-            _logminmax->getValue(logmin, logmax);
-            logEncode encoder(logmin, logmax);
-            float min_value = powf(2.0, logmin);
-            float max_value = powf(2.0, logmax);
-
-            fprintf(file, "# Generated LUT with openfx-CMS\n");
-            fprintf(file, "LUT_1D_SIZE %i\n", lut1dsize);
-            fprintf(file, "LUT_1D_INPUT_RANGE %f %f\n\n", min_value, max_value);
-            //fprintf(file, "DOMAIN_MIN %f %f %f\n", min_value, min_value, min_value);
-            //fprintf(file, "DOMAIN_MAX  %f %f %f\n\n", max_value, max_value, max_value);
-            for (int i = 0; i < lut1dsize; ++i){
-                float val = encoder.apply(float(i) / float(lut1dsize-1) * max_value);
-                fprintf(file, "%f %f %f\n", val, val, val);
-            }
-            fprintf(file, "\n\n");
-        }
-
-
         fprintf(file, "LUT_3D_SIZE %d\n", _lutSize);
         for (int i = 0; i < _lut.size(); i++) {
             fprintf(file, "%f %f %f\n", _lut[i].r, _lut[i].g, _lut[i].b);
@@ -170,12 +149,6 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
         fclose(file);
     }
 
-    if (paramName == kParamEnableShaperLut)
-    {
-        bool isEnabled = _logScale->getValue();
-        _logminmax->setEnabled(isEnabled);
-        _lut1dsize->setEnabled(isEnabled);
-    }
 }
 
 void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
@@ -235,42 +208,6 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
             OFX::PushButtonParamDescriptor* param = desc.definePushButtonParam("BakeLUT");
             param->setLabel("Bake LUT");
             param->setHint("Create the 3D LUT file in cube format.");
-            if (page) {
-                page->addChild(*param);
-            }
-        }
-
-        {
-            OFX::BooleanParamDescriptor * param = desc.defineBooleanParam(kParamEnableShaperLut);
-            param->setLabel("LOG shaper LUT");
-            param->setHint("Add a log shaper LUT");
-            param->setEnabled(true);
-            param->setDefault(false);
-            if (page) {
-                page->addChild(*param);
-            }
-        }
-
-        {
-            OFX::Double2DParamDescriptor * param = desc.defineDouble2DParam(kParamLogMinmax);
-            param->setLabel("Log2 Min Max values");
-            param->setHint("Shaper LUT Min and max exposure values");
-            param->setDefault(-8, 4);
-            param->setEnabled(false);
-            if (page) {
-                page->addChild(*param);
-            }
-        }
-
-        {
-            OFX::ChoiceParamDescriptor * param = desc.defineChoiceParam(kParamShaperSize);
-            param->setLabel("Shaper LUT size");
-            param->setHint("The size of the Shaper 1D LUT");
-            param->appendOption("512");
-            param->appendOption("1024");
-            param->appendOption("2048");
-            param->appendOption("4096");
-            param->setEnabled(false);
             if (page) {
                 page->addChild(*param);
             }

@@ -26,7 +26,7 @@
 #include <cfloat>
 
 #include "CMSLogEncoding.h"
-#include "../utils.h"
+#include "../utils/utils.h"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 

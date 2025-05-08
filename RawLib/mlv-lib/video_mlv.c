@@ -1413,7 +1413,8 @@ int openMlvClip(mlvObject_t * video, const char * mlvPath, char * error_message)
     /* Reads MLV audio into buffer (video->audio_data) and sync it,
      * set full audio buffer size (video->audio_buffer_size) and
      * aligned usable audio data size (video->audio_size) */
-    readMlvAudioData(video);
+    // not needed for now
+    // readMlvAudioData(video);
 
 short_cut:
 

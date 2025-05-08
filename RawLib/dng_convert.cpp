@@ -11,7 +11,7 @@ struct Dng_processor::dngc_impl{
 	libraw_processed_image_t* _image;
 };
 
-Dng_processor::Dng_processor(Mlv_video* mlv_video) : _buffer(NULL), _mlv_video(mlv_video)
+Dng_processor::Dng_processor() : _buffer(NULL)
 {
 	_imp = new dngc_impl;
 	_imp->libraw = new LibRaw;

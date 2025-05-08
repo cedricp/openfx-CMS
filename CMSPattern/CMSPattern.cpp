@@ -27,7 +27,6 @@
 
 #include "ofxOpenGLRender.h"
 #include "CMSPattern.h"
-#include "../utils.h" 
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -37,31 +36,21 @@ class CMSPatternProcessor
 public:
     CMSPatternProcessor(OFX::ImageEffect &instance): ImageProcessor(instance)
     {
-        _logencoder = nullptr;
         _res.x  =_res.y = 0;
     } 
 
     ~CMSPatternProcessor()
     {
-        if (_logencoder) delete _logencoder;
     }
 
     void setValues(const int lutsize,
-                    const OfxPointI &rod, bool isAntiLog,
-                    double logmin, double logmax)
+                    const OfxPointI &rod)
     {
-        if (_logencoder) delete _logencoder;
         _lutsize = lutsize;
         _res = rod;
-        if (isAntiLog){
-            _logencoder = new logEncode(logmin, logmax);
-        } else {
-            _logencoder = nullptr;
-        }
     }
 
 private:
-    logEncode* _logencoder;
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
         OFX::unused(rs);
@@ -106,11 +95,6 @@ private:
                     float curr_red = float(curr_pos % _lutsize) / (_lutsize - 1);
                     float curr_green = float((curr_pos / _lutsize) % _lutsize) / (_lutsize - 1);
                     float curr_blue = float((curr_pos / _lutsize / _lutsize) % _lutsize) / (_lutsize - 1);
-                    if (_logencoder){
-                        curr_red    = _logencoder->apply_backward(curr_red);
-                        curr_green  = _logencoder->apply_backward(curr_green);
-                        curr_blue   = _logencoder->apply_backward(curr_blue);
-                    }
                     *dstPix++ = curr_red;
                     *dstPix++ = curr_green;  
                     *dstPix++ = curr_blue;
@@ -182,10 +166,7 @@ void CMSPatternPlugin::render(const OFX::RenderArguments &args)
 
     double lutsize = _lutSize->getValue();
     OfxPointI resolution = getCMSResolution();
-    bool isAntilog = _antiLogScale->getValue();
-    double min, max;
-    _logminmax->getValue(min, max);
-    processor.setValues(lutsize, resolution, isAntilog, min, max);
+    processor.setValues(lutsize, resolution);
     processor.process();
 }
 

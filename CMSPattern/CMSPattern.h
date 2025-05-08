@@ -51,8 +51,6 @@ public:
     {
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
         _lutSize = fetchIntParam(kParamLUTSizeName);
-        _antiLogScale = fetchBooleanParam(kParamLog2EncodeEnable);
-        _logminmax = fetchDouble2DParam(kParamLog2MinMax);
     }
 
     virtual ~CMSPatternPlugin(){ }
@@ -70,9 +68,6 @@ private:
     OfxPointI getCMSResolution();
 private:
     OFX::IntParam *_lutSize;
-    OFX::BooleanParam *_antiLogScale;
-    OFX::Double2DParam *_logminmax;
-
     OFX::Clip* _dstClip;
 };
 

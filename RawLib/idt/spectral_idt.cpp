@@ -308,7 +308,7 @@ const vector<double> Illum::getIllumData() const
 //	outputs:
 //		const string _type : the type of Illuminant
 
-const string Illum::getIllumType() const
+string Illum::getIllumType() const
 {
     return _type;
 }
@@ -322,7 +322,7 @@ const string Illum::getIllumType() const
 //	outputs:
 //		const int : the interval/increment of the Illuminant SPD data
 
-const int Illum::getIllumInc() const
+int Illum::getIllumInc() const
 {
     return _inc;
 }
@@ -336,7 +336,7 @@ const int Illum::getIllumInc() const
 //  outputs:
 //      const int : the index value of the Illuminant SPD data at 550nm
 
-const double Illum::getIllumIndex() const
+double Illum::getIllumIndex() const
 {
     return _index;
 }
@@ -472,7 +472,7 @@ const char *Spst::getModel() const
 //		const uint8_t: Wavelength increment value (e.g., 5nm, 10nm) of
 //                     the camera sensitivity
 
-const uint8_t Spst::getWLIncrement() const
+uint8_t Spst::getWLIncrement() const
 {
     return _increment;
 }
@@ -486,7 +486,7 @@ const uint8_t Spst::getWLIncrement() const
 //	outputs:
 //		const vector <RGBSen>: the sensitivity (in vector) of the camera
 
-const vector<RGBSen> Spst::getSensitivity() const
+vector<RGBSen> Spst::getSensitivity() const
 {
     return _rgbsen;
 }

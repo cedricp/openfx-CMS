@@ -147,8 +147,6 @@ struct dataPath
     vector<string> paths;
 };
 
-static float                  custom_Matrix[3][3] = { 0.0 };
-static float                  custom_Buffer[9]    = { 0.0 };
 static vector<vector<double>> custom_idtm;
 
 const double pi = 3.1416;

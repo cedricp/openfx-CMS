@@ -52,29 +52,6 @@ if(NOT CMAKE_GENERATOR MATCHES "Xcode|Visual Studio")
   MESSAGE (STATUS "    Configuration:"  ${CMAKE_BUILD_TYPE})
 endif()
 
-include(FindOpenGL REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(OpenCL REQUIRED)
-
-add_subdirectory(libs)
-
-message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
-message("Oencl lib dir: ${OpenCL_LIBRARIES}")
-message("pthread: ${PTHREAD}")
-
-add_subdirectory(RawLib)
-
-# Use -Ofast when applicable (implies -ffast-math)
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Wextra -Ofast -DNDEBUG")
-    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Wextra -Ofast -DNDEBUG")
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Ofast -DNDEBUG")
-    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Ofast -DNDEBUG")
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Wextra -Ofast -DNDEBUG")
-    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Wextra -Ofast -DNDEBUG")
-endif()
 SET(OPENFX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/openfx)
 
 # C++ Include directories
@@ -88,43 +65,41 @@ INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/Plugins/include)
 INCLUDE_DIRECTORIES(${OpenCL_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLBase)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/include)
 
+include(FindOpenGL REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(OpenCL REQUIRED)
+
+add_subdirectory(libs)
+
+message("Oencl include dir: ${OpenCL_INCLUDE_DIRS}")
+message("Oencl lib dir: ${OpenCL_LIBRARIES}")
+message("pthread: ${PTHREAD}")
+
+add_subdirectory(RawLib)
+
+set(TARGET_DEFS OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON
+      OFX_EXTENSIONS_RESOLVE OFX_EXTENSIONS_TUTTLE OFX_SUPPORTS_OPENGLRENDER NOMINMAX OFX_SUPPORTS_MULTITHREAD)
+
+add_subdirectory(openfx)
+add_subdirectory(SupportExt)
+
+# Use -Ofast when applicable (implies -ffast-math)
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Wextra -Ofast -DNDEBUG")
+    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Wextra -Ofast -DNDEBUG")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Ofast -DNDEBUG")
+    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Ofast -DNDEBUG")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set (CMAKE_CXX_FLAGS_RELEASE "-Wall -Wextra -Ofast -DNDEBUG")
+    set (CMAKE_C_FLAGS_RELEASE   "-Wall -Wextra -Ofast -DNDEBUG")
+endif()
+
 # Define "DEBUG" on debug builds
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 # /MP on MSVC
 ADD_COMPILE_OPTIONS($<$<CXX_COMPILER_ID:MSVC>:/MP>)
-
-set(OFX_SUPPORT_HEADER_DIR "${OPENFX_PATH}/Support/include")
-set(OFX_SUPPORT_LIBRARY_DIR "${OPENFX_PATH}/Support/Library")
-
-FILE(GLOB SUPPORT_SOURCES
-    "${OFX_SUPPORT_HEADER_DIR}/*.h"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsCore.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsImageEffect.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsInteract.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsLog.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsMultiThread.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsParams.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsProperty.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/ofxsPropertyValidation.cpp"
-    "${OFX_SUPPORT_LIBRARY_DIR}/*.h"
-    "SupportExt/tinythread.cpp"
-    "SupportExt/ofxsThreadSuite.cpp"
-    "SupportExt/ofxsLut.cpp"
-    "SupportExt/*.h"
-    "SupportExt/ofxsGenerator.cpp"
-    "SupportExt/ofxsLut.cpp"
-    "SupportExt/ofxsMultiPlane.cpp"
-    "SupportExt/ofxsOGLTextRenderer.cpp"
-    "SupportExt/ofxsOGLFontData.cpp"
-    "SupportExt/ofxsRamp.cpp"
-    "SupportExt/ofxsShutter.cpp"
-    "SupportExt/ofxsTracking.cpp"
-    "SupportExt/ofxsTransform3x3.cpp"
-    "SupportExt/ofxsTransformInteract.cpp"
-    "SupportExt/ofxsRectangleInteract.cpp"
-    "SupportExt/*.h"
-)
 
 FILE(GLOB CMS_SOURCES
   "libs/GFX/gfx.cpp"
@@ -140,6 +115,9 @@ FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
   "CMSMLVReader/net.sf.openfx.MLVReader.png"
+)
+
+FILE(GLOB CMS_OCLSHADERS
   "resources/opencl/debayer_ppg.cl"
 )
 
@@ -147,27 +125,25 @@ IF(MINGW)
 SET(LINKFLAGS "-static-libgcc -static-libstdc++")
 ENDIF(MINGW)
 
-ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} ${SUPPORT_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static> )
+ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static> )
 SET_TARGET_PROPERTIES(CMS PROPERTIES PREFIX "")
 SET_TARGET_PROPERTIES(CMS PROPERTIES SUFFIX ".ofx")
 
 # Add extra flags to the link step of the plugin
 if(APPLE)
-  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-fvisibility=hidden -exported_symbols_list,${OFX_SUPPORT_HEADER_DIR}/osxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-fvisibility=hidden -exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/openfx/Support/include/osxSymbols")
   SET_TARGET_PROPERTIES(CMS PROPERTIES INSTALL_RPATH "@loader_path/../Frameworks;@loader_path/../Libraries")
 elseif(MINGW)
-  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "${LINKFLAGS} -shared -fvisibility=hidden -Xlinker --version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "${LINKFLAGS} -shared -fvisibility=hidden -Xlinker --version-script=${CMAKE_CURRENT_SOURCE_DIR}/openfx/Support/include/linuxSymbols")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD" OR ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # Linux & FreeBSD
-  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-Wl,-fvisibility=hidden,--version-script=${OFX_SUPPORT_HEADER_DIR}/linuxSymbols")
+  SET_TARGET_PROPERTIES(CMS PROPERTIES LINK_FLAGS "-Wl,-fvisibility=hidden,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/openfx/Support/include/linuxSymbols")
   SET_TARGET_PROPERTIES(CMS PROPERTIES INSTALL_RPATH "$ORIGIN/../../Libraries")
 endif()
-set(TARGET_DEFS OFX_EXTENSIONS_VEGAS OFX_EXTENSIONS_NUKE OFX_EXTENSIONS_NATRON
-      OFX_EXTENSIONS_RESOLVE OFX_EXTENSIONS_TUTTLE OFX_SUPPORTS_OPENGLRENDER NOMINMAX OFX_SUPPORTS_MULTITHREAD)
 
 INCLUDE_DIRECTORIES(CMS libs/GFX)
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE ${TARGET_DEFS})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} libraw_static m ws2_32 Ceres::ceres) 
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} supportext-static openfx-static libraw_static m ws2_32 Ceres::ceres) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html
@@ -231,11 +207,15 @@ ELSE()
     DESTINATION CMS.ofx.bundle/Contents/Resources
   )
 
+  INSTALL(FILES ${CMS_OCLSHADERS}
+    DESTINATION CMS.ofx.bundle/Contents/Resources/Shaders
+  )
+
   INSTALL(FILES Info.plist
     DESTINATION CMS.ofx.bundle/Contents
   )
 
   INSTALL(DIRECTORY resources/data
-    DESTINATION CMS.ofx.bundle/Contents
+    DESTINATION CMS.ofx.bundle/Contents/Resources
   )
 ENDIF()

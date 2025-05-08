@@ -49,9 +49,9 @@ public:
     void setIllumIndex( const double &index );
 
     const vector<double> getIllumData() const;
-    const string         getIllumType() const;
-    const int            getIllumInc() const;
-    const double         getIllumIndex() const;
+    string         getIllumType() const;
+    int            getIllumInc() const;
+    double         getIllumIndex() const;
     vector<double>       cctToxy( const double &cctd ) const;
 
     int readSPD( const string &path, const string &type );
@@ -88,8 +88,8 @@ public:
 
     const char          *getBrand() const;
     const char          *getModel() const;
-    const uint8_t        getWLIncrement() const;
-    const vector<RGBSen> getSensitivity() const;
+    uint8_t        getWLIncrement() const;
+    vector<RGBSen> getSensitivity() const;
 
     char *getBrand();
     char *getModel();

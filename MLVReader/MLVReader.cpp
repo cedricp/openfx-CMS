@@ -33,8 +33,6 @@
 #include <fstream>
 #include <stddef.h>
 #include "ofxOpenGLRender.h"
-#include "../utils.h" 
-#include "mathutils.h"
 
 extern "C"{
 #include <dng/dng.h>
@@ -69,8 +67,8 @@ public:
     {
         OFX::unused(rs);
         scale = 1. / (wl - bl);
-        float maxval = (wl - bl) * std::min(cam_mult[0], std::min(cam_mult[1], cam_mult[2]));
-        maxval *= scale;
+        float clipping_value = (wl - bl) * std::min(cam_mult[0], std::min(cam_mult[1], cam_mult[2]));
+        clipping_value *= scale;
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
             if (y >= raw_height) break;
@@ -84,9 +82,9 @@ public:
                 in[1] = ((*srcPix++)) * scale * cam_mult[1];
                 in[2] = ((*srcPix++)) * scale * cam_mult[2];
                 if (clip){
-                    if (in[0] > maxval) in[0] = maxval;
-                    if (in[1] > maxval) in[1] = maxval;
-                    if (in[2] > maxval) in[2] = maxval;
+                    if (in[0] > clipping_value) in[0] = clipping_value;
+                    if (in[1] > clipping_value) in[1] = clipping_value;
+                    if (in[2] > clipping_value) in[2] = clipping_value;
                 }
                 dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
                 dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
@@ -97,7 +95,7 @@ public:
         }
     }
 
-    float idt_matrix[9];
+    Matrix3x3f idt_matrix;
     OFX::Image *srcImg;
     float scale, wl, bl;
     uint16_t *raw_buffer;
@@ -130,7 +128,7 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     // matMethod0
     // No color space conversion
     // No camera matrix
-    std::string datapath = _pluginPath + "/Contents/data";
+    std::string datapath = _pluginPath + "/Contents/Resources/data";
 
     _useSpectralIdt->setEnabled(false);
     
@@ -166,7 +164,7 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
 
     if ( idt.calIDT() )
     {
-        idt.getIdtF(_idt);
+        idt.getIdtF(_idt.data());
         idt.getWBF(_asShotNeutral);
         return true;
     }
@@ -195,7 +193,7 @@ void MLVReaderPlugin::computeIDT()
     if (!prepareSprectralSensIDT()){
         // No spectral sensitivities IDT, fall back to DNG IDT
         DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
-        idt.getDNGIDTMatrix(_idt, colorspace);
+        idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
         // Clear checkbox
         _useSpectralIdt->setValue(false);
@@ -208,7 +206,7 @@ Mlv_video* MLVReaderPlugin::getMlv()
     Mlv_video *mlv_video = nullptr;
     {
         if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
-        for (int i = 0; i < _mlv_video.size(); ++i){
+        for (unsigned int i = 0; i < _mlv_video.size(); ++i){
             if (!_mlv_video[i]->locked()){
                 _mlv_video[i]->lock();
                 mlv_video = _mlv_video[i];
@@ -241,10 +239,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         setPersistentMessage(OFX::Message::eMessageWarning, "", std::string("Warning : Focus pixel map not found"));
     }
     
-    OFX::BitDepthEnum dstBitDepth = _outputClip->getPixelDepth();
-    OFX::PixelComponentEnum dstComponents = _outputClip->getPixelComponents();
-    assert(OFX_COMPONENTS_OK(dstComponents));
-    
     OFX::auto_ptr<OFX::Image> dst(_outputClip->fetchImage(args.time));
     
     if (!dst)
@@ -252,7 +246,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
     
-    float maxval = _maxValue;
     int mlv_width = mlv_video->raw_resolution_x();
     int mlv_height = mlv_video->raw_resolution_y();
     
@@ -262,6 +255,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     
     if (_debayerType->getValue() == 0){
         int dng_size = 0;
+        float max_value = _maxValue;
         // Extract raw buffer - No processing (debug)
         Mlv_video::RawInfo  info;
         mlv_video->low_level_process(info);
@@ -272,7 +266,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             uint16_t* srcPix = raw_buffer + ((width_img) * (height_img - 1 - y)) + ((int)renderWin.x1 * 4);
             float *dstPix = (float*)dst->getPixelAddress((int)renderWin.x1, y+(int)renderWin.y1);
             for(int x=renderWin.x1; x < renderWin.x2; x++) {
-                float pixel_val = float(*srcPix++) / maxval;
+                float pixel_val = float(*srcPix++) / max_value;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
                 *dstPix++ = pixel_val;
@@ -282,7 +276,6 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     } else {
         // Common code for CPU and OpenCL
         Mlv_video::RawInfo rawInfo;
-        int camid = mlv_video->get_camid();
         rawInfo.dual_iso_mode = _dualIsoMode->getValue();
         rawInfo.chroma_smooth = _chromaSmooth->getValue();
         rawInfo.fix_focuspixels = _fixFocusPixel->getValue();
@@ -317,20 +310,18 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         _levelsDirty = false;
     }
 
-    float cam_matrix[9] = {0};
-    
-    int colorspace = _ouptutColorSpace->getValue();
+    Matrix3x3f cam_matrix;
     
     uint32_t black_level = _blackLevel->getValue();  
     uint32_t white_level = _whiteLevel->getValue();
 
     // Compute clip values
     float scale = 1. / float(white_level - black_level);
-    float maxval = float(white_level - black_level) * std::min(_asShotNeutral[0], std::min(_asShotNeutral[1], _asShotNeutral[2]));
-    maxval *= scale;
+    float clipping_value = float(white_level - black_level) * std::min(_asShotNeutral[0], std::min(_asShotNeutral[1], _asShotNeutral[2]));
+    clipping_value *= scale;
 
     if (_highlightMode->getValue() > 0){
-        maxval = 10000.f;
+        clipping_value = 10000.f;
     }
 
     computeColorspaceMatrix(cam_matrix);
@@ -400,7 +391,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_green.setArg(7, sizeof(float) * (locopt.sizex + 2*3) * (locopt.sizey + 2*3), nullptr);
         kernel_demosaic_green.setArg(8, _asShotNeutral[0]);
         kernel_demosaic_green.setArg(9, _asShotNeutral[2]);
-        kernel_demosaic_green.setArg(10, maxval);
+        kernel_demosaic_green.setArg(10, clipping_value);
         
         queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
     }
@@ -431,7 +422,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_redblue.setArg(5, matrixbuffer);
         kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
-        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix);
+        queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix.data());
         queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
     }
 
@@ -455,16 +446,13 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
         _levelsDirty = false;
     }
     
-    int color_temperature = _colorTemperature->getValue();
-    int colorspace = _ouptutColorSpace->getValue();
-   
     if (dng_buffer == nullptr || dng_size == 0){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
     }
 
     // Note : Libraw needs to be compiled with multithreading (reentrant) support and no OpenMP support
-    Dng_processor dng_processor(mlv_video);
+    Dng_processor dng_processor;
 
     int highlight_mode = _highlightMode->getValue();
     dng_processor.set_interpolation(_debayerType->getValue()-1);
@@ -489,7 +477,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.process();
 }
 
-void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
+void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
 {
     Mlv_video * mlv_video = getMlv();
     if (mlv_video == nullptr){
@@ -498,20 +486,21 @@ void MLVReaderPlugin::computeColorspaceMatrix(float out_matrix[9])
 
     if (_useSpectralIdt->getValue()){
         // Spectral sensitivity based matrix
-        memcpy(out_matrix, _idt, 9*sizeof(float));
+        out_matrix = _idt;
     } else {
-        float xyzd65tocam[9], rgb2rgb[9], cam2xyxd50[9];
+        Matrix3x3f xyzd65tocam, rgb2rgb, cam2xyxd50;
         int colorspace = _ouptutColorSpace->getValue();
 
-        mlv_video->get_camera_matrix2f(xyzd65tocam);
+        mlv_video->get_camera_matrix2f(xyzd65tocam.data());
         
-        get_matrix_cam2rec709(xyzd65tocam, rgb2rgb);
+        rgb2rgb = get_matrix_cam2rec709(xyzd65tocam);
         if (colorspace <= REC709){
             // Using DNG IDT matrix
-            mat_mat_mult(rec709toxyzD50, rgb2rgb, cam2xyxd50);
-            mat_mat_mult(_idt, cam2xyxd50, out_matrix);
+            cam2xyxd50 = Matrix3x3f(rec709toxyzD50) * rgb2rgb;
+            out_matrix = _idt * cam2xyxd50;
+
         } else {
-            mat_mat_mult(rec709toxyzD50, rgb2rgb, out_matrix);
+            out_matrix = Matrix3x3f(rec709toxyzD50) * rgb2rgb;
         }
     }
 
@@ -575,7 +564,7 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
     }
 
     // Reserve as MLV readers as threads + some extra for safety 
-    for (int i = 0; i < _numThreads+4; ++i){
+    for (unsigned int i = 0; i < _numThreads+4; ++i){
         // Copy video stream, fast way
         Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
         _mlv_video.push_back(mlv_videodup);

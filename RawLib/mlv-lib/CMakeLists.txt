@@ -2,7 +2,7 @@ FILE(GLOB MLV_SOURCES video_mlv.c audio_mlv.c)
 FILE(GLOB LJ92_SOURCES liblj92/lj92.c)
 FILE(GLOB CAMID_SOURCES camid/camera_id.c)
 FILE(GLOB DNG_SOURCES dng/dng.c)
-FILE(GLOB LLRAW_SOURCES llrawproc/llrawproc.c llrawproc/darkframe.c llrawproc/dualiso.c llrawproc/hist.c llrawproc/patternnoise.c llrawproc/pixelproc.c llrawproc/stripes.c)
+FILE(GLOB LLRAW_SOURCES llrawproc/*.c)
 
 if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 ADD_COMPILE_DEFINITIONS(-DSTDOUT_SILENT)

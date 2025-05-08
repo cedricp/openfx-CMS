@@ -14,6 +14,8 @@
 
 #include "OpenCLBase.h"
 
+#include "mathutils.h"
+
 #define kPluginName "MLVReader"
 #define kPluginGrouping "MagicLantern"
 #define kPluginDescription "Magic lantern MLV reader plugin"
@@ -104,8 +106,8 @@ public:
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         _gThreadHost->mutexCreate(&_idtMutex, 0);
         _pluginPath = getPluginFilePath();
-        std::string focusPixelMap = _pluginPath + "/Contents/fpm";
-        std::string debayer_program = _pluginPath + "/Contents/Resources/debayer_ppg.cl";
+        std::string focusPixelMap = _pluginPath + "/Contents/Resources/fpm";
+        std::string debayer_program = _pluginPath + "/Contents/Resources/Shaders/debayer_ppg.cl";
         
         strcpy(FOCUSPIXELMAP_DIRECTORY, focusPixelMap.c_str());
         addProgram(debayer_program, "debayer_ppg");
@@ -132,7 +134,7 @@ private:
     virtual bool getTimeDomain(OfxRangeD& range) OVERRIDE FINAL;
     virtual bool getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod) OVERRIDE FINAL;
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
-    virtual bool isVideoStream(const std::string& filename){return true;};
+    virtual bool isVideoStream(const std::string& ){return true;};
     virtual void render(const OFX::RenderArguments &args) OVERRIDE FINAL;
     virtual void changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName) OVERRIDE FINAL;
 
@@ -145,7 +147,7 @@ private:
     Mlv_video* getMlv();
     void computeIDT();
     bool prepareSprectralSensIDT();
-    void computeColorspaceMatrix(float out_matrix[9]);
+    void computeColorspaceMatrix(Matrix3x3f& out_matrix);
     void setMlvFile(std::string file, bool set = true);
 
     OfxMutexHandle _videoMutex, _idtMutex;
@@ -178,7 +180,7 @@ private:
     OFX::IntParam* _whiteLevel;
     OFX::IntParam* _bpp;
     OFX::BooleanParam* _resetLevels;
-    float _idt[9];
+    Matrix3x3f _idt;
     float _asShotNeutral[3];
     float _wbcompensation;
     int _maxValue=0;
