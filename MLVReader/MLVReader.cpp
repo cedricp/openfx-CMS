@@ -69,6 +69,8 @@ public:
         scale = 1. / (wl - bl);
         float clipping_value = (wl - bl) * std::min(cam_mult[0], std::min(cam_mult[1], cam_mult[2]));
         clipping_value *= scale;
+        Vector3f scaledCamMult = Vector3f(cam_mult[0], cam_mult[1], cam_mult[2]) * scale;
+
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
             if (y >= raw_height) break;
@@ -77,18 +79,14 @@ public:
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 if (x > raw_width) break;
-                float in[3];
-                in[0] = ((*srcPix++)) * scale * cam_mult[0];
-                in[1] = ((*srcPix++)) * scale * cam_mult[1];
-                in[2] = ((*srcPix++)) * scale * cam_mult[2];
+                Vector3f in(srcPix[0], srcPix[1], srcPix[2]);
+                srcPix += 3;
+                in *= scaledCamMult;
                 if (clip){
-                    if (in[0] > clipping_value) in[0] = clipping_value;
-                    if (in[1] > clipping_value) in[1] = clipping_value;
-                    if (in[2] > clipping_value) in[2] = clipping_value;
+                    in.clip(0.f, clipping_value);
                 }
-                dstPix[0] = idt_matrix[0]*in[0] + idt_matrix[1]*in[1] + idt_matrix[2]*in[2];
-                dstPix[1] = idt_matrix[3]*in[0] + idt_matrix[4]*in[1] + idt_matrix[5]*in[2];
-                dstPix[2] = idt_matrix[6]*in[0] + idt_matrix[7]*in[1] + idt_matrix[8]*in[2];
+                Vector3f out = idt_matrix.vecmult(in);
+                out.copy_to(dstPix);
                 dstPix[3] = 1.f;
                 dstPix+=4;
             }
@@ -159,13 +157,13 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     idt.loadTrainingData(datapath + "/training/training_spectral.json");
     
     // Set the user white balance coeffs
-    std::vector< double > dcoeffs (_asShotNeutral, _asShotNeutral + 3);
+    std::vector< double > dcoeffs (_asShotNeutral.data(), _asShotNeutral.data() + 3);
     idt.chooseIllumSrc( dcoeffs, 0 );
 
     if ( idt.calIDT() )
     {
         idt.getIdtF(_idt.data());
-        idt.getWBF(_asShotNeutral);
+        idt.getWBF(_asShotNeutral.data());
         return true;
     }
 
@@ -188,11 +186,11 @@ void MLVReaderPlugin::computeIDT()
     }
 
     // Thread safe...
-    _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral, _wbcompensation, _cameraWhiteBalance->getValue());
+    _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _wbcompensation, _cameraWhiteBalance->getValue());
     
     if (!prepareSprectralSensIDT()){
         // No spectral sensitivities IDT, fall back to DNG IDT
-        DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral);
+        DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral.data());
         idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
         // Clear checkbox
@@ -317,7 +315,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
 
     // Compute clip values
     float scale = 1. / float(white_level - black_level);
-    float clipping_value = float(white_level - black_level) * std::min(_asShotNeutral[0], std::min(_asShotNeutral[1], _asShotNeutral[2]));
+    float clipping_value = float(white_level - black_level) * _asShotNeutral.min();
     clipping_value *= scale;
 
     if (_highlightMode->getValue() > 0){
@@ -459,7 +457,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     dng_processor.set_highlight(highlight_mode);
 
     // Get raw buffer -> raw colors
-    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, _asShotNeutral);
+    uint16_t* processed_buffer = dng_processor.get_processed_image((uint8_t*)dng_buffer, dng_size, _asShotNeutral.data());
     free(dng_buffer);
     
     ColorProcessor processor(*this);
@@ -470,7 +468,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.bl = _blackLevel->getValue();
     processor.raw_width = width_img;
     processor.raw_height = height_img;
-    processor.cam_mult = _asShotNeutral;
+    _asShotNeutral.copy_to(processor.cam_mult);
     processor.clip = _highlightMode->getValue() == 0;
     computeColorspaceMatrix(processor.idt_matrix);
 
@@ -496,11 +494,11 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
         rgb2rgb = get_matrix_cam2rec709(xyzd65tocam);
         if (colorspace <= REC709){
             // Using DNG IDT matrix
-            cam2xyxd50 = Matrix3x3f(rec709toxyzD50) * rgb2rgb;
+            cam2xyxd50 = rec709toxyzD50 * rgb2rgb;
             out_matrix = _idt * cam2xyxd50;
 
         } else {
-            out_matrix = Matrix3x3f(rec709toxyzD50) * rgb2rgb;
+            out_matrix = rec709toxyzD50 * rgb2rgb;
         }
     }
 

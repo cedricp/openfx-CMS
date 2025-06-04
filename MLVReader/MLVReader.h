@@ -181,7 +181,7 @@ private:
     OFX::IntParam* _bpp;
     OFX::BooleanParam* _resetLevels;
     Matrix3x3f _idt;
-    float _asShotNeutral[3];
+    Vector3f _asShotNeutral;
     float _wbcompensation;
     int _maxValue=0;
     bool _idtDirty = true;
