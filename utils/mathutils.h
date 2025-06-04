@@ -1,134 +1,214 @@
 #pragma once
 
-
 template <class T>
 inline void matrix_vector_mult(const T *mat, const T *vec, T *result)
 {
-    for (int i = 0; i < 3; i++)
+  for (int i = 0; i < 3; i++)
+  {
+    T res = 0.0;
+    for (int j = 0; j < 3; j++)
     {
-        T res = 0.0;
-        for (int j = 0; j < 3; j++)
-        {
-            res += mat[i*3+j] * vec[j];
-        }
-        result[i] = res;
+      res += mat[i * 3 + j] * vec[j];
     }
+    result[i] = res;
+  }
 }
 
 template <class T>
 inline void mat_mat_mult(const T *mat1, const T *mat2, T *result)
 {
-    for (int i = 0; i < 3; i++)
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < 3; j++)
     {
-        for (int j = 0; j < 3; j++)
-        {
-            T res = 0.0;
-            for (int k = 0; k < 3; k++)
-            {
-                res += mat1[i*3+k] * mat2[k*3+j];
-            }
-            result[i*3+j] = res;
-        }
+      T res = 0.0;
+      for (int k = 0; k < 3; k++)
+      {
+        res += mat1[i * 3 + k] * mat2[k * 3 + j];
+      }
+      result[i * 3 + j] = res;
     }
+  }
 }
 
 template <class T>
 inline void invert_matrix(const T *mat, T *result)
 {
-    T det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7]) -
-                mat[1] * (mat[3] * mat[8] - mat[5] * mat[6]) +
-                mat[2] * (mat[3] * mat[7] - mat[4] * mat[6]);
-    if (det == 0) return;
-    det = 1.f / det;
-    result[0] = (mat[4] * mat[8] - mat[5] * mat[7]) * det;
-    result[1] = -(mat[1] * mat[8] - mat[2] * mat[7]) * det;
-    result[2] = (mat[1] * mat[5] - mat[2] * mat[4]) * det;
-    result[3] = -(mat[3] * mat[8] - mat[5] * mat[6]) * det;
-    result[4] = (mat[0] * mat[8] - mat[2] * mat[6]) * det;
-    result[5] = -(mat[0] * mat[5] - mat[2] * mat[3]) * det;
-    result[6] = (mat[3] * mat[7] - mat[4] * mat[6]) * det;
-    result[7] = -(mat[0] * mat[7] - mat[1] * mat[6]) * det;
-    result[8] = (mat[0] * mat[4] - mat[1] * mat[3]) * det;
+  T det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7]) -
+          mat[1] * (mat[3] * mat[8] - mat[5] * mat[6]) +
+          mat[2] * (mat[3] * mat[7] - mat[4] * mat[6]);
+  if (det == 0)
+    return;
+  det = 1.f / det;
+  result[0] = (mat[4] * mat[8] - mat[5] * mat[7]) * det;
+  result[1] = -(mat[1] * mat[8] - mat[2] * mat[7]) * det;
+  result[2] = (mat[1] * mat[5] - mat[2] * mat[4]) * det;
+  result[3] = -(mat[3] * mat[8] - mat[5] * mat[6]) * det;
+  result[4] = (mat[0] * mat[8] - mat[2] * mat[6]) * det;
+  result[5] = -(mat[0] * mat[5] - mat[2] * mat[3]) * det;
+  result[6] = (mat[3] * mat[7] - mat[4] * mat[6]) * det;
+  result[7] = -(mat[0] * mat[7] - mat[1] * mat[6]) * det;
+  result[8] = (mat[0] * mat[4] - mat[1] * mat[3]) * det;
 }
 
 template <class T>
 class Vector3
 {
   T vec[3];
-  public:
 
-  Vector3(){
+public:
+  Vector3()
+  {
     vec[0] = vec[1] = vec[2] = 0;
   }
 
-  Vector3(const T& a, const T& b, const T& c){
-    vec[0] = a; vec[1] = b; vec[2] = c;
+  Vector3(const T &a, const T &b, const T &c)
+  {
+    vec[0] = a;
+    vec[1] = b;
+    vec[2] = c;
   }
 
-  Vector3(const T* ref){
-    for(int i = 0; i < 3; ++i) vec[i] = ref[i];
+  Vector3(const T *ref)
+  {
+    for (int i = 0; i < 3; ++i)
+      vec[i] = ref[i];
   }
 
-  Vector3(const Vector3& ref){
-    for(int i = 0; i < 3; ++i) vec[i] = ref.vec[i];
+  Vector3(const Vector3 &ref)
+  {
+    for (int i = 0; i < 3; ++i)
+      vec[i] = ref.vec[i];
   }
 
-  void copy_to(T* ref) const {
-    for(int i = 0; i < 3; ++i) ref[i] = vec[i];
+  void print(const char* prefix) const
+  {
+    printf("%s Vector3(%f, %f, %f)\n", prefix, vec[0], vec[1], vec[2]);
   }
 
-  Vector3 operator + (const Vector3& a) const {
+  void copy_to(T *ref) const
+  {
+    for (int i = 0; i < 3; ++i)
+      ref[i] = vec[i];
+  }
+
+  Vector3 operator+(const Vector3 &a) const
+  {
     return Vector3(vec[0] + a.vec[0], vec[1] + a.vec[1], vec[2] + a.vec[2]);
   }
 
-  Vector3 operator - (const Vector3& a) const {
+  Vector3 operator-(const Vector3 &a) const
+  {
     return Vector3(vec[0] - a.vec[0], vec[1] - a.vec[1], vec[2] - a.vec[2]);
   }
 
-  Vector3 operator * (const Vector3& a) const {
+  Vector3 operator*(const Vector3 &a) const
+  {
     return Vector3(vec[0] * a.vec[0], vec[1] * a.vec[1], vec[2] * a.vec[2]);
   }
 
-  Vector3 operator * (const T& a) const {
+  Vector3 operator*(const T &a) const
+  {
     return Vector3(vec[0] * a, vec[1] * a, vec[2] * a);
   }
 
-  Vector3 operator / (const T& a) const {
+  Vector3 operator/(const T &a) const
+  {
     return Vector3(vec[0] / a, vec[1] / a, vec[2] / a);
   }
 
-  Vector3 operator / (const Vector3& a) const {
+  Vector3 operator/(const Vector3 &a) const
+  {
     return Vector3(vec[0] / a.vec[0], vec[1] / a.vec[1], vec[2] / a.vec[2]);
   }
 
-  Vector3 operator - () const {
+  Vector3 operator-() const
+  {
     return Vector3(-vec[0], -vec[1], -vec[2]);
   }
 
-  Vector3 operator *= (const Vector3& a) {
-    vec[0] *= a.vec[0]; vec[1] *= a.vec[1]; vec[2] *= a.vec[2];
+  Vector3 operator*=(const Vector3 &a)
+  {
+    vec[0] *= a.vec[0];
+    vec[1] *= a.vec[1];
+    vec[2] *= a.vec[2];
     return *this;
   }
 
-  Vector3 clip(const T& min, const T& max) const {
+  Vector3 clip(const T &min, const T &max) const
+  {
     return Vector3(std::max(min, std::min(max, vec[0])),
                    std::max(min, std::min(max, vec[1])),
                    std::max(min, std::min(max, vec[2])));
   }
 
-  T min() const {
+  T min() const
+  {
     return std::min(vec[0], std::min(vec[1], vec[2]));
   }
 
-  T* data() {
+  T *data()
+  {
     return vec;
   }
 
-  const T* data() const {
+  const T *data() const
+  {
     return vec;
   }
 
-  T& operator[] (int i){
+  T &operator[](int i)
+  {
+    return vec[i];
+  }
+
+  T operator[](int i) const
+  {
+    return vec[i];
+  }
+};
+
+template <class T>
+class Vector2
+{
+  T vec[2];
+
+public:
+  Vector2()
+  {
+    vec[0] = vec[1] = 0;
+  }
+
+  Vector2(const T &a, const T &b)
+  {
+    vec[0] = a;
+    vec[1] = b;
+  }
+
+  Vector2(const T *ref)
+  {
+    for (int i = 0; i < 2; ++i)
+      vec[i] = ref[i];
+  }
+
+  Vector2(const Vector2 &ref)
+  {
+    for (int i = 0; i < 2; ++i)
+      vec[i] = ref.vec[i];
+  }
+
+  T *data()
+  {
+    return vec;
+  }
+
+  T &operator[](int i)
+  {
+    return vec[i];
+  }
+
+  T operator[](int i) const
+  {
     return vec[i];
   }
 };
@@ -137,116 +217,257 @@ template <class T>
 class Matrix3x3
 {
   T mat[9];
-  public:
 
+public:
   // Identity
-  Matrix3x3(){
+  Matrix3x3()
+  {
     identity();
   }
 
-  Matrix3x3(const T* ref){
-    for(int i = 0; i < 9; ++i) mat[i] = ref[i];
+  Matrix3x3(const T *ref)
+  {
+    for (int i = 0; i < 9; ++i)
+      mat[i] = ref[i];
   }
 
-  Matrix3x3(const Matrix3x3& ref){
-    for(int i = 0; i < 9; ++i) mat[i] = ref.mat[i];
+  Matrix3x3(const Matrix3x3 &ref)
+  {
+    for (int i = 0; i < 9; ++i)
+      mat[i] = ref.mat[i];
   }
 
-  Matrix3x3(const T& a, const T& b, const T& c,
-             const T& d, const T& e, const T& f,
-             const T& g, const T& h, const T& i){
-    mat[0] = a; mat[1] = b; mat[2] = c;
-    mat[3] = d; mat[4] = e; mat[5] = f;
-    mat[6] = g; mat[7] = h; mat[8] = i;
+  Matrix3x3(const T &a, const T &b, const T &c,
+            const T &d, const T &e, const T &f,
+            const T &g, const T &h, const T &i)
+  {
+    mat[0] = a;
+    mat[1] = b;
+    mat[2] = c;
+    mat[3] = d;
+    mat[4] = e;
+    mat[5] = f;
+    mat[6] = g;
+    mat[7] = h;
+    mat[8] = i;
   }
 
-  void identity(){
-    mat[0] = 1; mat[1] = 0; mat[2] = 0;
-    mat[3] = 0; mat[4] = 1; mat[5] = 0;
-    mat[6] = 0; mat[7] = 0; mat[8] = 1;
+  void identity()
+  {
+    mat[0] = 1;
+    mat[1] = 0;
+    mat[2] = 0;
+    mat[3] = 0;
+    mat[4] = 1;
+    mat[5] = 0;
+    mat[6] = 0;
+    mat[7] = 0;
+    mat[8] = 1;
   }
 
-  T* data(){
+  void print(const char* prefix) const
+  {
+    printf("%s Matrix3x3(%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
+           prefix, mat[0], mat[1], mat[2],
+           mat[3], mat[4], mat[5],
+           mat[6], mat[7], mat[8]);
+  }
+
+  T *data()
+  {
     return mat;
   }
 
-  T& operator[] (int i){
+  T &operator[](int i)
+  {
     return mat[i];
   }
 
-  Matrix3x3 operator * (const Matrix3x3& a) const {
+  Matrix3x3 operator*(const Matrix3x3 &a) const
+  {
     Matrix3x3 res;
     mat_mat_mult(mat, a.mat, res.mat);
     return res;
   }
 
-  Vector3<T> vecmult(const Vector3<T>& a) const {
+  // Vector3<T> operator*(const Vector3<T> &a) const
+  // {
+  //   Vector3<T> res;
+  //   matrix_vector_mult(mat, a.data(), res.data());
+  //   return res;
+  // }
+
+  Matrix3x3 operator*(const Vector3<T> &a) const
+  {
+    Matrix3x3 res;
+    res.mat[0] = mat[0] * a[0];
+    res.mat[1] = mat[1] * a[1];
+    res.mat[2] = mat[2] * a[2];
+    res.mat[3] = mat[3] * a[0];
+    res.mat[4] = mat[4] * a[1];
+    res.mat[5] = mat[5] * a[2];
+    res.mat[6] = mat[6] * a[0];
+    res.mat[7] = mat[7] * a[1];
+    res.mat[8] = mat[8] * a[2];
+    return res;
+  }
+
+  Vector3<T> vecmult(const Vector3<T> &a) const
+  {
     Vector3<T> res;
     matrix_vector_mult(mat, a.data(), res.data());
     return res;
   }
 
-  void operator = (const Matrix3x3& a) {
-    for(int i = 0; i < 9; ++i) mat[i] = a.mat[i];
+  void operator=(const Matrix3x3 &a)
+  {
+    for (int i = 0; i < 9; ++i)
+      mat[i] = a.mat[i];
   }
 
-  Matrix3x3 invert() const {
+  Matrix3x3 invert() const
+  {
     Matrix3x3 res;
     invert_matrix(mat, res.mat);
     return res;
   }
 
-  void invert_in_place(){
+  void invert_in_place()
+  {
     Matrix3x3 res;
     invert_matrix(mat, res.mat);
-    for(int i = 0; i < 9; ++i) mat[i] = res[i];
+    for (int i = 0; i < 9; ++i)
+      mat[i] = res[i];
   }
 
-  void normalize_rows(){
+  void normalize_rows()
+  {
     float sum[3] = {mat[0] + mat[1] + mat[2],
                     mat[3] + mat[4] + mat[5],
                     mat[6] + mat[7] + mat[8]};
     // Normalize rows
-    mat[0] /= sum[0];mat[1] /= sum[0];mat[2] /= sum[0];
-    mat[3] /= sum[1];mat[4] /= sum[1];mat[5] /= sum[1];
-    mat[6] /= sum[2];mat[7] /= sum[2];mat[8] /= sum[2];
+    mat[0] /= sum[0];
+    mat[1] /= sum[0];
+    mat[2] /= sum[0];
+    mat[3] /= sum[1];
+    mat[4] /= sum[1];
+    mat[5] /= sum[1];
+    mat[6] /= sum[2];
+    mat[7] /= sum[2];
+    mat[8] /= sum[2];
   }
 };
 
 typedef Matrix3x3<float> Matrix3x3f;
 typedef Vector3<float> Vector3f;
+typedef Vector2<float> Vector2f;
 
 const Matrix3x3f xyzD65_rec709D65(
     3.2404542, -1.5371385, -0.4985314,
-    -0.9692660 , 1.8760108, 0.0415560,
-     0.0556434, -0.2040259, 1.0572252);
+    -0.9692660, 1.8760108, 0.0415560,
+    0.0556434, -0.2040259, 1.0572252);
 
-     const Matrix3x3f rec709toxyzD65(
+const Matrix3x3f rec709toxyzD65(
     0.4124564, 0.3575761, 0.1804375,
     0.2126729, 0.7151522, 0.0721750,
     0.0193339, 0.1191920, 0.9503041);
 
 const Matrix3x3f rec709toxyzD50(
-    0.4124564,  0.3575761,  0.1804375,
-    0.2126729,  0.7151522,  0.0721750,
-    0.0193339,  0.1191920,  0.9503041);
+    0.4124564, 0.3575761, 0.1804375,
+    0.2126729, 0.7151522, 0.0721750,
+    0.0193339, 0.1191920, 0.9503041);
 
 const Matrix3x3f xyzD50toxyxD65(
-    0.9555766, -0.0230393,  0.0631636,
-    -0.0282895,  1.0099416,  0.0210077,
-     0.0122982, -0.0204830,  1.3299098);
+    0.9555766, -0.0230393, 0.0631636,
+    -0.0282895, 1.0099416, 0.0210077,
+    0.0122982, -0.0204830, 1.3299098);
 
 const Matrix3x3f xyzD65toxyxD50(
-    1.0478112,  0.0228866, -0.0501270,
-    0.0295424,  0.9904844, -0.0170491,
-    -0.0092345,  0.0150436,  0.7521316);
+    1.0478112, 0.0228866, -0.0501270,
+    0.0295424, 0.9904844, -0.0170491,
+    -0.0092345, 0.0150436, 0.7521316);
 
-Matrix3x3f get_matrix_cam2rec709(const Matrix3x3f& xyzD65tocam)
+const Matrix3x3f bradford_matrix(
+    0.8951, 0.2664, -0.1614,
+    -0.7502, 1.7135, 0.0367,
+    0.0389, -0.0685, 1.0296);
+
+template <class T>
+inline Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
 {
-    Matrix3x3f rgb2cam;
-    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    rgb2cam = xyzD65tocam * rec709toxyzD65;
-    rgb2cam.normalize_rows();
-    // Invert RGB2CAM matrix
-    return rgb2cam.invert();
+  Matrix3x3f rgb2cam;
+  // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
+  rgb2cam = xyzD65tocam * rec709toxyzD65;
+  rgb2cam.normalize_rows();
+  // Invert RGB2CAM matrix
+  return rgb2cam.invert();
+}
+
+template <class T>
+class Primaries
+{
+public:
+  Primaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y)
+  {
+    red = Vector2<T>(r_x, r_y);
+    green = Vector2<T>(g_x, g_y);
+    blue = Vector2<T>(b_x, b_y);
+  }
+  Vector2<T> red;
+  Vector2<T> green;
+  Vector2<T> blue;
+};
+
+template <class T>
+inline Vector3<T> whitepoint_to_XYZ(Vector2<T> whitepoint)
+{
+  return Vector3<T>(whitepoint[0] / whitepoint[1], 1., (1. - whitepoint[0] - whitepoint[1]) / whitepoint[1]);
+}
+
+template <class T>
+inline Matrix3x3<T> primaries_to_RGB(const Primaries<T> &primaries)
+{
+  T Xr = primaries.red[0] / primaries.red[1];
+  T Yr = 1;
+  T Zr = (1. - primaries.red[0] - primaries.red[1]) / primaries.red[1];
+
+  T Xg = primaries.green[0] / primaries.green[1];
+  T Yg = 1;
+  T Zg = (1. - primaries.green[0] - primaries.green[1]) / primaries.green[1];
+
+  T Xb = primaries.blue[0] / primaries.blue[1];
+  T Yb = 1;
+  T Zb = (1. - primaries.blue[0] - primaries.blue[1]) / primaries.blue[1];
+  return Matrix3x3<T>(Xr, Xg, Xb,
+                      Yr, Yg, Yb,
+                      Zr, Zg, Zb);
+}
+
+template <class T>
+inline Matrix3x3<T> compute_adapted_matrix(const Primaries<T> &primaries, Vector2<T> source_whitepoint, Vector2<T> target_whitepoint, bool invert = false)
+{
+  Vector3<T> source_whitepoint_XYZ = whitepoint_to_XYZ(source_whitepoint);
+  Vector3<T> target_whitepoint_XYZ = whitepoint_to_XYZ(target_whitepoint);
+  Matrix3x3<T> RGB_primaries = primaries_to_RGB(primaries);
+  Vector3<T> S = RGB_primaries.invert().vecmult(source_whitepoint_XYZ);
+
+  Matrix3x3<T> TO_XYZ = RGB_primaries * S;
+
+  Vector3<T> chromatic_adapt_source = bradford_matrix.vecmult(source_whitepoint_XYZ);
+  Vector3<T> chromatic_adapt_target = bradford_matrix.vecmult(target_whitepoint_XYZ);
+
+  Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
+      chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
+      0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
+      0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
+
+  Matrix3x3<T> source_target_white_matrix = (bradford_matrix.invert() * chromatic_adaptation_matrix) * bradford_matrix;
+  Matrix3x3<T> RGB_TO_XYZ = source_target_white_matrix * TO_XYZ;
+
+  if (invert)
+  {
+    return RGB_TO_XYZ.invert();
+  }
+
+  return RGB_TO_XYZ;
 }

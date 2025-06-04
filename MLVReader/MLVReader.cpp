@@ -67,9 +67,9 @@ public:
     {
         OFX::unused(rs);
         scale = 1. / (wl - bl);
-        float clipping_value = (wl - bl) * std::min(cam_mult[0], std::min(cam_mult[1], cam_mult[2]));
+        float clipping_value = (wl - bl) * cam_mult.min();
         clipping_value *= scale;
-        Vector3f scaledCamMult = Vector3f(cam_mult[0], cam_mult[1], cam_mult[2]) * scale;
+        Vector3f scaledCamMult = cam_mult * scale;
 
         for (int y = procWindow.y1; y < procWindow.y2; y++)
         {
@@ -97,7 +97,7 @@ public:
     OFX::Image *srcImg;
     float scale, wl, bl;
     uint16_t *raw_buffer;
-    float *cam_mult;
+    Vector3f cam_mult;
     int raw_width, raw_height;
     bool clip;
 };
@@ -468,7 +468,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.bl = _blackLevel->getValue();
     processor.raw_width = width_img;
     processor.raw_height = height_img;
-    _asShotNeutral.copy_to(processor.cam_mult);
+    processor.cam_mult = _asShotNeutral;
     processor.clip = _highlightMode->getValue() == 0;
     computeColorspaceMatrix(processor.idt_matrix);
 

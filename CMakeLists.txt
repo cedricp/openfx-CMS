@@ -110,6 +110,7 @@ FILE(GLOB CMS_SOURCES
   "CMSLogEncoding/CMSLogEncoding.cpp"
   "MLVReader/MLVReader.cpp"
   "CMSVectorScope/CMSVectorScope.cpp"
+  "CMSColorConversion/CMSColorConversion.cpp"
 )
 
 FILE(GLOB CMS_RESOURCES
