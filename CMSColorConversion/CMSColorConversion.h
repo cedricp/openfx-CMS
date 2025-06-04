@@ -12,7 +12,7 @@
 
 #define kPluginName "CMSColorConversionOFX"
 #define kPluginGrouping "CMSPlugins"
-#define kPluginDescription "A color conversion plugin."
+#define kPluginDescription "A color transformation plugin that creates RGB to XYZ conversion from (xy) color primaries and (xy) white point."
 
 #define kPluginIdentifier "net.sf.openfx.CMSColorConversionOFX"
 #define kPluginVersionMajor 1 // Incrementing this number means that you have broken backwards compatibility of the plug-in.

@@ -81,7 +81,7 @@ private:
 
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
-                Vector3f srcColor(srcPix[0], srcPix[1], srcPix[2]);
+                Vector3f srcColor(srcPix);
                 Vector3f dstColor = _conversion_matrix.vecmult(srcColor);
                 *dstPix++ = dstColor[0];
                 *dstPix++ = dstColor[1];
@@ -148,10 +148,10 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         (float)_greenPrimary->getValueAtTime(time).y,
         (float)_bluePrimary->getValueAtTime(time).x,
         (float)_bluePrimary->getValueAtTime(time).y);
-    Vector2f sourceWhitePoint(
+    PrimaryXY<float> sourceWhitePoint(
         (float)_sourceWhitePoint->getValueAtTime(time).x,
         (float)_sourceWhitePoint->getValueAtTime(time).y);
-    Vector2f destWhitePoint(
+    PrimaryXY<float> destWhitePoint(
         (float)_destWhitePoint->getValueAtTime(time).x,
         (float)_destWhitePoint->getValueAtTime(time).y);
 
