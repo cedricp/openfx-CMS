@@ -413,6 +413,16 @@ const Matrix3x3f bradford_matrix(
     -0.7502, 1.7135, 0.0367,
     0.0389, -0.0685, 1.0296);
 
+const Matrix3x3f cmccat2000_matrix(
+    0.7982,  0.3389, -0.1371,
+    -0.5918,  1.5512,  0.0406,
+    0.0008,  0.0239,  0.9753);
+
+const Matrix3x3f ciecat02_matrix(
+    0.7328,  0.4296, -0.1624,
+    -0.7036,  1.6975,  0.0061,
+    0.0030,  0.0136,  0.9834);
+
 template <class T>
 inline Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
 {
@@ -477,7 +487,9 @@ public:
 };
 
 template <class T>
-inline Matrix3x3<T> compute_adapted_matrix(const Primaries<T> &primaries, PrimaryXY<T> source_whitepoint, PrimaryXY<T> target_whitepoint, bool invert = false)
+inline Matrix3x3<T> compute_adapted_matrix(const Primaries<T> &primaries, PrimaryXY<T> source_whitepoint,
+                                           PrimaryXY<T> target_whitepoint, const Matrix3x3<T>& ca_matrix, 
+                                           bool invert = false)
 {
     Vector3<T> source_whitepoint_XYZ = source_whitepoint.to_XYZ();
     Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
@@ -486,15 +498,15 @@ inline Matrix3x3<T> compute_adapted_matrix(const Primaries<T> &primaries, Primar
 
     Matrix3x3<T> to_xyz = rgb_primaries * S;
 
-    Vector3<T> chromatic_adapt_source = bradford_matrix.vecmult(source_whitepoint_XYZ);
-    Vector3<T> chromatic_adapt_target = bradford_matrix.vecmult(target_whitepoint_XYZ);
+    Vector3<T> chromatic_adapt_source = ca_matrix.vecmult(source_whitepoint_XYZ);
+    Vector3<T> chromatic_adapt_target = ca_matrix.vecmult(target_whitepoint_XYZ);
 
     Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
         chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
         0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
         0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
 
-    Matrix3x3<T> source_target_white_matrix = (bradford_matrix.invert() * chromatic_adaptation_matrix) * bradford_matrix;
+    Matrix3x3<T> source_target_white_matrix = (ca_matrix.invert() * chromatic_adaptation_matrix) * ca_matrix;
     Matrix3x3<T> rgb_to_xyz = source_target_white_matrix * to_xyz;
 
     if (invert)

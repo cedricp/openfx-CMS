@@ -1,10 +1,7 @@
 #pragma once
 
 #include "ofxsProcessing.H"
-#include "ofxsMacros.h"
-#include "ofxsImageEffect.h"
-#include "ofxsLut.h"
-#include "ofxsCoords.h"
+#include "OpenCLBase.h"
 #ifdef OFX_EXTENSIONS_NATRON
 #include "ofxNatron.h"
 #endif
@@ -35,7 +32,11 @@
 #define kBluePrimaryParam "bluePrimary"
 #define kSourceWhitePointParam "sourceWhitePoint"
 #define kDestWhitePointParam "destWhitePoint"
+#define kPrimariesChoice "primaries"
+#define kSourceWhiteChoice "srcWhite"
+#define kTargetWhiteChoice "tgtWhite"
 #define kInvertTransformParam "invert"
+#define kChromaticAdaptationMethod "chomaticAdaptation"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -47,11 +48,11 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
-class CMSColorConversionPlugin : public OFX::ImageEffect
+class CMSColorConversionPlugin : public OpenCLBase
 {
 public:
     /** @brief ctor */
-    CMSColorConversionPlugin(OfxImageEffectHandle handle) : OFX::ImageEffect(handle)
+    CMSColorConversionPlugin(OfxImageEffectHandle handle) : OpenCLBase(handle)
     {
         _inputClip = fetchClip(kOfxImageEffectSimpleSourceClipName);
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
@@ -61,6 +62,12 @@ public:
         _sourceWhitePoint = fetchDouble2DParam(kSourceWhitePointParam);
         _destWhitePoint = fetchDouble2DParam(kDestWhitePointParam);
         _invert = fetchBooleanParam(kInvertTransformParam);
+        _primariesChoice = fetchChoiceParam(kPrimariesChoice);
+        _srcWBChoice = fetchChoiceParam(kSourceWhiteChoice);
+        _tgtWBChoice = fetchChoiceParam(kTargetWhiteChoice);
+        _chromaticAdaptationMethod = fetchChoiceParam(kChromaticAdaptationMethod);
+        std::string debayer_program = getPluginFilePath() + "/Contents/Resources/Shaders/imgutils.cl";
+        addProgram(debayer_program, "imgutils");
     }
 
 private:
@@ -82,6 +89,10 @@ private:
     OFX::Double2DParam *_sourceWhitePoint;
     OFX::Double2DParam *_destWhitePoint;
     OFX::BooleanParam *_invert;
+    OFX::ChoiceParam *_primariesChoice;
+    OFX::ChoiceParam *_srcWBChoice;
+    OFX::ChoiceParam *_tgtWBChoice;
+    OFX::ChoiceParam *_chromaticAdaptationMethod;
 };
 
 class CMSColorConversionPluginFactory : public OFX::PluginFactoryHelper<CMSColorConversionPluginFactory>

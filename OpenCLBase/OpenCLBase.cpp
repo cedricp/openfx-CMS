@@ -144,6 +144,7 @@ bool OpenCLBase::addProgram(std::string program_path, std::string program_name)
     programfile.close();
 
     if (programtext.str().empty()){
+        printf("Falied to load OpenCL program\n");
         setPersistentMessage(OFX::Message::eMessageError, "", "Failed to load OpenCL program");
         _gThreadHost->mutexUnLock(_OclMutex);
         return false;

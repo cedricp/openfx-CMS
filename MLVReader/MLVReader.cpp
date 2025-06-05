@@ -426,7 +426,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
 
     // Fetch result from GPU
     cl::array<size_t, 3> origin = {(size_t)args.renderWindow.x1, (size_t)args.renderWindow.y1, 0};
-    cl::array<size_t, 3> size = {(size_t)args.renderWindow.x2, (size_t)args.renderWindow.y2, 1};
+    cl::array<size_t, 3> size = {(size_t)(args.renderWindow.x2 - args.renderWindow.x1), (size_t)(args.renderWindow.y2 - args.renderWindow.y1), 1};
     queue.enqueueReadImage(img_out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
     queue.finish();
 }
