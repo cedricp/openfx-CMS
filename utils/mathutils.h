@@ -142,9 +142,21 @@ public:
                        std::max(min, std::min(max, vec[2])));
     }
 
+    void clip_in_place(const T &min, const T &max)
+    {
+        vec[0] = std::max(min, std::min(max, vec[0]));
+        vec[1] = std::max(min, std::min(max, vec[1]));
+        vec[2] = std::max(min, std::min(max, vec[2]));
+    }
+
     T min() const
     {
         return std::min(vec[0], std::min(vec[1], vec[2]));
+    }
+
+    T max() const
+    {
+        return std::max(vec[0], std::max(vec[1], vec[2]));
     }
 
     T *data()
@@ -262,28 +274,16 @@ public:
               const T &d, const T &e, const T &f,
               const T &g, const T &h, const T &i)
     {
-        mat[0] = a;
-        mat[1] = b;
-        mat[2] = c;
-        mat[3] = d;
-        mat[4] = e;
-        mat[5] = f;
-        mat[6] = g;
-        mat[7] = h;
-        mat[8] = i;
+        mat[0] = a;mat[1] = b;mat[2] = c;
+        mat[3] = d;mat[4] = e;mat[5] = f;
+        mat[6] = g;mat[7] = h;mat[8] = i;
     }
 
     void identity()
     {
-        mat[0] = 1;
-        mat[1] = 0;
-        mat[2] = 0;
-        mat[3] = 0;
-        mat[4] = 1;
-        mat[5] = 0;
-        mat[6] = 0;
-        mat[7] = 0;
-        mat[8] = 1;
+        mat[0] = 1;mat[1] = 0;mat[2] = 0;
+        mat[3] = 0;mat[4] = 1;mat[5] = 0;
+        mat[6] = 0;mat[7] = 0;mat[8] = 1;
     }
 
     void print(const char *prefix) const
@@ -311,14 +311,14 @@ public:
         return res;
     }
 
-    // Vector3<T> operator*(const Vector3<T> &a) const
-    // {
-    //   Vector3<T> res;
-    //   matrix_vector_mult(mat, a.data(), res.data());
-    //   return res;
-    // }
+    Vector3<T> operator*(const Vector3<T> &a) const
+    {
+      Vector3<T> res;
+      matrix_vector_mult(mat, a.data(), res.data());
+      return res;
+    }
 
-    Matrix3x3 operator*(const Vector3<T> &a) const
+    Matrix3x3 scale(const Vector3<T> &a) const
     {
         Matrix3x3 res;
         res.mat[0] = mat[0] * a[0];
@@ -330,13 +330,6 @@ public:
         res.mat[6] = mat[6] * a[0];
         res.mat[7] = mat[7] * a[1];
         res.mat[8] = mat[8] * a[2];
-        return res;
-    }
-
-    Vector3<T> vecmult(const Vector3<T> &a) const
-    {
-        Vector3<T> res;
-        matrix_vector_mult(mat, a.data(), res.data());
         return res;
     }
 
@@ -383,6 +376,8 @@ typedef Matrix3x3<float> Matrix3x3f;
 typedef Vector3<float> Vector3f;
 typedef Vector2<float> Vector2f;
 
+// Predefined color space matrices
+
 const Matrix3x3f xyzD65_rec709D65(
     3.2404542, -1.5371385, -0.4985314,
     -0.9692660, 1.8760108, 0.0415560,
@@ -408,6 +403,8 @@ const Matrix3x3f xyzD65toxyxD50(
     0.0295424, 0.9904844, -0.0170491,
     -0.0092345, 0.0150436, 0.7521316);
 
+// Chromatic adaptation matrices
+
 const Matrix3x3f bradford_matrix(
     0.8951, 0.2664, -0.1614,
     -0.7502, 1.7135, 0.0367,
@@ -423,26 +420,17 @@ const Matrix3x3f ciecat02_matrix(
     -0.7036,  1.6975,  0.0061,
     0.0030,  0.0136,  0.9834);
 
-template <class T>
-inline Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
-{
-    Matrix3x3f rgb2cam;
-    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    rgb2cam = xyzD65tocam * rec709toxyzD65;
-    rgb2cam.normalize_rows();
-    // Invert RGB2CAM matrix
-    return rgb2cam.invert();
-}
 
+// Color primaries in xy format
 template <class T>
-class PrimaryXY : public Vector2<T>
+class PrimariesXY : public Vector2<T>
 {
 public:
-    PrimaryXY(T x, T y) : Vector2<T>(x, y) {}
+    PrimariesXY(T x, T y) : Vector2<T>(x, y) {}
 
-    PrimaryXY(const Vector2<T> &v) : Vector2<T>(v) {}
+    PrimariesXY(const Vector2<T> &v) : Vector2<T>(v) {}
 
-    PrimaryXY() : Vector2<T>() {}
+    PrimariesXY() : Vector2<T>() {}
 
     Vector3<T> to_XYZ() const
     {
@@ -451,30 +439,39 @@ public:
         return Vector3<T>(X() / Y(), 1., (1. - X() - Y()) / Y());
     }
 
-    float X() const
+    T X() const
     {
         return (*this)[0];
     }
 
-    float Y() const
+    T Y() const
     {
         return (*this)[1];
     }
 };
 
+// RGB primaries in xy format
 template <class T>
-class Primaries
+class RGBPrimaries
 {
-    PrimaryXY<T> red;
-    PrimaryXY<T> green;
-    PrimaryXY<T> blue;
+    PrimariesXY<T> red;
+    PrimariesXY<T> green;
+    PrimariesXY<T> blue;
 public:
-    Primaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y)
+    RGBPrimaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y)
     {
-        red = PrimaryXY<T>(r_x, r_y);
-        green = PrimaryXY<T>(g_x, g_y);
-        blue = PrimaryXY<T>(b_x, b_y);
+        red = PrimariesXY<T>(r_x, r_y);
+        green = PrimariesXY<T>(g_x, g_y);
+        blue = PrimariesXY<T>(b_x, b_y);
     }
+
+    RGBPrimaries(const PrimariesXY<T> &r, const PrimariesXY<T> &g, const PrimariesXY<T> &b)
+    {
+        red = r;
+        green = g;
+        blue = b;
+    }
+
     Matrix3x3<T> toRgbMatrix() const
     {
         Vector3<T> X = red.to_XYZ();
@@ -484,35 +481,35 @@ public:
         ret.transpose();
         return ret;
     }
+
+    Matrix3x3<T> compute_adapted_matrix(PrimariesXY<T> source_whitepoint,
+                                               PrimariesXY<T> target_whitepoint, const Matrix3x3<T>& ca_matrix, 
+                                               bool invert = false)
+    {
+        Vector3<T> source_whitepoint_XYZ = source_whitepoint.to_XYZ();
+        Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
+        Matrix3x3<T> rgb_primaries = toRgbMatrix();
+        Vector3<T> S = rgb_primaries.invert() * source_whitepoint_XYZ;
+    
+        Matrix3x3<T> to_xyz = rgb_primaries.scale(S);
+    
+        Vector3<T> chromatic_adapt_source = ca_matrix * source_whitepoint_XYZ;
+        Vector3<T> chromatic_adapt_target = ca_matrix * target_whitepoint_XYZ;
+    
+        Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
+            chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
+            0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
+            0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
+    
+        Matrix3x3<T> source_target_white_matrix = (ca_matrix.invert() * chromatic_adaptation_matrix) * ca_matrix;
+        Matrix3x3<T> rgb_to_xyz = source_target_white_matrix * to_xyz;
+    
+        if (invert)
+        {
+            rgb_to_xyz.invert_in_place();
+        }
+    
+        return rgb_to_xyz;
+    }
 };
 
-template <class T>
-inline Matrix3x3<T> compute_adapted_matrix(const Primaries<T> &primaries, PrimaryXY<T> source_whitepoint,
-                                           PrimaryXY<T> target_whitepoint, const Matrix3x3<T>& ca_matrix, 
-                                           bool invert = false)
-{
-    Vector3<T> source_whitepoint_XYZ = source_whitepoint.to_XYZ();
-    Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
-    Matrix3x3<T> rgb_primaries = primaries.toRgbMatrix();
-    Vector3<T> S = rgb_primaries.invert().vecmult(source_whitepoint_XYZ);
-
-    Matrix3x3<T> to_xyz = rgb_primaries * S;
-
-    Vector3<T> chromatic_adapt_source = ca_matrix.vecmult(source_whitepoint_XYZ);
-    Vector3<T> chromatic_adapt_target = ca_matrix.vecmult(target_whitepoint_XYZ);
-
-    Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
-        chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
-        0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
-        0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
-
-    Matrix3x3<T> source_target_white_matrix = (ca_matrix.invert() * chromatic_adaptation_matrix) * ca_matrix;
-    Matrix3x3<T> rgb_to_xyz = source_target_white_matrix * to_xyz;
-
-    if (invert)
-    {
-        rgb_to_xyz.invert_in_place();
-    }
-
-    return rgb_to_xyz;
-}

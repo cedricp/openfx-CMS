@@ -43,6 +43,17 @@ extern "C"{
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+template <class T>
+static Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
+{
+    Matrix3x3f rgb2cam;
+    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
+    rgb2cam = xyzD65tocam * rec709toxyzD65;
+    rgb2cam.normalize_rows();
+    // Invert RGB2CAM matrix
+    return rgb2cam.invert();
+}
+
 enum ColorSpaceFormat {
         ACES_AP0,
         ACES_AP1,
@@ -66,9 +77,9 @@ public:
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
         OFX::unused(rs);
-        scale = 1. / (wl - bl);
-        float clipping_value = (wl - bl) * cam_mult.min();
-        clipping_value *= scale;
+        float range = wl - bl;
+        scale = 1.0 / range;
+        float clipping_value = scale * range * cam_mult.min();
         Vector3f scaledCamMult = cam_mult * scale;
 
         for (int y = procWindow.y1; y < procWindow.y2; y++)
@@ -79,16 +90,18 @@ public:
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 if (x > raw_width) break;
-                Vector3f in(srcPix[0], srcPix[1], srcPix[2]);
-                srcPix += 3;
+                Vector3f in((float)srcPix[0], (float)srcPix[1], (float)srcPix[2]);
                 in *= scaledCamMult;
                 if (clip){
-                    in.clip(0.f, clipping_value);
+                    in.clip_in_place(0.f, clipping_value);
                 }
-                Vector3f out = idt_matrix.vecmult(in);
+
+                Vector3f out = idt_matrix * in;
                 out.copy_to(dstPix);
+
                 dstPix[3] = 1.f;
-                dstPix+=4;
+                dstPix += 4;
+                srcPix += 3;
             }
         }
     }
@@ -315,8 +328,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
 
     // Compute clip values
     float scale = 1. / float(white_level - black_level);
-    float clipping_value = float(white_level - black_level) * _asShotNeutral.min();
-    clipping_value *= scale;
+    float clipping_value = scale * float(white_level - black_level) * _asShotNeutral.min();
 
     if (_highlightMode->getValue() > 0){
         clipping_value = 10000.f;
@@ -834,7 +846,8 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     { 
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kHighlightMode);
-        param->setLabel("HIghlight processing");
+        param->setLabel("Highlight processing");
+        param->setHint("Help to remove pinkish highlights");
         param->appendOption("Clip", "", "clip");
         param->appendOption("Unclip", "", "unclip");
         param->setDefault(0);
@@ -858,9 +871,9 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kColorTemperature);
         param->setLabel("Color temperature");
+        param->setHint("Color temperature in Kelvin");
         param->setRange(2800, 8000);
         param->setDisplayRange(2800, 8000);
-        param->setHint("Color temperature in Kelvin");
         param->setDefault(6500);
         if (page_colors)
         {
@@ -871,6 +884,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     { 
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kChromaSmooth);
         param->setLabel("Chroma smoothing");
+        param->setHint("Chroma smoothing algorithm (remove chroma noise, slow processing)");
         param->appendOption("None", "", "none");
         param->appendOption("2x2", "2x2 filtering", "cs22");
         param->appendOption("3x3", "3x3 filtering", "cs33");
@@ -886,7 +900,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kFixFocusPixel);
         param->setLabel("Fix focus pixels");
-        param->setHint("Fix focus pixels");
+        param->setHint("Fix focus pixels on mirrorless cameras");
         param->setDefault(true);
         if (page_raw)
         {
@@ -897,9 +911,9 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kBlackLevel);
         param->setLabel("Black level");
+        param->setHint("Raw black level");
         param->setRange(0, 65535);
         param->setDisplayRange(0, 16535);
-        param->setHint("Raw black level");
         param->setDefault(0);
         if (page_raw)
         {
@@ -910,9 +924,9 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kWhiteLevel);
         param->setLabel("White level");
+        param->setHint("Raw white level");
         param->setRange(0, 65535);
         param->setDisplayRange(0, 16535);
-        param->setHint("Raw white level");
         param->setDefault(0);
         if (page_raw)
         {
@@ -923,6 +937,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kResetLevels);
         param->setLabel("Reset levels");
+        param->setHint("Reset black and white levels to default values (camera calcualted)");
         if (page_raw)
         {
             page_raw->addChild(*param);
@@ -932,7 +947,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::IntParamDescriptor *param = desc.defineIntParam(kBpp);
         param->setLabel("Bpp");
-        param->setHint("Raw bits per pixel");
+        param->setHint("Bits per pixel");
         param->setEnabled(false);
         param->setDefault(0);
         if (page_raw)
