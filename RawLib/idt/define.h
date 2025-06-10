@@ -86,8 +86,8 @@
 #    define FALSE 0
 #endif
 
-#define FORI( val ) for ( int i = 0; i < val; i++ )
-#define FORJ( val ) for ( int j = 0; j < val; j++ )
+#define FORI( val ) for ( size_t i = 0; i < val; i++ )
+#define FORJ( val ) for ( size_t j = 0; j < val; j++ )
 #define FORIJ( val1, val2 )                                                    \
     for ( int i = 0; i < val1; i++ )                                           \
         for ( int j = 0; j < val2; j++ )
@@ -424,8 +424,8 @@ inline bool isCTLetterDigit( const char c )
 // to represent color temperature(s) (e.g., D60, 3200K)
 inline bool isValidCT( string str )
 {
-    int i      = 0;
-    int length = str.length();
+    size_t i      = 0;
+    size_t length = str.length();
 
     if ( length == 0 )
         return false;

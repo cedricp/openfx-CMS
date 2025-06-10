@@ -48,7 +48,7 @@ static Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
 {
     Matrix3x3f rgb2cam;
     // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    rgb2cam = xyzD65tocam * rec709toxyzD65;
+    rgb2cam = xyzD65tocam * rec709_to_xyzD65_matrix<float>();
     rgb2cam.normalize_rows();
     // Invert RGB2CAM matrix
     return rgb2cam.invert();
@@ -61,8 +61,7 @@ enum ColorSpaceFormat {
         XYZ
 };
 
-class ColorProcessor
-    : public OFX::ImageProcessor
+class ColorProcessor : public OFX::ImageProcessor
 {
 public:
     ColorProcessor(OFX::ImageEffect &instance): ImageProcessor(instance)
@@ -145,7 +144,6 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     
     SSIDT::Idt idt;
     int ok = 0;
-    //idt.setVerbosity(1);
     ok = idt.loadIlluminant( vector<string>(), "na" );
     if (!ok)
     {
@@ -158,7 +156,11 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
         ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
         if (ok) break;
     }
-    if (!ok) return false;
+
+    if (!ok)
+    {
+        return false;
+    }
 
     _useSpectralIdt->setEnabled(true);
 
@@ -188,7 +190,7 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
 void MLVReaderPlugin::computeIDT()
 {
     IDT_MUTEX_LOCK
-    int colorspace = _ouptutColorSpace->getValue();
+    int colorspace = _outputColorSpace->getValue();
 
     if (colorspace == 3){
         return;
@@ -499,18 +501,17 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
         out_matrix = _idt;
     } else {
         Matrix3x3f xyzd65tocam, rgb2rgb, cam2xyxd50;
-        int colorspace = _ouptutColorSpace->getValue();
+        int colorspace = _outputColorSpace->getValue();
 
         mlv_video->get_camera_matrix2f(xyzd65tocam.data());
         
         rgb2rgb = get_matrix_cam2rec709(xyzd65tocam);
         if (colorspace <= REC709){
             // Using DNG IDT matrix
-            cam2xyxd50 = rec709toxyzD50 * rgb2rgb;
+            cam2xyxd50 = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
             out_matrix = _idt * cam2xyxd50;
-
         } else {
-            out_matrix = rec709toxyzD50 * rgb2rgb;
+            out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
         }
     }
 
@@ -529,7 +530,7 @@ bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
     return true;
 }
 
-bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane)
+bool MLVReaderPlugin::isIdentity(const OFX::IsIdentityArguments& /*args*/, OFX::Clip*& /*identityClip*/, double& /*identityTime*/, int& /*view*/, std::string& /*plane*/)
 {
     return false;
 }
@@ -610,7 +611,7 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     mlv->unlock();
 }
 
-void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& p_Args, const std::string& p_ClipName)
+void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& /*p_Args*/, const std::string& p_ClipName)
 {
     if (p_ClipName == kOfxImageEffectSimpleSourceClipName)
     {
@@ -674,10 +675,10 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kUseSpectralIdt)
     {
         if (_useSpectralIdt->getValue()){
-            _ouptutColorSpace->setValue(0);
-            _ouptutColorSpace->setEnabled(false);
+            _outputColorSpace->setValue(0);
+            _outputColorSpace->setEnabled(false);
         } else {
-            _ouptutColorSpace->setEnabled(true);
+            _outputColorSpace->setEnabled(true);
         }
         _idtDirty = true;
     }

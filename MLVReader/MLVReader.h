@@ -84,7 +84,7 @@ public:
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);
         _mlv_audiofilename = fetchStringParam(kAudioFilename);
         _audioExportButton = fetchPushButtonParam(kAudioExport);
-        _ouptutColorSpace = fetchChoiceParam(kColorSpaceFormat);
+        _outputColorSpace = fetchChoiceParam(kColorSpaceFormat);
         _debayerType = fetchChoiceParam(kDebayerType);
         _highlightMode = fetchChoiceParam(kHighlightMode);
         _chromaSmooth = fetchChoiceParam(kChromaSmooth);
@@ -161,7 +161,7 @@ private:
     OFX::PushButtonParam* _audioExportButton;
     OFX::PushButtonParam* _darkFrameButton;
     OFX::DoubleParam* _mlv_fps;
-    OFX::ChoiceParam* _ouptutColorSpace;
+    OFX::ChoiceParam* _outputColorSpace;
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;
     OFX::ChoiceParam* _chromaSmooth;

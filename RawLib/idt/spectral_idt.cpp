@@ -1028,9 +1028,6 @@ void Idt::chooseIllumSrc( const vector<double> &src, int highlight )
         vector<double> wb_tmp  = calWB( _Illuminants[i], highlight );
         double         sse_tmp = calSSE( wb_tmp, src );
 
-        //            printf ("%s, %f \n", _Illuminants[i]._type.c_str(), sse_tmp);
-        //            printf ("%f, %f, %f\n ", wb_tmp[0], wb_tmp[1], wb_tmp[2]);
-
         if ( sse_tmp < sse )
         {
             sse        = sse_tmp;
@@ -1415,19 +1412,6 @@ const Illum Idt::getBestIllum() const
     return _bestIllum;
 }
 
-//	=====================================================================
-//	Get Verbosity value for the length of IDT generation status message
-//
-//	inputs:
-//      N/A
-//
-//	outputs:
-//		int: _verbosity (const)
-
-const int Idt::getVerbosity() const
-{
-    return _verbosity;
-}
 
 //	=====================================================================
 //  Get Spectral Training Data that was loaded from the file

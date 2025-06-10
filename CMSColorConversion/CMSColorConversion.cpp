@@ -116,7 +116,7 @@ private:
                 }
                 else if (alphaSrc)
                 {
-                    *srcPix++;
+                    srcPix++;
                 }
             }
         }
@@ -162,8 +162,7 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         (float)_greenPrimary->getValueAtTime(time).x,
         (float)_greenPrimary->getValueAtTime(time).y,
         (float)_bluePrimary->getValueAtTime(time).x,
-        (float)_bluePrimary->getValueAtTime(time).y);
-    PrimariesXY<float> sourceWhitePoint(
+        (float)_bluePrimary->getValueAtTime(time).y,
         (float)_sourceWhitePoint->getValueAtTime(time).x,
         (float)_sourceWhitePoint->getValueAtTime(time).y);
     PrimariesXY<float> destWhitePoint(
@@ -175,17 +174,17 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
     
     switch(ca_method){
         case 1:
-        ca_matrix = cmccat2000_matrix;
+        ca_matrix = cmccat2000_matrix<float>;
         break;
         case 2:
-        ca_matrix = ciecat02_matrix;
+        ca_matrix = ciecat02_matrix<float>;
         break;
         case 0:
         default:
-        ca_matrix = bradford_matrix;
+        ca_matrix = bradford_matrix<float>;
     }
 
-    Matrix3x3f conversion_matrix = srcPrimaries.compute_adapted_matrix(sourceWhitePoint, destWhitePoint, ca_matrix, _invert->getValueAtTime(time));
+    Matrix3x3f conversion_matrix = srcPrimaries.compute_adapted_matrix(destWhitePoint, ca_matrix, _invert->getValueAtTime(time));
 
     if (getUseOpenCL() && srcComponents == OFX::ePixelComponentRGBA)
     {
@@ -301,18 +300,8 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
             _bluePrimary->setValue(xy);
         }
 
-        // HP Z27 DreamColor
-        if (primaries == 3){
-            xy.x = 0.684;xy.y = 0.313;
-            _redPrimary->setValue(xy);
-            xy.x = 0.212;xy.y = 0.722;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.149;xy.y = 0.054;
-            _bluePrimary->setValue(xy);
-        }
-
         // Pal/Secam
-        if (primaries == 4){
+        if (primaries == 3){
             xy.x = 0.64;xy.y = 0.33;
             _redPrimary->setValue(xy);
             xy.x = 0.29;xy.y = 0.60;
@@ -322,7 +311,7 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         }
 
         // Wide Gamut RGB
-        if (primaries == 5){
+        if (primaries == 4){
             xy.x = 0.7347;xy.y = 0.2653;
             _redPrimary->setValue(xy);
             xy.x = 0.1152;xy.y = 0.8264;
@@ -332,12 +321,22 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         }
 
         // Adobe RGB
-        if (primaries == 6){
+        if (primaries == 5){
             xy.x = 0.640;xy.y = 0.330;
             _redPrimary->setValue(xy);
             xy.x = 0.210;xy.y = 0.710;
             _greenPrimary->setValue(xy);
             xy.x = 0.150;xy.y = 0.060;
+            _bluePrimary->setValue(xy);
+        }
+
+        // HP Z27 DreamColor
+        if (primaries == 6){
+            xy.x = 0.684;xy.y = 0.313;
+            _redPrimary->setValue(xy);
+            xy.x = 0.212;xy.y = 0.722;
+            _greenPrimary->setValue(xy);
+            xy.x = 0.149;xy.y = 0.054;
             _bluePrimary->setValue(xy);
         }
 
@@ -403,7 +402,7 @@ void CMSColorConversionPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 #endif
 }
 
-bool CMSColorConversionPlugin::isIdentity(const OFX::IsIdentityArguments &args,
+bool CMSColorConversionPlugin::isIdentity(const OFX::IsIdentityArguments &/*args*/,
                                           OFX::Clip *&identityClip,
                                           double & /*identityTime*/
                                           ,
@@ -459,10 +458,10 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             param->appendOption("Rec709");
             param->appendOption("Rec2020");
             param->appendOption("Display P3");
-            param->appendOption("HP DreamColor Z27");
-            param->appendOption("Pal/Secam");
+            param->appendOption("BT601 (Pal/Secam)");
             param->appendOption("Wide gamut");
             param->appendOption("Adobe RGB");
+            param->appendOption("HP DreamColor Z27");
             if (page)
             {
                 page->addChild(*param);
@@ -575,4 +574,4 @@ CMSColorConversionPluginFactory::createInstance(OfxImageEffectHandle handle,
 static CMSColorConversionPluginFactory p(kPluginIdentifier, kPluginVersionMajor, kPluginVersionMinor);
 mRegisterPluginFactoryInstance(p)
 
-    OFXS_NAMESPACE_ANONYMOUS_EXIT
+OFXS_NAMESPACE_ANONYMOUS_EXIT

@@ -143,7 +143,6 @@ public:
     const vector<CMF>            getCMF() const;
     const vector<vector<double>> getIDT() const;
     const vector<double>         getWB() const;
-    const int                    getVerbosity() const;
 
     void getIdtF(float matrix[9]) const;
     void getWBF(float wb[3]) const;
