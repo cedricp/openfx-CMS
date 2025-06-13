@@ -273,11 +273,6 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 	return true;
 }
 
-void Mlv_video::free_dng_buffer()
-{
-	freeDngData(_imp->dng_object);
-}
-
 void Mlv_video::write_audio(std::string path)
 {
 	mlvObject_t* mlv = _imp->mlv_object;
@@ -399,7 +394,7 @@ uint16_t* Mlv_video::get_dng_buffer(uint32_t frame, int& dng_size, bool no_buffe
 	return (uint16_t*)buffer;
 }
 
-void Mlv_video::set_levels(int black, int white)
+void Mlv_video::set_dng_raw_levels(int black, int white)
 {
 	mlvObject_t mlvob = *_imp->mlv_object;
 

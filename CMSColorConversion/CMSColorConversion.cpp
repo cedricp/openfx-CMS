@@ -272,72 +272,58 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         OfxPointD xy;
         // Rec709
         if (primaries == 0){
-            xy.x = 0.640;xy.y = 0.330;
-            _redPrimary->setValue(xy);
-            xy.x = 0.300;xy.y = 0.600;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.150;xy.y = 0.060;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries rec709d65 = rec709d65_primaries<double>;
+            _redPrimary->setValue(rec709d65.red_primaries().X(), rec709d65_primaries<float>.red_primaries().Y());
+            _greenPrimary->setValue(rec709d65.green_primaries().X(), rec709d65.green_primaries().Y());
+            _bluePrimary->setValue(rec709d65.blue_primaries().X(), rec709d65.blue_primaries().Y());
         }
 
         // Rec2020
         if (primaries == 1){
-            xy.x = 0.708;xy.y = 0.292;
-            _redPrimary->setValue(xy);
-            xy.x = 0.170;xy.y = 0.797;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.131;xy.y = 0.046;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries rec2020d65 = rec2020d65_primaries<double>;
+            _redPrimary->setValue(rec2020d65.red_primaries().X(), rec2020d65.red_primaries().Y());
+            _greenPrimary->setValue(rec2020d65.green_primaries().X(), rec2020d65.green_primaries().Y());
+            _bluePrimary->setValue(rec2020d65.blue_primaries().X(), rec2020d65.blue_primaries().Y());
         }
 
         // P3
         if (primaries == 2){
-            xy.x = 0.680;xy.y = 0.320;
-            _redPrimary->setValue(xy);
-            xy.x = 0.265;xy.y = 0.690;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.150;xy.y = 0.060;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries p3d65 = p3_display_primaries<double>;
+            _redPrimary->setValue(p3d65.red_primaries().X(), p3d65.red_primaries().Y());
+            _greenPrimary->setValue(p3d65.green_primaries().X(), p3d65.green_primaries().Y());
+            _bluePrimary->setValue(p3d65.blue_primaries().X(), p3d65.blue_primaries().Y());
         }
 
         // Pal/Secam
         if (primaries == 3){
-            xy.x = 0.64;xy.y = 0.33;
-            _redPrimary->setValue(xy);
-            xy.x = 0.29;xy.y = 0.60;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.15;xy.y = 0.06;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries bt601 = bt601_primaries<double>;
+            _redPrimary->setValue(bt601.red_primaries().X(), bt601.red_primaries().Y());
+            _greenPrimary->setValue(bt601.green_primaries().X(), bt601.green_primaries().Y());
+            _bluePrimary->setValue(bt601.blue_primaries().X(), bt601.blue_primaries().Y());
         }
 
         // Wide Gamut RGB
         if (primaries == 4){
-            xy.x = 0.7347;xy.y = 0.2653;
-            _redPrimary->setValue(xy);
-            xy.x = 0.1152;xy.y = 0.8264;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.1566;xy.y = 0.0177;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries widegamut = wide_gamut_rgb_primaries<double>;
+            _redPrimary->setValue(widegamut.red_primaries().X(), widegamut.red_primaries().Y());
+            _greenPrimary->setValue(widegamut.green_primaries().X(), widegamut.green_primaries().Y());
+            _bluePrimary->setValue(widegamut.blue_primaries().X(), widegamut.blue_primaries().Y());
         }
 
         // Adobe RGB
         if (primaries == 5){
-            xy.x = 0.640;xy.y = 0.330;
-            _redPrimary->setValue(xy);
-            xy.x = 0.210;xy.y = 0.710;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.150;xy.y = 0.060;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries adobe_rgb = adobe_rgb_primaries<double>;
+            _redPrimary->setValue(adobe_rgb.red_primaries().X(), adobe_rgb.red_primaries().Y());
+            _greenPrimary->setValue(adobe_rgb.green_primaries().X(), adobe_rgb.green_primaries().Y());
+            _bluePrimary->setValue(adobe_rgb.blue_primaries().X(), adobe_rgb.blue_primaries().Y());
         }
 
         // HP Z27 DreamColor
         if (primaries == 6){
-            xy.x = 0.684;xy.y = 0.313;
-            _redPrimary->setValue(xy);
-            xy.x = 0.212;xy.y = 0.722;
-            _greenPrimary->setValue(xy);
-            xy.x = 0.149;xy.y = 0.054;
-            _bluePrimary->setValue(xy);
+            RGBPrimaries hp_dreamcolor = hp_dreamcolor_rgb_primaries<double>;
+            _redPrimary->setValue(hp_dreamcolor.red_primaries().X(), hp_dreamcolor.red_primaries().Y());
+            _greenPrimary->setValue(hp_dreamcolor.green_primaries().X(), hp_dreamcolor.green_primaries().Y());
+            _bluePrimary->setValue(hp_dreamcolor.blue_primaries().X(), hp_dreamcolor.blue_primaries().Y());
         }
 
     }
@@ -347,23 +333,19 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         OfxPointD xy;
         if (wb == 0){
             // D50
-            xy.x = 0.345704;xy.y = 0.358540;
-            _sourceWhitePoint->setValue(xy);
+            _sourceWhitePoint->setValue(WP_D50<double>.X(), WP_D50<double>.Y());
         }
         if (wb == 1){
             // D65
-            xy.x = 0.3127;xy.y = 0.3290;
-            _sourceWhitePoint->setValue(xy);
+            _sourceWhitePoint->setValue(WP_D65<double>.X(), WP_D65<double>.Y());
         }
         if (wb == 2){
             // DCI P3
-            xy.x = 0.314;xy.y = 0.351;
-            _sourceWhitePoint->setValue(xy);
+            _sourceWhitePoint->setValue(WP_P3_DCI<double>.X(), WP_P3_DCI<double>.Y());
         }
         if (wb == 3){
             // DreamColor Z27
-            xy.x = 0.303;xy.y = 0.317;
-            _sourceWhitePoint->setValue(xy);
+            _sourceWhitePoint->setValue(WP_DISPLAY_DREAMCOLOR<double>.X(), WP_DISPLAY_DREAMCOLOR<double>.Y());
         }
     }
 
@@ -371,12 +353,11 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         int wb = _tgtWBChoice->getValue();
         OfxPointD xy;
         if (wb == 0){
-            xy.x = 0.345704;xy.y = 0.358540;
-            _destWhitePoint->setValue(xy);
+            _destWhitePoint->setValue(WP_D50<double>.X(), WP_D50<double>.Y());
         }
         if (wb == 1){
             xy.x = 0.3127;xy.y = 0.3290;
-            _destWhitePoint->setValue(xy);
+            _destWhitePoint->setValue(WP_D65<double>.X(), WP_D65<double>.Y());
         }
     }
 }

@@ -477,6 +477,26 @@ public:
         white = w;
     }
 
+    PrimariesXY<T> red_primaries() const
+    {
+        return red;
+    }
+
+    PrimariesXY<T> green_primaries() const
+    {
+        return green;
+    }
+
+    PrimariesXY<T> blue_primaries() const
+    {
+        return blue;
+    }
+
+    PrimariesXY<T> white_primaries() const
+    {
+        return white;
+    }
+
     Matrix3x3<T> toRgbMatrix() const
     {
         Vector3<T> X = red.to_XYZ();
@@ -571,15 +591,27 @@ const RGBPrimaries<T>  bt601_primaries = RGBPrimaries<T> (0.640, 0.330,
                                                           WP_D65<T>);
 
 template <class T>
-const RGBPrimaries<T>  wide_gamut_rgb_prmaries = RGBPrimaries<T> (0.7347, 0.2653,
+const RGBPrimaries<T>  wide_gamut_rgb_primaries = RGBPrimaries<T> (0.7347, 0.2653,
                                                                   0.1152, 0.8264,
                                                                   0.1566, 0.0177,
-                                                                  WP_DISPLAY_DREAMCOLOR<T>);
+                                                                  WP_D50<T>);
 
+template <class T>
+const RGBPrimaries<T>  hp_dreamcolor_rgb_primaries = RGBPrimaries<T> (0.684, 0.313,
+                                                                      0.212, 0.722,
+                                                                      0.149, 0.054,
+                                                                      WP_DISPLAY_DREAMCOLOR<T>);
+
+template <class T>
+const RGBPrimaries<T>  adobe_rgb_primaries = RGBPrimaries<T> (0.640, 0.330,
+                                                              0.210, 0.710,
+                                                              0.150, 0.060,
+                                                              WP_D65<T>);
+                                                              
 template <class T>
 inline Matrix3x3<T> rec709_to_xyzD65_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {
-    // Convert Rec709 to XYZ D50 using the Bradford chromatic adaptation matrix
+    // Convert Rec709 to XYZ D65 using the Bradford chromatic adaptation matrix
     return rec709d65_primaries<T>.compute_adapted_matrix(
         WP_D65<T>,
         ca_matrix, false);

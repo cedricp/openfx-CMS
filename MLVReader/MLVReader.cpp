@@ -44,11 +44,12 @@ extern "C"{
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 template <class T>
-static Matrix3x3<T> get_matrix_cam2rec709(const Matrix3x3<T> &xyzD65tocam)
+static Matrix3x3<T> get_neutral_cam2rec709_matrix(const Matrix3x3<T> &xyzD65tocam)
 {
     Matrix3x3f rgb2cam;
     // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
     rgb2cam = xyzD65tocam * rec709_to_xyzD65_matrix<float>();
+    // Remove the white balance from the camera matrix
     rgb2cam.normalize_rows();
     // Invert RGB2CAM matrix
     return rgb2cam.invert();
@@ -448,7 +449,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
 void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img)
 {
     int dng_size = 0;
-    mlv_video->set_levels(_blackLevel->getValue(), _whiteLevel->getValue());
+    mlv_video->set_dng_raw_levels(_blackLevel->getValue(), _whiteLevel->getValue());
     uint16_t* dng_buffer = mlv_video->get_dng_buffer(time, dng_size, false);
 
     if (_levelsDirty){
@@ -500,17 +501,17 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
         // Spectral sensitivity based matrix
         out_matrix = _idt;
     } else {
-        Matrix3x3f xyzd65tocam, rgb2rgb, cam2xyxd50;
+        Matrix3x3f xyzd65tocam, rgb2rgb;
         int colorspace = _outputColorSpace->getValue();
 
         mlv_video->get_camera_matrix2f(xyzd65tocam.data());
         
-        rgb2rgb = get_matrix_cam2rec709(xyzd65tocam);
+        rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
         if (colorspace <= REC709){
             // Using DNG IDT matrix
-            cam2xyxd50 = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
-            out_matrix = _idt * cam2xyxd50;
+            out_matrix = _idt * rec709_to_xyzD50_matrix<float>() * rgb2rgb;
         } else {
+            // XYZD50 output
             out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
         }
     }
