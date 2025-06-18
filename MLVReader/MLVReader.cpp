@@ -373,10 +373,15 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_border.setArg(7, white_level);
         kernel_demosaic_border.setArg(8, _asShotNeutral[0]);
         kernel_demosaic_border.setArg(9, _asShotNeutral[2]);
+        kernel_demosaic_border.setArg(10, clipping_value);
 
         cl::NDRange sizes(width, height);
         
-        queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
+        bool ok = queue.enqueueNDRangeKernel(kernel_demosaic_border, cl::NullRange, sizes, cl::NullRange, NULL, &timer);
+        if (ok != CL_SUCCESS){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Border interpolation failed"));
+            return;
+        }
     }
 
     {
@@ -406,7 +411,11 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_green.setArg(9, _asShotNeutral[2]);
         kernel_demosaic_green.setArg(10, clipping_value);
         
-        queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
+        bool ok = queue.enqueueNDRangeKernel(kernel_demosaic_green, cl::NullRange, sizes, local, NULL, &timer);
+        if (ok != CL_SUCCESS){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Green channel demosaic failed"));
+            return;
+        }
     }
 
     {
@@ -436,7 +445,11 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix.data());
-        queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
+        bool ok = queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
+        if (ok != CL_SUCCESS){
+            setPersistentMessage(OFX::Message::eMessageError, "", std::string("OpenCL : Green channel demosaic failed"));
+            return;
+        }
     }
 
     // Fetch result from GPU

@@ -184,7 +184,7 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         ca_matrix = bradford_matrix<float>;
     }
 
-    Matrix3x3f conversion_matrix = srcPrimaries.compute_adapted_matrix(destWhitePoint, ca_matrix, _invert->getValueAtTime(time));
+    Matrix3x3f conversion_matrix = srcPrimaries.compute_adapted_matrix(_invert->getValueAtTime(time), destWhitePoint, ca_matrix);
 
     if (getUseOpenCL() && srcComponents == OFX::ePixelComponentRGBA)
     {

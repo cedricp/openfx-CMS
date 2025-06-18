@@ -37,22 +37,6 @@ FC(const int row, const int col, const unsigned int filters)
   return filters >> ((((row) << 1 & 14) + ((col) & 1)) << 1) & 3;
 }
 
-kernel void
-test_pattern (write_only image2d_t out)
-{
-  const int x = get_global_id(0);
-  const int y = get_global_id(1);
-  float4 color;
-
-  float w = get_image_width(out);
-  float h = get_image_height(out);
-
-  color.x = x/w;
-  color.y = y/h;
-
-  write_imagef (out, (int2)(x, y), color);
-}
-
 /**
  * fill greens pass of pattern pixel grouping.
  * in (float) or (float4).x -> out (float4)
@@ -84,6 +68,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
   // this is 3 pixel left and above of the work group origin
   const int xul = mul24(xgid, xlsz) - 3;
   const int yul = mul24(ygid, ylsz) - 3;
+  const float scale = white_level - black_level;
 
   // populate local memory buffer
   for(int n = 0; n <= maxbuf/lsz; n++)
@@ -92,9 +77,8 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
     if(bufidx >= maxbuf) continue;
     const int xx = xul + bufidx % stride;
     const int yy = yul + bufidx / stride;
-    unsigned int val = read_imageui(in, sampleri, (int2)(xx, yy)).x;
-    if(val < black_level) val = black_level;
-    buffer[bufidx] = (float)(val - black_level) / (float)(white_level - black_level);
+    int val = read_imageui(in, sampleri, (int2)(xx, yy)).x;
+    buffer[bufidx] = fmax(0, (float)(val - black_level)) / scale;
   }
 
   // center buffer around current x,y-Pixel
@@ -162,7 +146,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
 
   color = fmin(color, clip_value);
 
-  write_imagef (out, (int2)(x,y), fmax(color, 0.0f));
+  write_imagef (out, (int2)(x,y), color);
 }
 
 
@@ -291,10 +275,11 @@ kernel void
 border_interpolate(read_only image2d_t in, write_only image2d_t out,
                    const int width, const int height, const unsigned int filters,
                    const int border, const unsigned int black_level, const unsigned int white_level,
-                   float rmult, float bmult)
+                   const float rmult, const float bmult, const float clip_value)
 {
   const int x = get_global_id(0);
   const int y = get_global_id(1);
+  const float scale = white_level - black_level;
 
   if(x >= width || y >= height) return;
 
@@ -311,27 +296,30 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
     if (j>=0 && i>=0 && j<height && i<width)
     {
       const int f = FC(j,i,filters);
-      unsigned int val = read_imageui(in, sampleri, (int2)(i, j)).x;
-      if(val < black_level) val = black_level;
-      sum[f] += (float)(val - black_level) / (float)(white_level - black_level);
+      int val = read_imageui(in, sampleri, (int2)(i, j)).x;
+      sum[f] += fmax(0, (float)(val - black_level)) / scale;
       count[f]++;
     }
   }
   
-  unsigned int val = read_imageui(in, sampleri, (int2)(x, y)).x;
-  if(val < black_level) val = black_level;
-  const float i = (float)(val - black_level) / (float)(white_level - black_level);
+  int val = read_imageui(in, sampleri, (int2)(x, y)).x;
+  const float i = fmax(0, (float)(val - black_level)) / scale;
 
-  o.x = count[0] > 0 ? sum[0]/count[0] : i;
-  o.y = count[1]+count[3] > 0 ? (sum[1]+sum[3])/(count[1]+count[3]) : i;
-  o.z = count[2] > 0 ? sum[2]/count[2] : i;
+  o.x = count[0] > 0 ? sum[0]/(float)count[0] : i;
+  o.y = count[1]+count[3] > 0 ? (sum[1]+sum[3])/(float)(count[1]+count[3]) : i;
+  o.z = count[2] > 0 ? sum[2]/(float)count[2] : i;
 
   const int f = FC(y,x,filters);
 
-  if     (f == 0) o.x = i * rmult;
+  if     (f == 0) o.x = i;
   else if(f == 1) o.y = i;
-  else if(f == 2) o.z = i * bmult;
+  else if(f == 2) o.z = i;
   else            o.y = i;
 
-  write_imagef (out, (int2)(x, y), fmax(o, 0.0f));
+  o.x *= rmult;
+  o.z *= bmult;
+
+  o = fmin(o, clip_value);
+
+  write_imagef (out, (int2)(x, y), o);
 }
