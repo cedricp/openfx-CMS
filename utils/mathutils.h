@@ -427,6 +427,8 @@ typedef PrimariesXY<float> PrimariesXYf;
 // Predefined white point primaries
 
 template <class T>
+const PrimariesXY<T> WP_ACES = PrimariesXY<T>(0.32168, 0.33767);
+template <class T>
 const PrimariesXY<T> WP_D65 = PrimariesXY<T>(0.31272, 0.32903);
 template <class T>
 const PrimariesXY<T> WP_D50 = PrimariesXY<T> (0.34567, 0.35850);
@@ -518,32 +520,43 @@ public:
         return ret;
     }
 
+    Matrix3x3<T> compute_adaptation_matrix(const PrimariesXY<T> source_whitepoint,
+                                           const PrimariesXY<T> target_whitepoint,
+                                        const Matrix3x3<T>& ca_matrix = bradford_matrix<T>) const
+    {
+        Vector3<T> source_whitepoint_XYZ = source_whitepoint.to_XYZ();
+        Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
+
+        Vector3<T> chromatic_adapt_source = ca_matrix * source_whitepoint_XYZ;
+        Vector3<T> chromatic_adapt_target = ca_matrix * target_whitepoint_XYZ;
+
+        Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
+            chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
+            0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
+            0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
+
+        return ca_matrix.invert() * chromatic_adaptation_matrix;
+    }
+
     // Compute RGBW primaries to XYZ using a chromatic adaptation matrix, the resulting matrix will convert RGB->XYZ
     // If XYZ->RGB Matrix is needed, just set invert to true
     Matrix3x3<T> compute_adapted_matrix(bool invert = false,
                                         const PrimariesXY<T> target_whitepoint = WP_D50<T>,
                                         const Matrix3x3<T>& ca_matrix = bradford_matrix<float>) const
     {
-        Vector3<T> source_whitepoint_XYZ = white.to_XYZ();
-        Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
+        Matrix3x3<T> chromatic_adaptation_matrix = compute_adaptation_matrix(white, target_whitepoint, ca_matrix);
+
         Matrix3x3<T> rgb_primaries = toRgbMatrix();
-        Vector3<T> S = rgb_primaries.invert() * source_whitepoint_XYZ;
-    
+        Vector3<T> S = rgb_primaries.invert() * white.to_XYZ();
         Matrix3x3<T> to_xyz = rgb_primaries.scale(S);
-    
-        Vector3<T> chromatic_adapt_source = ca_matrix * source_whitepoint_XYZ;
-        Vector3<T> chromatic_adapt_target = ca_matrix * target_whitepoint_XYZ;
-    
-        Matrix3x3<T> chromatic_adaptation_matrix = Matrix3x3<T>(
-            chromatic_adapt_target[0] / chromatic_adapt_source[0], 0, 0,
-            0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
-            0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
-    
-        Matrix3x3<T> source_target_white_matrix = (ca_matrix.invert() * chromatic_adaptation_matrix) * ca_matrix;
+
+        Matrix3x3<T> source_target_white_matrix = (chromatic_adaptation_matrix) * ca_matrix;
         Matrix3x3<T> rgb_to_xyz = source_target_white_matrix * to_xyz;
     
         return invert ? rgb_to_xyz.invert() : rgb_to_xyz;
     }
+
+
 };
 
 typedef RGBPrimaries<float> RGBPrimariesf;
@@ -603,7 +616,19 @@ const RGBPrimaries<T>  adobe_rgb_primaries = RGBPrimaries<T> (0.640, 0.330,
                                                               0.210, 0.710,
                                                               0.150, 0.060,
                                                               WP_D65<T>);
-                                                              
+
+template <class T>
+const RGBPrimaries<T>  ap0_primaries = RGBPrimaries<T> (0.7347, 0.2653,
+                                                        0.000, 1.000,
+                                                        0.001, -0.077,
+                                                        WP_ACES<T>);                                                              
+
+template <class T>
+const RGBPrimaries<T>  ap1_primaries = RGBPrimaries<T> (0.713, 0.293,
+                                                        0.165, 0.830,
+                                                        0.128, 0.044,
+                                                        WP_ACES<T>); 
+
 template <class T>
 inline Matrix3x3<T> rec709_to_xyzD65_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {

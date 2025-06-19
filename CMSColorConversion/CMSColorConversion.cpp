@@ -91,20 +91,20 @@ private:
             }
 
             float *dstPix = (float *)_dstImg->getPixelAddress(procWindow.x1, y);
-            const float *srcPix = (float *)_src->getPixelAddress(procWindow.x1, y);
-            if (!dstPix || !srcPix)
+            if (!dstPix)
             {
                 continue;
             }
-
+            
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
+                const float *srcPix = (float *)_src->getPixelAddress(x, y);
+                if (!srcPix) continue;
                 Vector3f srcColor(srcPix);
                 Vector3f dstColor = _conversion_matrix *srcColor;
                 *dstPix++ = dstColor[0];
                 *dstPix++ = dstColor[1];
                 *dstPix++ = dstColor[2];
-                srcPix += 3;
 
                 if (alphaDst && alphaSrc)
                 {
@@ -113,10 +113,6 @@ private:
                 else if (alphaDst)
                 {
                     *dstPix++ = 1.0;
-                }
-                else if (alphaSrc)
-                {
-                    srcPix++;
                 }
             }
         }
@@ -191,20 +187,29 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         clearPersistentMessage();
         
         OfxRectI srcBounds = src->getBounds();
-        //OfxRectI dstBounds = dst->getBounds();
+        OfxRectI dstBounds = dst->getBounds();
+
+        int srcWidth = srcBounds.x2 - srcBounds.x1;
+        int srcHeight = srcBounds.y2 - srcBounds.y1;
+        int dstWidth = dstBounds.x2 - dstBounds.x1;
+        int dstHeight = dstBounds.y2 - dstBounds.y1;
 
         cl::Event timer;
         cl::CommandQueue queue = cl::CommandQueue(getCurrentCLContext(), getCurrentCLDevice());
         cl::Kernel kernel_matrixop(getProgram("imgutils"), "matrix_xform");
 
         cl::Buffer matrixbuffer(getCurrentCLContext(), CL_MEM_READ_ONLY, sizeof(float) * 9);
-        cl::Image2D img_in(getCurrentCLContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), srcBounds.x2, srcBounds.y2, 0, (float*)src->getPixelData());
-        cl::Image2D img_out(getCurrentCLContext(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), srcBounds.x2, srcBounds.y2, 0, NULL);
+        cl::Image2D img_in(getCurrentCLContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), srcWidth, srcHeight, 0, (float*)src->getPixelData());
+        cl::Image2D img_out(getCurrentCLContext(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), dstWidth, dstHeight, 0, NULL);
 
         // Set CL arguments
         kernel_matrixop.setArg(0, img_in);
         kernel_matrixop.setArg(1, img_out);
         kernel_matrixop.setArg(2, matrixbuffer);
+        kernel_matrixop.setArg(3, (int)srcBounds.x1);
+        kernel_matrixop.setArg(4, (int)srcBounds.y1);
+        kernel_matrixop.setArg(5, (int)srcWidth);
+        kernel_matrixop.setArg(6, (int)srcHeight);
 
         cl::NDRange sizes(srcBounds.x2, srcBounds.y2, 1);
         int errcode = queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, (float*)conversion_matrix.data());
@@ -224,7 +229,7 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         cl::array<size_t, 3> origin = {(size_t)args.renderWindow.x1, (size_t)args.renderWindow.y1, 0};
         cl::array<size_t, 3> size = {(size_t)(args.renderWindow.x2 - args.renderWindow.x1), (size_t)(args.renderWindow.y2 - args.renderWindow.y1), 1};
         errcode = queue.enqueueReadImage(img_out, CL_TRUE, origin, size, 0, 0, (float*)dst->getPixelData());
-         if (errcode != CL_SUCCESS)
+        if (errcode != CL_SUCCESS)
         {
             setPersistentMessage(OFX::Message::eMessageError, "", string_format("OpenCL : enqueueReadImage failed with error code %i", errcode));
         }
@@ -318,8 +323,24 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
             _bluePrimary->setValue(adobe_rgb.blue_primaries().X(), adobe_rgb.blue_primaries().Y());
         }
 
-        // HP Z27 DreamColor
+        // ACES AP0
         if (primaries == 6){
+            RGBPrimaries ap0_dreamcolor = ap0_primaries<double>;
+            _redPrimary->setValue(ap0_dreamcolor.red_primaries().X(), ap0_dreamcolor.red_primaries().Y());
+            _greenPrimary->setValue(ap0_dreamcolor.green_primaries().X(), ap0_dreamcolor.green_primaries().Y());
+            _bluePrimary->setValue(ap0_dreamcolor.blue_primaries().X(), ap0_dreamcolor.blue_primaries().Y());
+        }
+
+        // ACES AP1
+        if (primaries == 7){
+            RGBPrimaries ap1_dreamcolor = ap1_primaries<double>;
+            _redPrimary->setValue(ap1_dreamcolor.red_primaries().X(), ap1_dreamcolor.red_primaries().Y());
+            _greenPrimary->setValue(ap1_dreamcolor.green_primaries().X(), ap1_dreamcolor.green_primaries().Y());
+            _bluePrimary->setValue(ap1_dreamcolor.blue_primaries().X(), ap1_dreamcolor.blue_primaries().Y());
+        }
+
+        // HP Z27 DreamColor
+        if (primaries == 8){
             RGBPrimaries hp_dreamcolor = hp_dreamcolor_rgb_primaries<double>;
             _redPrimary->setValue(hp_dreamcolor.red_primaries().X(), hp_dreamcolor.red_primaries().Y());
             _greenPrimary->setValue(hp_dreamcolor.green_primaries().X(), hp_dreamcolor.green_primaries().Y());
@@ -345,6 +366,10 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         }
         if (wb == 3){
             // DreamColor Z27
+            _sourceWhitePoint->setValue(WP_ACES<double>.X(), WP_ACES<double>.Y());
+        }
+        if (wb == 4){
+            // DreamColor Z27
             _sourceWhitePoint->setValue(WP_DISPLAY_DREAMCOLOR<double>.X(), WP_DISPLAY_DREAMCOLOR<double>.Y());
         }
     }
@@ -358,6 +383,10 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         if (wb == 1){
             xy.x = 0.3127;xy.y = 0.3290;
             _destWhitePoint->setValue(WP_D65<double>.X(), WP_D65<double>.Y());
+        }
+        if (wb == 2){
+            xy.x = 0.3127;xy.y = 0.3290;
+            _destWhitePoint->setValue(WP_ACES<double>.X(), WP_ACES<double>.Y());
         }
     }
 }
@@ -435,13 +464,15 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
         {
             OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kPrimariesChoice);
             param->setLabel("Source primaries");
-            param->setHint("Select predefined primaries");
+            param->setHint("Select predefined RGB primaries");
             param->appendOption("Rec709");
             param->appendOption("Rec2020");
             param->appendOption("Display P3");
             param->appendOption("BT601 (Pal/Secam)");
             param->appendOption("Wide gamut");
             param->appendOption("Adobe RGB");
+            param->appendOption("ACES AP0");
+            param->appendOption("ACES AP1");
             param->appendOption("HP DreamColor Z27");
             if (page)
             {
@@ -489,6 +520,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             param->appendOption("D50");
             param->appendOption("D65");
             param->appendOption("DCI-P3 (~6300K)");
+            param->appendOption("ACES (~6000K)");
             param->appendOption("HP DreamColor Z27 (~7100K)");
             if (page)
             {
@@ -513,6 +545,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             param->setHint("Select white");
             param->appendOption("D50");
             param->appendOption("D65");
+            param->appendOption("ACES");
             if (page)
             {
                 page->addChild(*param);
