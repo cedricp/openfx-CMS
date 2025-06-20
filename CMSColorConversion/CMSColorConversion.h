@@ -20,7 +20,8 @@
 #define kSupportsHalf false
 #define kSupportsFloat true
 
-#define kSupportsTiles 1
+// More work is needed to support tiles
+#define kSupportsTiles 0
 #define kSupportsMultiResolution 0
 #define kSupportsRenderScale 0
 #define kSupportsMultipleClipPARs false
@@ -68,6 +69,12 @@ public:
         _chromaticAdaptationMethod = fetchChoiceParam(kChromaticAdaptationMethod);
         std::string debayer_program = getPluginFilePath() + "/Contents/Resources/Shaders/imgutils.cl";
         addProgram(debayer_program, "imgutils");
+
+        _greenPrimary->setEnabled(false);
+        _bluePrimary->setEnabled(false);
+        _redPrimary->setEnabled(false);
+        _sourceWhitePoint->setEnabled(false);
+        _destWhitePoint->setEnabled(false);
     }
 
 private:
@@ -93,6 +100,7 @@ private:
     OFX::ChoiceParam *_srcWBChoice;
     OFX::ChoiceParam *_tgtWBChoice;
     OFX::ChoiceParam *_chromaticAdaptationMethod;
+    OFX::BooleanParam *_chromaticAdaptationOnly;
 };
 
 class CMSColorConversionPluginFactory : public OFX::PluginFactoryHelper<CMSColorConversionPluginFactory>

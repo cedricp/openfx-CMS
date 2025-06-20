@@ -249,7 +249,7 @@ public:
     // Identity
     Matrix3x3()
     {
-        identity();
+        set_identity();
     }
 
     Matrix3x3(const T *ref)
@@ -294,7 +294,7 @@ public:
         mat[6] = g;mat[7] = h;mat[8] = i;
     }
 
-    void identity()
+    void set_identity()
     {
         mat[0] = 1;mat[1] = 0;mat[2] = 0;
         mat[3] = 0;mat[4] = 1;mat[5] = 0;
@@ -403,15 +403,15 @@ public:
     {
         // Convert xy to XYZ using the formula:
         // X = x / y, Y = 1, Z = (1 - x - y) / y
-        return Vector3<T>(X() / Y(), 1., (1. - X() - Y()) / Y());
+        return Vector3<T>(x() / y(), 1., (1. - x() - y()) / y());
     }
 
-    T X() const
+    T x() const
     {
         return (*this)[0];
     }
 
-    T Y() const
+    T y() const
     {
         return (*this)[1];
     }
@@ -435,8 +435,9 @@ const PrimariesXY<T> WP_D50 = PrimariesXY<T> (0.34567, 0.35850);
 template <class T>
 const PrimariesXY<T> WP_P3_DCI = PrimariesXY<T> (0.314, 0.351);
 template <class T>
-const PrimariesXY<T> WP_DISPLAY_DREAMCOLOR = PrimariesXY<T> (0.303, 0.317);
-
+const PrimariesXY<T> WP_DISPLAY_G1_DREAMCOLOR = PrimariesXY<T> (0.305, 0.307);
+template <class T>
+const PrimariesXY<T> WP_DISPLAY_G2_DREAMCOLOR = PrimariesXY<T> (0.303, 0.317);
 // Chromatic adaptation matrices
 
 template <class T>
@@ -459,72 +460,71 @@ const Matrix3x3<T> ciecat02_matrix(
 
 // RGB primaries in xy format
 template <class T>
-class RGBPrimaries
+class RGBWPrimaries
 {
-    PrimariesXY<T> red;
-    PrimariesXY<T> green;
-    PrimariesXY<T> blue;
-    PrimariesXY<T> white;
+    PrimariesXY<T> _red;
+    PrimariesXY<T> _green;
+    PrimariesXY<T> _blue;
+    PrimariesXY<T> _white;
 public:
-    RGBPrimaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y, T W_x, T W_y)
+    RGBWPrimaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y, T W_x, T W_y)
     {
-        red = PrimariesXY<T>(r_x, r_y);
-        green = PrimariesXY<T>(g_x, g_y);
-        blue = PrimariesXY<T>(b_x, b_y);
-        white = PrimariesXY<T>(W_x, W_y);
+        _red = PrimariesXY<T>(r_x, r_y);
+        _green = PrimariesXY<T>(g_x, g_y);
+        _blue = PrimariesXY<T>(b_x, b_y);
+        _white = PrimariesXY<T>(W_x, W_y);
     }
 
-    RGBPrimaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y, const PrimariesXY<T>& w)
+    RGBWPrimaries(T r_x, T r_y, T g_x, T g_y, T b_x, T b_y, const PrimariesXY<T>& w)
     {
-        red = PrimariesXY<T>(r_x, r_y);
-        green = PrimariesXY<T>(g_x, g_y);
-        blue = PrimariesXY<T>(b_x, b_y);
-        white = w;
+        _red = PrimariesXY<T>(r_x, r_y);
+        _green = PrimariesXY<T>(g_x, g_y);
+        _blue = PrimariesXY<T>(b_x, b_y);
+        _white = w;
     }
 
-    RGBPrimaries(const PrimariesXY<T> &r, const PrimariesXY<T> &g, const PrimariesXY<T> &b, const PrimariesXY<T>& w)
+    RGBWPrimaries(const PrimariesXY<T> &r, const PrimariesXY<T> &g, const PrimariesXY<T> &b, const PrimariesXY<T>& w)
     {
-        red = r;
-        green = g;
-        blue = b;
-        white = w;
+        _red = r;
+        _green = g;
+        _blue = b;
+        _white = w;
     }
 
     PrimariesXY<T> red_primaries() const
     {
-        return red;
+        return _red;
     }
 
     PrimariesXY<T> green_primaries() const
     {
-        return green;
+        return _green;
     }
 
     PrimariesXY<T> blue_primaries() const
     {
-        return blue;
+        return _blue;
     }
 
     PrimariesXY<T> white_primaries() const
     {
-        return white;
+        return _white;
     }
 
     Matrix3x3<T> toRgbMatrix() const
     {
-        Vector3<T> X = red.to_XYZ();
-        Vector3<T> Y = green.to_XYZ();
-        Vector3<T> Z = blue.to_XYZ();
+        Vector3<T> X = _red.to_XYZ();
+        Vector3<T> Y = _green.to_XYZ();
+        Vector3<T> Z = _blue.to_XYZ();
         Matrix3x3<T> ret(X, Y, Z);
         ret.transpose();
         return ret;
     }
 
-    Matrix3x3<T> compute_adaptation_matrix(const PrimariesXY<T> source_whitepoint,
-                                           const PrimariesXY<T> target_whitepoint,
-                                        const Matrix3x3<T>& ca_matrix = bradford_matrix<T>) const
+    Matrix3x3<T> compute_chromatic_adaptation_matrix(const PrimariesXY<T> target_whitepoint,
+                                           const Matrix3x3<T>& ca_matrix = bradford_matrix<T>) const
     {
-        Vector3<T> source_whitepoint_XYZ = source_whitepoint.to_XYZ();
+        Vector3<T> source_whitepoint_XYZ = _white.to_XYZ();
         Vector3<T> target_whitepoint_XYZ = target_whitepoint.to_XYZ();
 
         Vector3<T> chromatic_adapt_source = ca_matrix * source_whitepoint_XYZ;
@@ -535,96 +535,99 @@ public:
             0, chromatic_adapt_target[1] / chromatic_adapt_source[1], 0,
             0, 0, chromatic_adapt_target[2] / chromatic_adapt_source[2]);
 
-        return ca_matrix.invert() * chromatic_adaptation_matrix;
+        return ca_matrix.invert() * chromatic_adaptation_matrix * ca_matrix;
     }
 
     // Compute RGBW primaries to XYZ using a chromatic adaptation matrix, the resulting matrix will convert RGB->XYZ
     // If XYZ->RGB Matrix is needed, just set invert to true
-    Matrix3x3<T> compute_adapted_matrix(bool invert = false,
+    Matrix3x3<T> compute_adapted_rgb_matrix(bool invert = false,
                                         const PrimariesXY<T> target_whitepoint = WP_D50<T>,
                                         const Matrix3x3<T>& ca_matrix = bradford_matrix<float>) const
     {
-        Matrix3x3<T> chromatic_adaptation_matrix = compute_adaptation_matrix(white, target_whitepoint, ca_matrix);
+        const Matrix3x3<T> chromatic_adaptation_matrix = compute_chromatic_adaptation_matrix(target_whitepoint, ca_matrix);
+        const Matrix3x3<T> rgb_primaries = toRgbMatrix();
 
-        Matrix3x3<T> rgb_primaries = toRgbMatrix();
-        Vector3<T> S = rgb_primaries.invert() * white.to_XYZ();
-        Matrix3x3<T> to_xyz = rgb_primaries.scale(S);
+        const Vector3<T> S = rgb_primaries.invert() * _white.to_XYZ();
+        const Matrix3x3<T> to_xyz = rgb_primaries.scale(S);
 
-        Matrix3x3<T> source_target_white_matrix = (chromatic_adaptation_matrix) * ca_matrix;
-        Matrix3x3<T> rgb_to_xyz = source_target_white_matrix * to_xyz;
+        const Matrix3x3<T> rgb_to_xyz = chromatic_adaptation_matrix * to_xyz;
     
         return invert ? rgb_to_xyz.invert() : rgb_to_xyz;
     }
-
-
 };
 
-typedef RGBPrimaries<float> RGBPrimariesf;
+typedef RGBWPrimaries<float> RGBPrimariesf;
 
 // Predefined RGB primaries
 
 template <class T>
-const RGBPrimaries<T> rec709d65_primaries = RGBPrimaries<T>(0.640, 0.330,
+const RGBWPrimaries<T> rec709d65_primaries = RGBWPrimaries<T>(0.640, 0.330,
                                                             0.300, 0.600,
                                                             0.150, 0.006, 
                                                             WP_D65<T>); // D65 white point
 
 template <class T>
-const RGBPrimaries<T> rec709d50_primaries = RGBPrimaries<T>(0.640, 0.330,
+const RGBWPrimaries<T> rec709d50_primaries = RGBWPrimaries<T>(0.640, 0.330,
                                                             0.300, 0.600,
                                                             0.150, 0.006, 
                                                             WP_D50<T>); // D50 white point
 
 template <class T>                                                      
-const RGBPrimaries<T>  rec2020d65_primaries = RGBPrimaries<T> (0.708, 0.292,
+const RGBWPrimaries<T>  rec2020d65_primaries = RGBWPrimaries<T> (0.708, 0.292,
                                                                0.170, 0.797,
                                                                0.131, 0.046,
                                                                WP_D65<T>);
 
 template <class T>
-const RGBPrimaries<T>  p3_display_primaries = RGBPrimaries<T> (0.680, 0.320,
+const RGBWPrimaries<T>  p3_display_primaries = RGBWPrimaries<T> (0.680, 0.320,
                                                                0.265, 0.690,
                                                                0.150, 0.060,
                                                                WP_D65<T>);
 
 template <class T>
-const RGBPrimaries<T>  dci_p3_primaries = RGBPrimaries<T> (0.680, 0.320,
+const RGBWPrimaries<T>  dci_p3_primaries = RGBWPrimaries<T> (0.680, 0.320,
                                                            0.265, 0.690,
                                                            0.150, 0.060,
                                                            WP_P3_DCI<T>);
 
 template <class T>
-const RGBPrimaries<T>  bt601_primaries = RGBPrimaries<T> (0.640, 0.330,
+const RGBWPrimaries<T>  bt601_primaries = RGBWPrimaries<T> (0.640, 0.330,
                                                           0.290, 0.600,
                                                           0.150, 0.060,
                                                           WP_D65<T>);
 
 template <class T>
-const RGBPrimaries<T>  wide_gamut_rgb_primaries = RGBPrimaries<T> (0.7347, 0.2653,
+const RGBWPrimaries<T>  wide_gamut_rgb_primaries = RGBWPrimaries<T> (0.7347, 0.2653,
                                                                   0.1152, 0.8264,
                                                                   0.1566, 0.0177,
                                                                   WP_D50<T>);
 
 template <class T>
-const RGBPrimaries<T>  hp_dreamcolor_rgb_primaries = RGBPrimaries<T> (0.684, 0.313,
-                                                                      0.212, 0.722,
-                                                                      0.149, 0.054,
-                                                                      WP_DISPLAY_DREAMCOLOR<T>);
+const RGBWPrimaries<T>  hp_dreamcolor_g1_rgb_primaries = RGBWPrimaries<T> (0.680, 0.307,
+                                                                           0.210, 0.696,
+                                                                           0.147, 0.054,
+                                                                           WP_DISPLAY_G1_DREAMCOLOR<T>);
 
 template <class T>
-const RGBPrimaries<T>  adobe_rgb_primaries = RGBPrimaries<T> (0.640, 0.330,
+const RGBWPrimaries<T>  hp_dreamcolor_g2_rgb_primaries = RGBWPrimaries<T> (0.684, 0.313,
+                                                                           0.212, 0.722,
+                                                                           0.149, 0.054,
+                                                                           WP_DISPLAY_G2_DREAMCOLOR<T>);
+
+template <class T>
+const RGBWPrimaries<T>  adobe_rgb_primaries = RGBWPrimaries<T> (0.640, 0.330,
                                                               0.210, 0.710,
                                                               0.150, 0.060,
                                                               WP_D65<T>);
 
 template <class T>
-const RGBPrimaries<T>  ap0_primaries = RGBPrimaries<T> (0.7347, 0.2653,
+const RGBWPrimaries<T>  ap0_primaries = RGBWPrimaries<T> (0.7347, 0.2653,
                                                         0.000, 1.000,
                                                         0.001, -0.077,
                                                         WP_ACES<T>);                                                              
 
 template <class T>
-const RGBPrimaries<T>  ap1_primaries = RGBPrimaries<T> (0.713, 0.293,
+const RGBWPrimaries<T>  ap1_primaries = RGBWPrimaries<T> (0.713, 0.293,
                                                         0.165, 0.830,
                                                         0.128, 0.044,
                                                         WP_ACES<T>); 
@@ -633,7 +636,7 @@ template <class T>
 inline Matrix3x3<T> rec709_to_xyzD65_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {
     // Convert Rec709 to XYZ D65 using the Bradford chromatic adaptation matrix
-    return rec709d65_primaries<T>.compute_adapted_matrix(
+    return rec709d65_primaries<T>.compute_adapted_rgb_matrix(
         false,
         WP_D65<T>,
         ca_matrix);
@@ -643,7 +646,7 @@ template <class T>
 inline Matrix3x3<T> rec709_to_xyzD50_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {
     // Convert Rec709 to XYZ D50 using the Bradford chromatic adaptation matrix
-    return rec709d65_primaries<T>.compute_adapted_matrix(
+    return rec709d65_primaries<T>.compute_adapted_rgb_matrix(
         false,
         WP_D50<T>,
         ca_matrix);
