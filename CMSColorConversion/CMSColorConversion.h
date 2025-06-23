@@ -38,6 +38,7 @@
 #define kTargetWhiteChoice "tgtWhite"
 #define kInvertTransformParam "invert"
 #define kChromaticAdaptationMethod "chomaticAdaptation"
+#define kToneResponseCurve "toneResponseCurve"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -67,6 +68,7 @@ public:
         _srcWBChoice = fetchChoiceParam(kSourceWhiteChoice);
         _tgtWBChoice = fetchChoiceParam(kTargetWhiteChoice);
         _chromaticAdaptationMethod = fetchChoiceParam(kChromaticAdaptationMethod);
+        _toneResponseCurve = fetchChoiceParam(kToneResponseCurve);
         std::string debayer_program = getPluginFilePath() + "/Contents/Resources/Shaders/imgutils.cl";
         addProgram(debayer_program, "imgutils");
 
@@ -101,6 +103,7 @@ private:
     OFX::ChoiceParam *_tgtWBChoice;
     OFX::ChoiceParam *_chromaticAdaptationMethod;
     OFX::BooleanParam *_chromaticAdaptationOnly;
+    OFX::ChoiceParam *_toneResponseCurve;
 };
 
 class CMSColorConversionPluginFactory : public OFX::PluginFactoryHelper<CMSColorConversionPluginFactory>

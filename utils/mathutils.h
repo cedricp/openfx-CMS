@@ -135,6 +135,22 @@ public:
         return *this;
     }
 
+    Vector3& operator/=(const Vector3 &a)
+    {
+        vec[0] /= a.vec[0];
+        vec[1] /= a.vec[1];
+        vec[2] /= a.vec[2];
+        return *this;
+    }
+
+    Vector3& operator/=(const T &a)
+    {
+        vec[0] /= a;
+        vec[1] /= a;
+        vec[2] /= a;
+        return *this;
+    }
+
     Vector3& operator=(const Vector3 &a)
     {
         vec[0] = a.vec[0];
@@ -243,7 +259,7 @@ public:
 template <class T>
 class Matrix3x3
 {
-    T mat[9];
+    Vector3<T> rows[3];
 
 public:
     // Identity
@@ -255,136 +271,122 @@ public:
     Matrix3x3(const T *ref)
     {
         for (int i = 0; i < 9; ++i)
-            mat[i] = ref[i];
+            rows[i / 3][i % 3] = ref[i];
     }
 
     Matrix3x3(const Matrix3x3 &ref)
     {
-        for (int i = 0; i < 9; ++i)
-            mat[i] = ref.mat[i];
+        for (int i = 0; i < 3; ++i)
+            rows[i] = ref.rows[i];
     }
 
     Matrix3x3(const Vector3<T> &a, const Vector3<T> &b, const Vector3<T> &c)
     {
-        mat[0] = a[0];
-        mat[1] = a[1];
-        mat[2] = a[2];
-        mat[3] = b[0];
-        mat[4] = b[1];
-        mat[5] = b[2];
-        mat[6] = c[0];
-        mat[7] = c[1];
-        mat[8] = c[2];
+        rows[0] = a;
+        rows[1] = b;
+        rows[2] = c;
     }
 
     void transpose()
     {
-        T temp;
-        temp = mat[1]; mat[1] = mat[3]; mat[3] = temp;
-        temp = mat[2]; mat[2] = mat[6]; mat[6] = temp;
-        temp = mat[5]; mat[5] = mat[7]; mat[7] = temp;
+        for (int i = 0; i < 3; ++i)
+            for (int j = i + 1; j < 3; ++j)
+                std::swap(rows[i][j], rows[j][i]);
     }
 
     Matrix3x3(const T &a, const T &b, const T &c,
               const T &d, const T &e, const T &f,
               const T &g, const T &h, const T &i)
     {
-        mat[0] = a;mat[1] = b;mat[2] = c;
-        mat[3] = d;mat[4] = e;mat[5] = f;
-        mat[6] = g;mat[7] = h;mat[8] = i;
+        rows[0] = Vector3<T>(a, b, c);
+        rows[1] = Vector3<T>(d, e, f);
+        rows[2] = Vector3<T>(g, h, i);
     }
 
     void set_identity()
     {
-        mat[0] = 1;mat[1] = 0;mat[2] = 0;
-        mat[3] = 0;mat[4] = 1;mat[5] = 0;
-        mat[6] = 0;mat[7] = 0;mat[8] = 1;
+        rows[0] = Vector3<T>(1, 0, 0);
+        rows[1] = Vector3<T>(0, 1, 0);
+        rows[2] = Vector3<T>(0, 0, 1);
     }
 
     void print(const char *prefix) const
     {
         printf("%s Matrix3x3(%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-               prefix, mat[0], mat[1], mat[2],
-               mat[3], mat[4], mat[5],
-               mat[6], mat[7], mat[8]);
+               prefix, rows[0][0], rows[0][1], rows[0][2],
+               rows[1][0], rows[1][1], rows[1][2],
+               rows[2][0], rows[2][1], rows[2][2]);
     }
 
     T *data()
     {
-        return mat;
+        return rows[0].data();
     }
 
-    T &operator[](int i)
+    const T *data() const
     {
-        return mat[i];
+        return rows[0].data();
+    }
+
+    Vector3<T> &operator[](int i)
+    {
+        return rows[i];
     }
 
     Matrix3x3 operator*(const Matrix3x3 &a) const
     {
         Matrix3x3 res;
-        mat_mat_mult(mat, a.mat, res.mat);
+        mat_mat_mult(data(), a.data(), res.data());
         return res;
     }
 
     Vector3<T> operator*(const Vector3<T> &a) const
     {
       Vector3<T> res;
-      matrix_vector_mult(mat, a.data(), res.data());
+      matrix_vector_mult(data(), a.data(), res.data());
       return res;
     }
 
     Matrix3x3 scale(const Vector3<T> &a) const
     {
         Matrix3x3 res;
-        res.mat[0] = mat[0] * a[0];
-        res.mat[1] = mat[1] * a[1];
-        res.mat[2] = mat[2] * a[2];
-        res.mat[3] = mat[3] * a[0];
-        res.mat[4] = mat[4] * a[1];
-        res.mat[5] = mat[5] * a[2];
-        res.mat[6] = mat[6] * a[0];
-        res.mat[7] = mat[7] * a[1];
-        res.mat[8] = mat[8] * a[2];
+        res.rows[0] = rows[0] * a;
+        res.rows[1] = rows[1] * a;
+        res.rows[2] = rows[2] * a;
         return res;
     }
 
     Matrix3x3& operator=(const Matrix3x3 &a)
     {
-        for (int i = 0; i < 9; ++i)
-            mat[i] = a.mat[i];
+        for (int i = 0; i < 3; ++i)
+            rows[i] = a.rows[i];
         return *this;
     }
 
     Matrix3x3 invert() const
     {
         Matrix3x3 res;
-        invert_matrix(mat, res.mat);
+        invert_matrix(data(), res.data());
         return res;
     }
 
     void invert_in_place()
     {
         Matrix3x3 res;
-        invert_matrix(mat, res.mat);
-        for (int i = 0; i < 9; ++i)
-            mat[i] = res[i];
+        invert_matrix(data(), res.data());
+        for (int i = 0; i < 3; ++i)
+            rows[i] = res.rows[i];
     }
 
     void normalize_rows()
     {
-        float sum[3] = {mat[0] + mat[1] + mat[2],
-                        mat[3] + mat[4] + mat[5],
-                        mat[6] + mat[7] + mat[8]};
+        float sum[3] = {rows[0][0] + rows[0][1] + rows[0][2],
+                        rows[1][0] + rows[1][1] + rows[1][2],
+                        rows[2][0] + rows[2][1] + rows[2][2]};
         // Normalize rows
-        mat[0] /= sum[0];
-        mat[1] /= sum[0];
-        mat[2] /= sum[0];
-        mat[3] /= sum[1];
-        mat[4] /= sum[1];
-        mat[5] /= sum[1];
-        mat[6] /= sum[2];
-        mat[7] /= sum[2];
-        mat[8] /= sum[2];
+        rows[0] /= sum[0];
+        rows[1] /= sum[1];
+        rows[2] /= sum[2];
     }
 };
 
@@ -540,7 +542,7 @@ public:
 
     // Compute RGBW primaries to XYZ using a chromatic adaptation matrix, the resulting matrix will convert RGB->XYZ
     // If XYZ->RGB Matrix is needed, just set invert to true
-    Matrix3x3<T> compute_adapted_rgb_matrix(bool invert = false,
+    Matrix3x3<T> compute_adapted_rgb2xyz_matrix(bool invert = false,
                                         const PrimariesXY<T> target_whitepoint = WP_D50<T>,
                                         const Matrix3x3<T>& ca_matrix = bradford_matrix<float>) const
     {
@@ -562,45 +564,45 @@ typedef RGBWPrimaries<float> RGBPrimariesf;
 
 template <class T>
 const RGBWPrimaries<T> rec709d65_primaries = RGBWPrimaries<T>(0.640, 0.330,
-                                                            0.300, 0.600,
-                                                            0.150, 0.006, 
-                                                            WP_D65<T>); // D65 white point
+                                                              0.300, 0.600,
+                                                              0.150, 0.006, 
+                                                              WP_D65<T>); // D65 white point
 
 template <class T>
 const RGBWPrimaries<T> rec709d50_primaries = RGBWPrimaries<T>(0.640, 0.330,
-                                                            0.300, 0.600,
-                                                            0.150, 0.006, 
-                                                            WP_D50<T>); // D50 white point
+                                                              0.300, 0.600,
+                                                              0.150, 0.006, 
+                                                              WP_D50<T>); // D50 white point
 
 template <class T>                                                      
 const RGBWPrimaries<T>  rec2020d65_primaries = RGBWPrimaries<T> (0.708, 0.292,
-                                                               0.170, 0.797,
-                                                               0.131, 0.046,
-                                                               WP_D65<T>);
+                                                                 0.170, 0.797,
+                                                                 0.131, 0.046,
+                                                                 WP_D65<T>);
 
 template <class T>
 const RGBWPrimaries<T>  p3_display_primaries = RGBWPrimaries<T> (0.680, 0.320,
-                                                               0.265, 0.690,
-                                                               0.150, 0.060,
-                                                               WP_D65<T>);
+                                                                 0.265, 0.690,
+                                                                 0.150, 0.060,
+                                                                 WP_D65<T>);
 
 template <class T>
 const RGBWPrimaries<T>  dci_p3_primaries = RGBWPrimaries<T> (0.680, 0.320,
-                                                           0.265, 0.690,
-                                                           0.150, 0.060,
-                                                           WP_P3_DCI<T>);
+                                                             0.265, 0.690,
+                                                             0.150, 0.060,
+                                                             WP_P3_DCI<T>);
 
 template <class T>
 const RGBWPrimaries<T>  bt601_primaries = RGBWPrimaries<T> (0.640, 0.330,
-                                                          0.290, 0.600,
-                                                          0.150, 0.060,
-                                                          WP_D65<T>);
+                                                            0.290, 0.600,
+                                                            0.150, 0.060,
+                                                            WP_D65<T>);
 
 template <class T>
 const RGBWPrimaries<T>  wide_gamut_rgb_primaries = RGBWPrimaries<T> (0.7347, 0.2653,
-                                                                  0.1152, 0.8264,
-                                                                  0.1566, 0.0177,
-                                                                  WP_D50<T>);
+                                                                    0.1152, 0.8264,
+                                                                    0.1566, 0.0177,
+                                                                    WP_D50<T>);
 
 template <class T>
 const RGBWPrimaries<T>  hp_dreamcolor_g1_rgb_primaries = RGBWPrimaries<T> (0.680, 0.307,
@@ -616,27 +618,27 @@ const RGBWPrimaries<T>  hp_dreamcolor_g2_rgb_primaries = RGBWPrimaries<T> (0.684
 
 template <class T>
 const RGBWPrimaries<T>  adobe_rgb_primaries = RGBWPrimaries<T> (0.640, 0.330,
-                                                              0.210, 0.710,
-                                                              0.150, 0.060,
-                                                              WP_D65<T>);
+                                                                0.210, 0.710,
+                                                                0.150, 0.060,
+                                                                WP_D65<T>);
 
 template <class T>
 const RGBWPrimaries<T>  ap0_primaries = RGBWPrimaries<T> (0.7347, 0.2653,
-                                                        0.000, 1.000,
-                                                        0.001, -0.077,
-                                                        WP_ACES<T>);                                                              
+                                                          0.000, 1.000,
+                                                          0.001, -0.077,
+                                                          WP_ACES<T>);                                                              
 
 template <class T>
 const RGBWPrimaries<T>  ap1_primaries = RGBWPrimaries<T> (0.713, 0.293,
-                                                        0.165, 0.830,
-                                                        0.128, 0.044,
-                                                        WP_ACES<T>); 
+                                                          0.165, 0.830,
+                                                          0.128, 0.044,
+                                                          WP_ACES<T>); 
 
 template <class T>
 inline Matrix3x3<T> rec709_to_xyzD65_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {
     // Convert Rec709 to XYZ D65 using the Bradford chromatic adaptation matrix
-    return rec709d65_primaries<T>.compute_adapted_rgb_matrix(
+    return rec709d65_primaries<T>.compute_adapted_rgb2xyz_matrix(
         false,
         WP_D65<T>,
         ca_matrix);
@@ -646,9 +648,44 @@ template <class T>
 inline Matrix3x3<T> rec709_to_xyzD50_matrix(const Matrix3x3<T> &ca_matrix = bradford_matrix<T>)
 {
     // Convert Rec709 to XYZ D50 using the Bradford chromatic adaptation matrix
-    return rec709d65_primaries<T>.compute_adapted_rgb_matrix(
+    return rec709d65_primaries<T>.compute_adapted_rgb2xyz_matrix(
         false,
         WP_D50<T>,
         ca_matrix);
 }
 
+template <class T>
+Vector3<T> gamma_correct(const Vector3<T> &v, float gamma)
+{
+    // Apply gamma correction to a vector
+    return Vector3<T>(pow(v[0], 1.0f / gamma),
+                      pow(v[1], 1.0f / gamma),
+                      pow(v[2], 1.0f / gamma));
+}
+
+template <class T>
+Vector3<T> inverse_gamma_correct(const Vector3<T> &v, float gamma)
+{
+    // Apply inverse gamma correction to a vector
+    return Vector3<T>(pow(v[0], gamma),
+                      pow(v[1], gamma),
+                      pow(v[2], gamma));
+}
+
+template <class T>
+Vector3<T> linear_to_srgb(const Vector3<T> &v)
+{
+    // Convert linear RGB to sRGB
+    return Vector3<T>(v[0] <= 0.0031308 ? 12.92 * v[0] : 1.055 * pow(v[0], 1.0 / 2.4) - 0.055,
+                      v[1] <= 0.0031308 ? 12.92 * v[1] : 1.055 * pow(v[1], 1.0 / 2.4) - 0.055,
+                      v[2] <= 0.0031308 ? 12.92 * v[2] : 1.055 * pow(v[2], 1.0 / 2.4) - 0.055);
+}
+
+template <class T>
+Vector3<T> srgb_to_linear(const Vector3<T> &v)
+{
+    // Convert sRGB to linear RGB
+    return Vector3<T>(v[0] <= 0.04045 ? v[0] / 12.92 : pow((v[0] + 0.055) / 1.055, 2.4),
+                      v[1] <= 0.04045 ? v[1] / 12.92 : pow((v[1] + 0.055) / 1.055, 2.4),
+                      v[2] <= 0.04045 ? v[2] / 12.92 : pow((v[2] + 0.055) / 1.055, 2.4));
+}

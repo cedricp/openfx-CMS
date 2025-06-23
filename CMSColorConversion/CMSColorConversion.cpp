@@ -62,12 +62,14 @@ public:
     }
 
     void setValues(const Matrix3x3f &conversion_matrix,
-                   OFX::Image *src)
+                   OFX::Image *src, int trc, bool inverse)
     {
         _src = src;
         _nComponentsSrc = _src->getPixelComponentCount();
         _nComponentsDst = _dstImg->getPixelComponentCount();
         _conversion_matrix = conversion_matrix;
+        _inverse = inverse;
+        _toneResponseCurve = trc;
     }
 
 private:
@@ -75,6 +77,8 @@ private:
     OFX::Image *_src;
     int _nComponentsSrc;
     int _nComponentsDst;
+    bool _inverse;
+    int _toneResponseCurve;
 
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
@@ -99,9 +103,50 @@ private:
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 const float *srcPix = (float *)_src->getPixelAddress(x, y);
-                if (!srcPix) continue;
                 Vector3f srcColor(srcPix);
+                if (!_inverse){
+                    switch(_toneResponseCurve)
+                    {
+                        case 0: // Linear
+                            break;
+                        case 1: // Gamma 2.2
+                            srcColor = inverse_gamma_correct(srcColor, 2.2);
+                            break;
+                        case 2: // Gamma 2.4
+                            srcColor = inverse_gamma_correct(srcColor, 2.4);
+                            break;
+                        case 3: // Gamma 2.6
+                            srcColor = inverse_gamma_correct(srcColor, 2.6);
+                            break;
+                        case 4: // sRGB
+                            srcColor = srgb_to_linear(srcColor);
+                            break;
+                    }
+                }
+
+                if (!srcPix) continue;
                 Vector3f dstColor = _conversion_matrix * srcColor;
+                
+                if (_inverse){
+                    switch(_toneResponseCurve)
+                    {
+                        case 0: // Linear
+                            break;
+                        case 1: // Gamma 2.2
+                            dstColor = gamma_correct(dstColor, 2.2);
+                        break;
+                        case 2: // Gamma 2.4
+                            dstColor = gamma_correct(dstColor, 2.4);
+                        break;
+                        case 3: // Gamma 2.6
+                            dstColor = gamma_correct(dstColor, 2.6);
+                            break;
+                        case 4: // sRGB
+                            dstColor = linear_to_srgb(dstColor);
+                            break;
+                    }
+                }
+                
                 *dstPix++ = dstColor[0];
                 *dstPix++ = dstColor[1];
                 *dstPix++ = dstColor[2];
@@ -183,16 +228,20 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
 
     bool adaptation_only = _primariesChoice->getValue() == 10;
     bool invert = _invert->getValueAtTime(time);
+    int trc = _toneResponseCurve->getValue();
     Matrix3x3f conversion_matrix;
 
     if (!adaptation_only)
     {
-       conversion_matrix = srcPrimaries.compute_adapted_rgb_matrix(invert, destWhitePoint, ca_matrix);
+       conversion_matrix = srcPrimaries.compute_adapted_rgb2xyz_matrix(invert, destWhitePoint, ca_matrix);
     } else
     {
+        trc = 0;
         conversion_matrix = srcPrimaries.compute_chromatic_adaptation_matrix(destWhitePoint, ca_matrix);
         if (invert) conversion_matrix.invert_in_place();
     }
+
+    conversion_matrix.print("Conversion matrix");
 
     if (getUseOpenCL() && srcComponents == OFX::ePixelComponentRGBA)
     {
@@ -222,6 +271,8 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         kernel_matrixop.setArg(4, (int)srcBounds.y1);
         kernel_matrixop.setArg(5, (int)srcWidth);
         kernel_matrixop.setArg(6, (int)srcHeight);
+        kernel_matrixop.setArg(7, (int)trc);
+        kernel_matrixop.setArg(8, (int)invert);
 
         cl::NDRange sizes(srcBounds.x2, srcBounds.y2, 1);
         int errcode = queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, (float*)conversion_matrix.data());
@@ -257,7 +308,7 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
         CMSConversionProcessor processor(*this);
         processor.setDstImg(dst.get());
         processor.setRenderWindow(args.renderWindow, args.renderScale);
-        processor.setValues(conversion_matrix, src.get());
+        processor.setValues(conversion_matrix, src.get(), trc, invert);
         processor.process();
     }
 }
@@ -285,6 +336,7 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
     OpenCLBase::changedParamCL(this, args, paramName);
 
     if (paramName == kPrimariesChoice){
+        _toneResponseCurve->setEnabled(true);
         int primaries = _primariesChoice->getValue();
         OfxPointD xy;
         _redPrimary->setEnabled(false);
@@ -376,6 +428,8 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
             _redPrimary->setValue(0,0);
             _greenPrimary->setValue(0,0);
             _bluePrimary->setValue(0,0);
+            _toneResponseCurve->setValue(0);
+            _toneResponseCurve->setEnabled(false);
         }
 
         if (primaries == 11){
@@ -425,17 +479,31 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         _destWhitePoint->setEnabled(false);
         OfxPointD xy;
         if (wb == 0){
+            // D50
             _destWhitePoint->setValue(WP_D50<double>.x(), WP_D50<double>.y());
         }
         if (wb == 1){
-            xy.x = 0.3127;xy.y = 0.3290;
+            // D65
             _destWhitePoint->setValue(WP_D65<double>.x(), WP_D65<double>.y());
         }
         if (wb == 2){
-            xy.x = 0.3127;xy.y = 0.3290;
-            _destWhitePoint->setValue(WP_ACES<double>.x(), WP_ACES<double>.y());
+            // DCI P3
+            _destWhitePoint->setValue(WP_P3_DCI<double>.x(), WP_P3_DCI<double>.y());
         }
         if (wb == 3){
+            // DreamColor Z27
+            _destWhitePoint->setValue(WP_ACES<double>.x(), WP_ACES<double>.y());
+        }
+        if (wb == 4){
+            // DreamColor Z27
+            _destWhitePoint->setValue(WP_DISPLAY_G1_DREAMCOLOR<double>.x(), WP_DISPLAY_G1_DREAMCOLOR<double>.y());
+        }
+        if (wb == 5){
+            // DreamColor Z27
+            _destWhitePoint->setValue(WP_DISPLAY_G2_DREAMCOLOR<double>.x(), WP_DISPLAY_G2_DREAMCOLOR<double>.y());
+        }
+        if (wb == 6){
+            // Custom
             _destWhitePoint->setEnabled(true);
         }
     }
@@ -476,6 +544,17 @@ bool CMSColorConversionPlugin::isIdentity(const OFX::IsIdentityArguments &/*args
     return false;
 }
 
+void setWPParam(OFX::ChoiceParamDescriptor* param)
+{
+    param->appendOption("D50");
+    param->appendOption("D65");
+    param->appendOption("DCI-P3 (~6300K)");
+    param->appendOption("D60 (ACES)");
+    param->appendOption("HP DreamColor Z27G1");
+    param->appendOption("HP DreamColor Z27G2");
+    param->appendOption("Custom");
+}
+
 void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
                                                         OFX::ContextEnum context)
 {
@@ -512,12 +591,27 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
         }
 
         {
+            OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kToneResponseCurve);
+            param->setLabel("Tone response curve");
+            param->setHint("Select tone response curve");
+            param->appendOption("Linear");
+            param->appendOption("Gamma 2.2");
+            param->appendOption("Gamma 2.4");
+            param->appendOption("Gamma 2.6");
+            param->appendOption("sRGB");
+            if (page)
+            {
+                page->addChild(*param);
+            }
+        }
+
+        {
             OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kPrimariesChoice);
             param->setLabel("Source primaries");
             param->setHint("Select predefined RGB primaries");
             param->appendOption("Rec709");
             param->appendOption("Rec2020");
-            param->appendOption("Display P3");
+            param->appendOption("P3");
             param->appendOption("BT601 (Pal/Secam)");
             param->appendOption("Wide gamut");
             param->appendOption("Adobe RGB");
@@ -569,14 +663,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
         {
             OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kSourceWhiteChoice);
             param->setLabel("Source white");
-            param->setHint("Select source white XY");
-            param->appendOption("D50");
-            param->appendOption("D65");
-            param->appendOption("DCI-P3 (~6300K)");
-            param->appendOption("ACES (~6000K)");
-            param->appendOption("HP DreamColor Z27G1 (~6300K)");
-            param->appendOption("HP DreamColor Z27G2 (~7100K)");
-            param->appendOption("Custom");
+            setWPParam(param);
             if (page)
             {
                 page->addChild(*param);
@@ -598,10 +685,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kTargetWhiteChoice);
             param->setLabel("Destination white XY");
             param->setHint("Select white");
-            param->appendOption("D50");
-            param->appendOption("D65");
-            param->appendOption("ACES");
-            param->appendOption("Custom");
+            setWPParam(param);
             if (page)
             {
                 page->addChild(*param);
