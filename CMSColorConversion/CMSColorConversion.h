@@ -39,6 +39,10 @@
 #define kInvertTransformParam "invert"
 #define kChromaticAdaptationMethod "chomaticAdaptation"
 #define kToneResponseCurve "toneResponseCurve"
+#define kPrintMatrix "printMatrixOnTerminal"
+
+template <class T> class Matrix3x3;
+typedef Matrix3x3<float> Matrix3x3f;
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -47,6 +51,7 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #else
 #define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB || (c) == OFX::ePixelComponentRGBA)
 #endif
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /** @brief The plugin that does our work */
@@ -69,6 +74,7 @@ public:
         _tgtWBChoice = fetchChoiceParam(kTargetWhiteChoice);
         _chromaticAdaptationMethod = fetchChoiceParam(kChromaticAdaptationMethod);
         _toneResponseCurve = fetchChoiceParam(kToneResponseCurve);
+        _printMatrix = fetchPushButtonParam(kPrintMatrix);
         std::string debayer_program = getPluginFilePath() + "/Contents/Resources/Shaders/imgutils.cl";
         addProgram(debayer_program, "imgutils");
 
@@ -88,7 +94,8 @@ private:
     bool isIdentity(const OFX::IsIdentityArguments &args, OFX::Clip *&identityClip, double &identityTime, int &view, std::string &plane) OVERRIDE FINAL;
 
 private:
-    int _lutSize;
+    Matrix3x3f computeMatrix(double time, bool& invert, int &trc);
+
     OFX::Clip *_inputClip;
     OFX::Clip *_outputClip;
     OFX::StringParam *_outputLutFile;
@@ -104,6 +111,7 @@ private:
     OFX::ChoiceParam *_chromaticAdaptationMethod;
     OFX::BooleanParam *_chromaticAdaptationOnly;
     OFX::ChoiceParam *_toneResponseCurve;
+    OFX::PushButtonParam* _printMatrix;
 };
 
 class CMSColorConversionPluginFactory : public OFX::PluginFactoryHelper<CMSColorConversionPluginFactory>

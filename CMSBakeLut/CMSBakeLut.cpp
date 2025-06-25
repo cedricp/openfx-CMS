@@ -131,11 +131,11 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
     {
         std::string filename = _outputLutFile->getValue();
         FILE *file = fopen(filename.c_str(), "w");
-        const int lut1dsize_choice = _lut1dsize->getValue();
-        int lut1dsize = 512;
-        if (lut1dsize_choice == 1) lut1dsize = 1024;
-        if (lut1dsize_choice == 2) lut1dsize = 2048;
-        if (lut1dsize_choice == 3) lut1dsize = 4096;
+        // const int lut1dsize_choice = _lut1dsize->getValue();
+        // int lut1dsize = 512;
+        // if (lut1dsize_choice == 1) lut1dsize = 1024;
+        // if (lut1dsize_choice == 2) lut1dsize = 2048;
+        // if (lut1dsize_choice == 3) lut1dsize = 4096;
 
         if (file == NULL) {
             printf("Error opening file %s\n", filename.c_str());
@@ -148,7 +148,6 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
         }
         fclose(file);
     }
-
 }
 
 void CMSBakeLutPluginFactory::describe(OFX::ImageEffectDescriptor &desc)

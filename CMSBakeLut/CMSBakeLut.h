@@ -23,6 +23,8 @@
 #define kSupportsMultipleClipPARs false
 #define kSupportsMultipleClipDepths false
 
+// #define kLUT1DSizeParamName "LUT1DSize"
+
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
 #ifdef OFX_EXTENSIONS_NATRON
@@ -48,6 +50,7 @@ public:
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
 
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
+        //_lut1dsize = fetchChoiceParam(kLUT1DSizeParamName);
     }
 
 private:
@@ -62,7 +65,7 @@ private:
     int _lutSize;
     OFX::StringParam* _outputLutFile;
     std::vector<Color> _lut;
-    OFX::ChoiceParam *_lut1dsize;
+    //OFX::ChoiceParam *_lut1dsize;
     OFX::Clip * _dstClip;
     OFX::Clip* _inputClip;
 };
