@@ -31,6 +31,33 @@
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+
+// Any changes here need to be reflected in the plugin descriptor
+Chromaticities<double> ChromaList[] = {
+    rec709d65_primaries<double>,
+    rec2020d65_primaries<double>,
+    dci_p3_primaries<double>,
+    bt601_primaries<double>,
+    wide_gamut_rgb_primaries<double>,
+    adobe_rgb_primaries<double>,
+    ap0_primaries<double>,
+    ap1_primaries<double>,
+    hp_dreamcolor_g1_rgb_primaries<double>,
+    hp_dreamcolor_g2_rgb_primaries<double>,
+    rec709d65_primaries<double>,
+};
+
+// Any changes here need to be reflected in the plugin descriptor
+PrimariesXY<double> WhitePointList[] = {
+    WP_D50<double>,
+    WP_ACES<double>,
+    WP_P3_DCI<double>,
+    WP_D65<double>,
+    WP_ILLUM_E<double>,
+    WP_DISPLAY_G1_DREAMCOLOR<double>,
+    WP_DISPLAY_G2_DREAMCOLOR<double>,
+};
+
 static std::string string_format(const std::string fmt_str, ...) {
     int final_n, n = ((int)fmt_str.size()) * 2; /* Reserve two times as much as the length of the fmt_str */
     std::unique_ptr<char[]> formatted;
@@ -47,6 +74,51 @@ static std::string string_format(const std::string fmt_str, ...) {
             break;
     }
     return std::string(formatted.get());
+}
+
+static Vector3f inv_gamma22(const Vector3f &color)
+{
+    return inverse_gamma_correct(color, 2.2f);
+}
+
+static Vector3f inv_gamma24(const Vector3f &color)
+{
+    return inverse_gamma_correct(color, 2.4f);
+}
+
+static Vector3f inv_gamma26(const Vector3f &color)
+{
+    return inverse_gamma_correct(color, 2.6f);
+}
+
+static Vector3f gamma22(const Vector3f &color)
+{
+    return gamma_correct(color, 2.2f);
+}
+
+static Vector3f gamma24(const Vector3f &color)
+{
+    return gamma_correct(color, 2.4f);
+}
+
+static Vector3f gamma26(const Vector3f &color)
+{
+    return gamma_correct(color, 2.6f);
+}
+
+static Vector3f no_gamma(const Vector3f &color)
+{
+    return color;
+}
+
+static Vector3f srgb_to_linear_gamma(const Vector3f &color)
+{
+    return srgb_to_linear(color);
+}
+
+static Vector3f linear_to_srgb_gamma(const Vector3f &color)
+{
+    return linear_to_srgb(color);
 }
 
 class CMSConversionProcessor
@@ -70,6 +142,29 @@ public:
         _conversion_matrix = conversion_matrix;
         _inverse = inverse;
         _toneResponseCurve = trc;
+        switch (trc){
+            default:
+            case 0:
+            inv_gamma_function = no_gamma;
+            gamma_function = no_gamma;
+            break;
+            case 1:
+            inv_gamma_function = inv_gamma22;
+            gamma_function = gamma22;
+            break;
+            case 2:
+            inv_gamma_function = inv_gamma24;
+            gamma_function = gamma24;
+            break;
+            case 3:
+            inv_gamma_function = inv_gamma26;
+            gamma_function = gamma26;
+            break;
+            case 4:
+            inv_gamma_function = srgb_to_linear_gamma;
+            gamma_function = linear_to_srgb_gamma;
+            break;
+        }
     }
 
 private:
@@ -79,6 +174,8 @@ private:
     int _nComponentsDst;
     bool _inverse;
     int _toneResponseCurve;
+    std::function<Vector3f(Vector3f)> inv_gamma_function;
+    std::function<Vector3f(Vector3f)> gamma_function;
 
     void multiThreadProcessImages(const OfxRectI &procWindow, const OfxPointD &rs) OVERRIDE FINAL
     {
@@ -103,50 +200,12 @@ private:
             for (int x = procWindow.x1; x < procWindow.x2; ++x)
             {
                 const float *srcPix = (float *)_src->getPixelAddress(x, y);
-                Vector3f srcColor(srcPix);
-                if (!_inverse){
-                    switch(_toneResponseCurve)
-                    {
-                        case 0: // Linear
-                            break;
-                        case 1: // Gamma 2.2
-                            srcColor = inverse_gamma_correct(srcColor, 2.2);
-                            break;
-                        case 2: // Gamma 2.4
-                            srcColor = inverse_gamma_correct(srcColor, 2.4);
-                            break;
-                        case 3: // Gamma 2.6
-                            srcColor = inverse_gamma_correct(srcColor, 2.6);
-                            break;
-                        case 4: // sRGB
-                            srcColor = srgb_to_linear(srcColor);
-                            break;
-                    }
-                }
-
                 if (!srcPix) continue;
+
+                Vector3f srcColor = !_inverse ? inv_gamma_function(Vector3f(srcPix)) : Vector3f(srcPix);
                 Vector3f dstColor = _conversion_matrix * srcColor;
-                
-                if (_inverse){
-                    switch(_toneResponseCurve)
-                    {
-                        case 0: // Linear
-                            break;
-                        case 1: // Gamma 2.2
-                            dstColor = gamma_correct(dstColor, 2.2);
-                        break;
-                        case 2: // Gamma 2.4
-                            dstColor = gamma_correct(dstColor, 2.4);
-                        break;
-                        case 3: // Gamma 2.6
-                            dstColor = gamma_correct(dstColor, 2.6);
-                            break;
-                        case 4: // sRGB
-                            dstColor = linear_to_srgb(dstColor);
-                            break;
-                    }
-                }
-                
+                if(_inverse) dstColor = gamma_function(dstColor);
+
                 *dstPix++ = dstColor[0];
                 *dstPix++ = dstColor[1];
                 *dstPix++ = dstColor[2];
@@ -337,6 +396,8 @@ void CMSColorConversionPlugin::getClipPreferences(OFX::ClipPreferencesSetter &cl
     clipPreferences.setOutputHasContinuousSamples(true);
 }
 
+
+
 void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args, const std::string &paramName)
 {
     OpenCLBase::changedParamCL(this, args, paramName);
@@ -350,90 +411,19 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
 
     if (paramName == kPrimariesChoice){
         _toneResponseCurve->setEnabled(true);
+        _colorPrimariesGroup->setEnabled(true);
+
         int primaries = _primariesChoice->getValue();
         OfxPointD xy;
         _redPrimary->setEnabled(false);
         _greenPrimary->setEnabled(false);
         _bluePrimary->setEnabled(false);
         // Rec709
-        if (primaries == 0){
-            Chromaticities rec709d65 = rec709d65_primaries<double>;
-            _redPrimary->setValue(rec709d65.red_primaries().x(), rec709d65_primaries<float>.red_primaries().y());
-            _greenPrimary->setValue(rec709d65.green_primaries().x(), rec709d65.green_primaries().y());
-            _bluePrimary->setValue(rec709d65.blue_primaries().x(), rec709d65.blue_primaries().y());
-        }
-
-        // Rec2020
-        if (primaries == 1){
-            Chromaticities rec2020d65 = rec2020d65_primaries<double>;
-            _redPrimary->setValue(rec2020d65.red_primaries().x(), rec2020d65.red_primaries().y());
-            _greenPrimary->setValue(rec2020d65.green_primaries().x(), rec2020d65.green_primaries().y());
-            _bluePrimary->setValue(rec2020d65.blue_primaries().x(), rec2020d65.blue_primaries().y());
-        }
-
-        // P3
-        if (primaries == 2){
-            Chromaticities p3d65 = p3_display_primaries<double>;
-            _redPrimary->setValue(p3d65.red_primaries().x(), p3d65.red_primaries().y());
-            _greenPrimary->setValue(p3d65.green_primaries().x(), p3d65.green_primaries().y());
-            _bluePrimary->setValue(p3d65.blue_primaries().x(), p3d65.blue_primaries().y());
-        }
-
-        // Pal/Secam
-        if (primaries == 3){
-            Chromaticities bt601 = bt601_primaries<double>;
-            _redPrimary->setValue(bt601.red_primaries().x(), bt601.red_primaries().y());
-            _greenPrimary->setValue(bt601.green_primaries().x(), bt601.green_primaries().y());
-            _bluePrimary->setValue(bt601.blue_primaries().x(), bt601.blue_primaries().y());
-        }
-
-        // Wide Gamut RGB
-        if (primaries == 4){
-            Chromaticities widegamut = wide_gamut_rgb_primaries<double>;
-            _redPrimary->setValue(widegamut.red_primaries().x(), widegamut.red_primaries().y());
-            _greenPrimary->setValue(widegamut.green_primaries().x(), widegamut.green_primaries().y());
-            _bluePrimary->setValue(widegamut.blue_primaries().x(), widegamut.blue_primaries().y());
-        }
-
-        // Adobe RGB
-        if (primaries == 5){
-            Chromaticities adobe_rgb = adobe_rgb_primaries<double>;
-            _redPrimary->setValue(adobe_rgb.red_primaries().x(), adobe_rgb.red_primaries().y());
-            _greenPrimary->setValue(adobe_rgb.green_primaries().x(), adobe_rgb.green_primaries().y());
-            _bluePrimary->setValue(adobe_rgb.blue_primaries().x(), adobe_rgb.blue_primaries().y());
-        }
-
-        // ACES AP0
-        if (primaries == 6){
-            Chromaticities ap0_dreamcolor = ap0_primaries<double>;
-            _redPrimary->setValue(ap0_dreamcolor.red_primaries().x(), ap0_dreamcolor.red_primaries().y());
-            _greenPrimary->setValue(ap0_dreamcolor.green_primaries().x(), ap0_dreamcolor.green_primaries().y());
-            _bluePrimary->setValue(ap0_dreamcolor.blue_primaries().x(), ap0_dreamcolor.blue_primaries().y());
-        }
-
-        // ACES AP1
-        if (primaries == 7){
-            Chromaticities ap1_dreamcolor = ap1_primaries<double>;
-            _redPrimary->setValue(ap1_dreamcolor.red_primaries().x(), ap1_dreamcolor.red_primaries().y());
-            _greenPrimary->setValue(ap1_dreamcolor.green_primaries().x(), ap1_dreamcolor.green_primaries().y());
-            _bluePrimary->setValue(ap1_dreamcolor.blue_primaries().x(), ap1_dreamcolor.blue_primaries().y());
-        }
-
-        // HP Z27 DreamColor
-        if (primaries == 8){
-            Chromaticities hp_dreamcolor = hp_dreamcolor_g1_rgb_primaries<double>;
-            _redPrimary->setValue(hp_dreamcolor.red_primaries().x(), hp_dreamcolor.red_primaries().y());
-            _greenPrimary->setValue(hp_dreamcolor.green_primaries().x(), hp_dreamcolor.green_primaries().y());
-            _bluePrimary->setValue(hp_dreamcolor.blue_primaries().x(), hp_dreamcolor.blue_primaries().y());
-        }
-
-        
-        // HP Z27 DreamColor
-        if (primaries == 9){
-            Chromaticities hp_dreamcolor = hp_dreamcolor_g2_rgb_primaries<double>;
-            _redPrimary->setValue(hp_dreamcolor.red_primaries().x(), hp_dreamcolor.red_primaries().y());
-            _greenPrimary->setValue(hp_dreamcolor.green_primaries().x(), hp_dreamcolor.green_primaries().y());
-            _bluePrimary->setValue(hp_dreamcolor.blue_primaries().x(), hp_dreamcolor.blue_primaries().y());
+        if (primaries < 10){
+            Chromaticities choosen = ChromaList[primaries];
+            _redPrimary->setValue(choosen.red_primaries().x(), choosen.red_primaries().y());
+            _greenPrimary->setValue(choosen.green_primaries().x(), choosen.green_primaries().y());
+            _bluePrimary->setValue(choosen.blue_primaries().x(), choosen.blue_primaries().y());
         }
 
         // Chromatic Adaptation
@@ -443,6 +433,8 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
             _bluePrimary->setValue(0,0);
             _toneResponseCurve->setValue(0);
             _toneResponseCurve->setEnabled(false);
+            _colorPrimariesGroup->setOpen(false);
+            _colorPrimariesGroup->setEnabled(false);
         }
 
         if (primaries == 11){
@@ -450,6 +442,7 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
             _redPrimary->setEnabled(true);
             _greenPrimary->setEnabled(true);
             _bluePrimary->setEnabled(true);
+            _colorPrimariesGroup->setOpen(true);
         }
     }
 
@@ -457,33 +450,9 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         int wb = _srcWBChoice->getValue();
         _sourceWhitePoint->setEnabled(false);
         OfxPointD xy;
-        if (wb == 0){
+        if (wb < 7){
             // D50
-            _sourceWhitePoint->setValue(WP_D50<double>.x(), WP_D50<double>.y());
-        }
-        if (wb == 1){
-            // D65
-            _sourceWhitePoint->setValue(WP_D65<double>.x(), WP_D65<double>.y());
-        }
-        if (wb == 2){
-            // DCI P3
-            _sourceWhitePoint->setValue(WP_P3_DCI<double>.x(), WP_P3_DCI<double>.y());
-        }
-        if (wb == 3){
-            // ACES
-            _sourceWhitePoint->setValue(WP_ACES<double>.x(), WP_ACES<double>.y());
-        }
-        if (wb == 4){
-            // Illum E
-            _sourceWhitePoint->setValue(WP_ILLUM_E<double>.x(), WP_ILLUM_E<double>.y());
-        }
-        if (wb == 5){
-            // DreamColor Z27
-            _sourceWhitePoint->setValue(WP_DISPLAY_G1_DREAMCOLOR<double>.x(), WP_DISPLAY_G1_DREAMCOLOR<double>.y());
-        }
-        if (wb == 6){
-            // DreamColor Z27
-            _sourceWhitePoint->setValue(WP_DISPLAY_G2_DREAMCOLOR<double>.x(), WP_DISPLAY_G2_DREAMCOLOR<double>.y());
+            _sourceWhitePoint->setValue(WhitePointList[wb].x(), WhitePointList[wb].y());
         }
         if (wb == 7){
             // Custom
@@ -495,33 +464,9 @@ void CMSColorConversionPlugin::changedParam(const OFX::InstanceChangedArgs &args
         int wb = _tgtWBChoice->getValue();
         _destWhitePoint->setEnabled(false);
         OfxPointD xy;
-        if (wb == 0){
+        if (wb < 7){
             // D50
-            _destWhitePoint->setValue(WP_D50<double>.x(), WP_D50<double>.y());
-        }
-        if (wb == 1){
-            // D65
-            _destWhitePoint->setValue(WP_D65<double>.x(), WP_D65<double>.y());
-        }
-        if (wb == 2){
-            // DCI P3
-            _destWhitePoint->setValue(WP_P3_DCI<double>.x(), WP_P3_DCI<double>.y());
-        }
-        if (wb == 3){
-            // ACES
-            _destWhitePoint->setValue(WP_ACES<double>.x(), WP_ACES<double>.y());
-        }
-        if (wb == 4){
-            // Illum E
-            _sourceWhitePoint->setValue(WP_ILLUM_E<double>.x(), WP_ILLUM_E<double>.y());
-        }
-        if (wb == 5){
-            // DreamColor Z27
-            _destWhitePoint->setValue(WP_DISPLAY_G1_DREAMCOLOR<double>.x(), WP_DISPLAY_G1_DREAMCOLOR<double>.y());
-        }
-        if (wb == 6){
-            // DreamColor Z27
-            _destWhitePoint->setValue(WP_DISPLAY_G2_DREAMCOLOR<double>.x(), WP_DISPLAY_G2_DREAMCOLOR<double>.y());
+            _destWhitePoint->setValue(WhitePointList[wb].x(), WhitePointList[wb].y());
         }
         if (wb == 7){
             // Custom
@@ -568,9 +513,9 @@ bool CMSColorConversionPlugin::isIdentity(const OFX::IsIdentityArguments &/*args
 void setWPParam(OFX::ChoiceParamDescriptor* param)
 {
     param->appendOption("D50");
-    param->appendOption("D65");
-    param->appendOption("DCI-P3 (~6300K)");
     param->appendOption("D60 (ACES)");
+    param->appendOption("DCI-P3 (~6300K)");
+    param->appendOption("D65");
     param->appendOption("Illuminant E");
     param->appendOption("HP DreamColor Z27G1");
     param->appendOption("HP DreamColor Z27G2");
@@ -649,12 +594,22 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             }
         }
 
-        Chromaticities rec709d65 = rec709d65_primaries<double>;
+        OFX::GroupParamDescriptor* group = desc.defineGroupParam(kGroupPrimaries);
+        group->setLabel("Color primaries");
+        group->setEnabled(true);
+        group->setOpen(false);
+        if (page) {
+            page->addChild(*group);
+        }
+
         {
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kRedPrimaryParam);
             param->setLabel("Red primary");
             param->setHint("The XY coordinates of the red primary in the CIE 1931 color space");
-            param->setDefault(rec709d65.red_primaries().x(), rec709d65.red_primaries().y());
+            param->setDefault(ChromaList[0].red_primaries().x(), ChromaList[0].red_primaries().y());
+            if (group){
+                param->setParent(*group);
+            }
             if (page)
             {
                 page->addChild(*param);
@@ -665,7 +620,10 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kGreenPrimaryParam);
             param->setLabel("Green primary");
             param->setHint("The XY coordinates of the green primary in the CIE 1931 color space");
-            param->setDefault(rec709d65.green_primaries().x(), rec709d65.green_primaries().y());
+            param->setDefault(ChromaList[0].green_primaries().x(), ChromaList[0].green_primaries().y());
+            if (group){
+                param->setParent(*group);
+            }
             if (page)
             {
                 page->addChild(*param);
@@ -676,7 +634,10 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kBluePrimaryParam);
             param->setLabel("Blue primary");
             param->setHint("The XY coordinates of the blue primary in the CIE 1931 color space");
-            param->setDefault(rec709d65.blue_primaries().x(), rec709d65.blue_primaries().y());
+            param->setDefault(ChromaList[0].blue_primaries().x(), ChromaList[0].blue_primaries().y());
+            if (group){
+                param->setParent(*group);
+            }
             if (page)
             {
                 page->addChild(*param);

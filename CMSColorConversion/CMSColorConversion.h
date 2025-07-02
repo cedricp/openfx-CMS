@@ -40,6 +40,7 @@
 #define kChromaticAdaptationMethod "chomaticAdaptation"
 #define kToneResponseCurve "toneResponseCurve"
 #define kPrintMatrix "printMatrixOnTerminal"
+#define kGroupPrimaries "ColorPrimaries"
 
 template <class T> class Matrix3x3;
 typedef Matrix3x3<float> Matrix3x3f;
@@ -75,6 +76,7 @@ public:
         _chromaticAdaptationMethod = fetchChoiceParam(kChromaticAdaptationMethod);
         _toneResponseCurve = fetchChoiceParam(kToneResponseCurve);
         _printMatrix = fetchPushButtonParam(kPrintMatrix);
+        _colorPrimariesGroup = fetchGroupParam(kGroupPrimaries);
         std::string debayer_program = getPluginFilePath() + "/Contents/Resources/Shaders/imgutils.cl";
         addProgram(debayer_program, "imgutils");
 
@@ -112,6 +114,7 @@ private:
     OFX::BooleanParam *_chromaticAdaptationOnly;
     OFX::ChoiceParam *_toneResponseCurve;
     OFX::PushButtonParam* _printMatrix;
+    OFX::GroupParam* _colorPrimariesGroup;
 };
 
 class CMSColorConversionPluginFactory : public OFX::PluginFactoryHelper<CMSColorConversionPluginFactory>
