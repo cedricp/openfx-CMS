@@ -77,8 +77,8 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
     if(bufidx >= maxbuf) continue;
     const int xx = xul + bufidx % stride;
     const int yy = yul + bufidx / stride;
-    int val = read_imageui(in, sampleri, (int2)(xx, yy)).x;
-    buffer[bufidx] = fmax(0, (float)(val - black_level)) / scale;
+    unsigned int val = read_imageui(in, sampleri, (int2)(xx, yy)).x;
+    buffer[bufidx] = fmax(0.0f, (float)val - (float)black_level) / scale;
   }
 
   // center buffer around current x,y-Pixel
@@ -296,14 +296,14 @@ border_interpolate(read_only image2d_t in, write_only image2d_t out,
     if (j>=0 && i>=0 && j<height && i<width)
     {
       const int f = FC(j,i,filters);
-      int val = read_imageui(in, sampleri, (int2)(i, j)).x;
-      sum[f] += fmax(0, (float)(val - black_level)) / scale;
+      unsigned int val = read_imageui(in, sampleri, (int2)(i, j)).x;
+      sum[f] += fmax(0, (float)val - (float)black_level) / scale;
       count[f]++;
     }
   }
   
-  int val = read_imageui(in, sampleri, (int2)(x, y)).x;
-  const float i = fmax(0, (float)(val - black_level)) / scale;
+  unsigned int val = read_imageui(in, sampleri, (int2)(x, y)).x;
+  const float i = fmax(0, (float)val - (float)black_level) / scale;
 
   o.x = count[0] > 0 ? sum[0]/(float)count[0] : i;
   o.y = count[1]+count[3] > 0 ? (sum[1]+sum[3])/(float)(count[1]+count[3]) : i;
