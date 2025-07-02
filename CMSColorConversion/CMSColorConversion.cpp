@@ -649,11 +649,12 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             }
         }
 
+        Chromaticities rec709d65 = rec709d65_primaries<double>;
         {
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kRedPrimaryParam);
             param->setLabel("Red primary");
             param->setHint("The XY coordinates of the red primary in the CIE 1931 color space");
-            param->setDefault(0.64, 0.33);
+            param->setDefault(rec709d65.red_primaries().x(), rec709d65.red_primaries().y());
             if (page)
             {
                 page->addChild(*param);
@@ -664,7 +665,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kGreenPrimaryParam);
             param->setLabel("Green primary");
             param->setHint("The XY coordinates of the green primary in the CIE 1931 color space");
-            param->setDefault(0.30, 0.60);
+            param->setDefault(rec709d65.green_primaries().x(), rec709d65.green_primaries().y());
             if (page)
             {
                 page->addChild(*param);
@@ -675,7 +676,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kBluePrimaryParam);
             param->setLabel("Blue primary");
             param->setHint("The XY coordinates of the blue primary in the CIE 1931 color space");
-            param->setDefault(0.15, 0.06);
+            param->setDefault(rec709d65.blue_primaries().x(), rec709d65.blue_primaries().y());
             if (page)
             {
                 page->addChild(*param);
