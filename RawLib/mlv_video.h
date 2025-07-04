@@ -21,6 +21,8 @@ public:
 		bool darkframe_enable = false;
 		bool darkframe_ok = false;
 		std::string darkframe_error;
+		int color_aberration_correction = 0;
+		int color_aberration_radius = 0;
 	};
 	mlv_imp* _imp = NULL;
 private:

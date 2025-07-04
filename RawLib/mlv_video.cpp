@@ -5,6 +5,7 @@ extern "C"{
 	#include "llrawproc/llrawproc.h"
 	#include "audio_mlv.h"
 	#include <camid/camera_id.h>
+	#include <color_aberration/ColorAberrationCorrection.h>
 }
 #include <string.h>
 #include <algorithm>

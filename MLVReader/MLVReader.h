@@ -55,6 +55,9 @@
 #define kBpp "bpp"
 #define kUseSpectralIdt "useSpectralIdt"
 #define kResetLevels "resetLevels"
+#define kCACorrectionThreshold "cacorrection_threshold"
+#define kCACorrectionRadius "cacorrection_radius"
+#define kGroupColorAberration "groupColorAberration"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -102,6 +105,9 @@ public:
         _bpp = fetchIntParam(kBpp);
         _useSpectralIdt = fetchBooleanParam(kUseSpectralIdt);
         _resetLevels = fetchBooleanParam(kResetLevels);
+        _cacorrection_threshold = fetchDoubleParam(kCACorrectionThreshold);
+        _cacorrection_radius = fetchIntParam(kCACorrectionRadius);
+
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
         _gThreadHost->mutexCreate(&_idtMutex, 0);
@@ -180,6 +186,8 @@ private:
     OFX::IntParam* _whiteLevel;
     OFX::IntParam* _bpp;
     OFX::BooleanParam* _resetLevels;
+    OFX::DoubleParam* _cacorrection_threshold;
+    OFX::IntParam* _cacorrection_radius;
     Matrix3x3f _idt;
     Vector3f _asShotNeutral;
     float _wbcompensation;
