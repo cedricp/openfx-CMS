@@ -25,7 +25,9 @@
 #include <RawLib/idt/dng_idt.h>
 #include <RawLib/idt/spectral_idt.h>
 #include <RawLib/idt/define.h>
-
+extern "C" {
+#include <RawLib/color_aberration/ColorAberrationCorrection.h>
+}
 #include <cmath>
 #include <climits>
 #include <cfloat>
@@ -305,6 +307,13 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             
         } else {
             renderCPU(args, dst.get(), mlv_video, time, mlv_height, mlv_width);
+        }
+
+        float cacorrection_threshold = _cacorrection_threshold->getValue();
+        if(cacorrection_threshold < 1.0){
+            uint8_t cacorrection_radius = (uint8_t)_cacorrection_radius->getValue();
+            // Apply color aberration correction
+            CACorrection(width_img, height_img, (float*)dst.get()->getPixelData(), cacorrection_threshold / 100., cacorrection_radius);
         }
     }
     mlv_video->unlock();
@@ -890,6 +899,49 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setRange(2800, 8000);
         param->setDisplayRange(2800, 8000);
         param->setDefault(6500);
+        if (page_colors)
+        {
+            page_colors->addChild(*param);
+        }
+    }
+
+
+    OFX::GroupParamDescriptor* group = desc.defineGroupParam(kGroupColorAberration);
+    group->setLabel("Color aberration correction");
+    group->setEnabled(true);
+    group->setOpen(false);
+    if (page_colors) {
+        page_colors->addChild(*group);
+    }
+    
+    {
+        OFX::DoubleParamDescriptor *param = desc.defineDoubleParam(kCACorrectionThreshold);
+        param->setLabel("CA Correction Threshold");
+        param->setHint("Chromatic Aberration Correction Threshold (1.0 disables correction)");
+        param->setRange(0.0, 1.0);
+        param->setDisplayRange(0.0, 1.0);
+        param->setDefault(1.0);
+        if (group)
+        {
+            param->setParent(*group);
+        }
+        if (page_colors)
+        {
+            page_colors->addChild(*param);
+        }
+    }
+
+    {
+        OFX::IntParamDescriptor *param = desc.defineIntParam(kCACorrectionRadius);
+        param->setLabel("CA Correction Radius");
+        param->setHint("Chromatic Aberration Correction Radius");
+        param->setRange(0, 20);
+        param->setDisplayRange(0, 20);
+        param->setDefault(0);
+        if (group)
+        {
+            param->setParent(*group);
+        }
         if (page_colors)
         {
             page_colors->addChild(*param);
