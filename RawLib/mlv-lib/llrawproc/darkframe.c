@@ -52,20 +52,22 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
     /* If file name is not set return error */
     if(!video->llrawproc->dark_frame_filename) return 1;
     /* Parse dark frame MLV */
-    mlvObject_t df_mlv = { 0 };
+    mlvObject_t * df_mlv = initMlvObject();
+    
     char err_msg[256] = { 0 };
-    int ret = openMlvClip(&df_mlv, video->llrawproc->dark_frame_filename, 2, err_msg);
+    int ret = openMlvClip(df_mlv, video->llrawproc->dark_frame_filename, err_msg);
     if(ret != 0)
     {
 #ifndef STDOUT_SILENT
         printf("DF: %s\n", err_msg);
 #endif
         if(error_message != NULL) strcpy(error_message, err_msg);
+        freeMlvObject(df_mlv, 0);
         return ret;
     }
 
     /* if lossless MLV return error */
-    if(df_mlv.MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)
+    if(df_mlv->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)
     {
         sprintf(err_msg, "Can not use lossless MLV as a dark frame:\n\n%s", video->llrawproc->dark_frame_filename);
 #ifndef STDOUT_SILENT
@@ -73,11 +75,11 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
 #endif
         if(error_message != NULL) strcpy(error_message, err_msg);
         /* Close darkframe MLV */
-        df_unload( df_mlv.file, df_mlv.filenum );
+        df_unload( df_mlv->file, df_mlv->filenum );
         return 1;
     }
     /* if resolution mismatch detected */
-    if( (df_mlv.RAWI.xRes != video->RAWI.xRes) || (df_mlv.RAWI.yRes != video->RAWI.yRes) )
+    if( (df_mlv->RAWI.xRes != video->RAWI.xRes) || (df_mlv->RAWI.yRes != video->RAWI.yRes) )
     {
         sprintf(err_msg, "Video clip and dark frame resolutions have not matched:\n\n%s", video->llrawproc->dark_frame_filename);
 #ifndef STDOUT_SILENT
@@ -85,11 +87,11 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
 #endif
         if(error_message != NULL) strcpy(error_message, err_msg);
         /* Close darkframe MLV */
-        df_unload( df_mlv.file, df_mlv.filenum );
+        df_unload( df_mlv->file, df_mlv->filenum );
         return 1;
     }
     /* if MLV has more than one frame just show the warning */
-    if( df_mlv.MLVI.videoFrameCount > 1 )
+    if( df_mlv->MLVI.videoFrameCount > 1 )
     {
         sprintf(err_msg, "For proper use as a dark frame all frames of this MLV have to be averaged first:\n\n%s", video->llrawproc->dark_frame_filename);
 #ifndef STDOUT_SILENT
@@ -99,7 +101,7 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
     }
 
     /* Allocate dark frame data buffer */
-    uint8_t * df_packed_buf = calloc(df_mlv.video_index[0].frame_size, 1);
+    uint8_t * df_packed_buf = calloc(df_mlv->video_index[0].frame_size, 1);
     if(!df_packed_buf)
     {
         sprintf(err_msg, "Packed buffer allocation error");
@@ -108,60 +110,57 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
 #endif
         if(error_message != NULL) strcpy(error_message, err_msg);
         /* Close darkframe MLV */
-        df_unload( df_mlv.file, df_mlv.filenum );
+        if(error_message != NULL) strcpy(error_message, err_msg);
+        freeMlvObject(df_mlv, 0);
         return 1;
     }
     /* Load dark frame data to the allocated buffer */
-    file_set_pos(df_mlv.file[0], df_mlv.video_index[0].frame_offset, SEEK_SET);
-    if ( fread(df_packed_buf, df_mlv.video_index[0].frame_size, 1, df_mlv.file[0]) != 1 )
+    file_set_pos(df_mlv->file[0], df_mlv->video_index[0].frame_offset, SEEK_SET);
+    if ( fread(df_packed_buf, df_mlv->video_index[0].frame_size, 1, df_mlv->file[0]) != 1 )
     {
         sprintf(err_msg, "Could not read dark frame from the file:\n\n%s", video->llrawproc->dark_frame_filename);
 #ifndef STDOUT_SILENT
         printf("DF: %s\n", err_msg);
 #endif
         if(error_message != NULL) strcpy(error_message, err_msg);
-        free(df_packed_buf);
-        /* Close darkframe MLV */
-        df_unload( df_mlv.file, df_mlv.filenum );
+        freeMlvObject(df_mlv, 0);
         return 1;
     }
     /* Free all data related to the dark frame if needed */
-    df_free(video);
     /* Fill DARK block header */
     memcpy(&video->llrawproc->dark_frame_hdr.blockType, "DARK", 4);
-    video->llrawproc->dark_frame_hdr.blockSize = sizeof(mlv_dark_hdr_t) + df_mlv.video_index[0].frame_size;
+    video->llrawproc->dark_frame_hdr.blockSize = sizeof(mlv_dark_hdr_t) + df_mlv->video_index[0].frame_size;
     video->llrawproc->dark_frame_hdr.timestamp = 0xFFFFFFFFFFFFFFFF;
-    video->llrawproc->dark_frame_hdr.samplesAveraged = MAX(df_mlv.VIDF.frameNumber + 1, df_mlv.MLVI.videoFrameCount);
-    video->llrawproc->dark_frame_hdr.cameraModel = df_mlv.IDNT.cameraModel;
-    video->llrawproc->dark_frame_hdr.xRes = df_mlv.RAWI.xRes;
-    video->llrawproc->dark_frame_hdr.yRes = df_mlv.RAWI.yRes;
-    video->llrawproc->dark_frame_hdr.rawWidth = df_mlv.RAWI.raw_info.width;
-    video->llrawproc->dark_frame_hdr.rawHeight = df_mlv.RAWI.raw_info.height;
-    video->llrawproc->dark_frame_hdr.bits_per_pixel = df_mlv.RAWI.raw_info.bits_per_pixel;
-    video->llrawproc->dark_frame_hdr.black_level = df_mlv.RAWI.raw_info.black_level;
-    video->llrawproc->dark_frame_hdr.white_level = df_mlv.RAWI.raw_info.white_level;
-    video->llrawproc->dark_frame_hdr.sourceFpsNom = df_mlv.MLVI.sourceFpsNom;
-    video->llrawproc->dark_frame_hdr.sourceFpsDenom = df_mlv.MLVI.sourceFpsDenom;
-    video->llrawproc->dark_frame_hdr.isoMode = df_mlv.EXPO.isoMode;
-    video->llrawproc->dark_frame_hdr.isoValue = df_mlv.EXPO.isoValue;
-    video->llrawproc->dark_frame_hdr.isoAnalog = df_mlv.EXPO.isoAnalog;
-    video->llrawproc->dark_frame_hdr.digitalGain = df_mlv.EXPO.digitalGain;
-    video->llrawproc->dark_frame_hdr.shutterValue = df_mlv.EXPO.shutterValue;
-    video->llrawproc->dark_frame_hdr.binning_x = df_mlv.RAWC.binning_x;
-    video->llrawproc->dark_frame_hdr.skipping_x = df_mlv.RAWC.skipping_x;
-    video->llrawproc->dark_frame_hdr.binning_y = df_mlv.RAWC.binning_y;
-    video->llrawproc->dark_frame_hdr.skipping_y = df_mlv.RAWC.skipping_y;
+    video->llrawproc->dark_frame_hdr.samplesAveraged = MAX(df_mlv->VIDF.frameNumber + 1, df_mlv->MLVI.videoFrameCount);
+    video->llrawproc->dark_frame_hdr.cameraModel = df_mlv->IDNT.cameraModel;
+    video->llrawproc->dark_frame_hdr.xRes = df_mlv->RAWI.xRes;
+    video->llrawproc->dark_frame_hdr.yRes = df_mlv->RAWI.yRes;
+    video->llrawproc->dark_frame_hdr.rawWidth = df_mlv->RAWI.raw_info.width;
+    video->llrawproc->dark_frame_hdr.rawHeight = df_mlv->RAWI.raw_info.height;
+    video->llrawproc->dark_frame_hdr.bits_per_pixel = df_mlv->RAWI.raw_info.bits_per_pixel;
+    video->llrawproc->dark_frame_hdr.black_level = df_mlv->RAWI.raw_info.black_level;
+    video->llrawproc->dark_frame_hdr.white_level = df_mlv->RAWI.raw_info.white_level;
+    video->llrawproc->dark_frame_hdr.sourceFpsNom = df_mlv->MLVI.sourceFpsNom;
+    video->llrawproc->dark_frame_hdr.sourceFpsDenom = df_mlv->MLVI.sourceFpsDenom;
+    video->llrawproc->dark_frame_hdr.isoMode = df_mlv->EXPO.isoMode;
+    video->llrawproc->dark_frame_hdr.isoValue = df_mlv->EXPO.isoValue;
+    video->llrawproc->dark_frame_hdr.isoAnalog = df_mlv->EXPO.isoAnalog;
+    video->llrawproc->dark_frame_hdr.digitalGain = df_mlv->EXPO.digitalGain;
+    video->llrawproc->dark_frame_hdr.shutterValue = df_mlv->EXPO.shutterValue;
+    video->llrawproc->dark_frame_hdr.binning_x = df_mlv->RAWC.binning_x;
+    video->llrawproc->dark_frame_hdr.skipping_x = df_mlv->RAWC.skipping_x;
+    video->llrawproc->dark_frame_hdr.binning_y = df_mlv->RAWC.binning_y;
+    video->llrawproc->dark_frame_hdr.skipping_y = df_mlv->RAWC.skipping_y;
     /* Allocate the dark frame 16bit buffer */
-    video->llrawproc->dark_frame_size = df_mlv.RAWI.xRes * df_mlv.RAWI.yRes * 2;
+    video->llrawproc->dark_frame_size = df_mlv->RAWI.xRes * df_mlv->RAWI.yRes * 2;
     video->llrawproc->dark_frame_data = calloc(video->llrawproc->dark_frame_size + 4, 1);
-    dng_unpack_image_bits(video->llrawproc->dark_frame_data, (uint16_t*)df_packed_buf, df_mlv.RAWI.xRes, df_mlv.RAWI.yRes, df_mlv.RAWI.raw_info.bits_per_pixel);
+    dng_unpack_image_bits(video->llrawproc->dark_frame_data, (uint16_t*)df_packed_buf, df_mlv->RAWI.xRes, df_mlv->RAWI.yRes, df_mlv->RAWI.raw_info.bits_per_pixel);
 #ifndef STDOUT_SILENT
     printf("DF: initialized Ext mode\n");
 #endif
     free(df_packed_buf);
 
-    /* Close darkframe MLV */
-    df_unload( df_mlv.file, df_mlv.filenum );
+    freeMlvObject(df_mlv, 0);
 
     return 0;
 }
@@ -239,7 +238,7 @@ void df_subtract(mlvObject_t * video, uint16_t * raw_image_buff, size_t raw_imag
     uint16_t white_level = (1 << video->RAWI.raw_info.bits_per_pixel) - 1;
 
     uint32_t pixel_count = raw_image_size / 2;
-#pragma omp parallel for
+//#pragma omp parallel for
     for(uint32_t i = 0; i < pixel_count; i++)
     {
         int32_t orig_val = raw_image_buff[i];
@@ -255,8 +254,7 @@ int df_validate(mlvObject_t * video, const char * df_filename, char * error_mess
     df_init_filename(video, df_filename);
     int ret = df_load_ext(video, error_message);
     df_free_filename(video);
-    df_free(video);
-
+    
     return ret;
 }
 

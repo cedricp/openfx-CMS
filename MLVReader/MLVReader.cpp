@@ -313,7 +313,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         if(cacorrection_threshold < 1.0){
             uint8_t cacorrection_radius = (uint8_t)_cacorrection_radius->getValue();
             // Apply color aberration correction
-            CACorrection(width_img, height_img, (float*)dst.get()->getPixelData(), cacorrection_threshold / 100., cacorrection_radius);
+            CACorrection(width_img, height_img, (float*)dst.get()->getPixelData(), cacorrection_threshold, cacorrection_radius);
         }
     }
     mlv_video->unlock();
@@ -856,17 +856,6 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
     }
 
-    {
-        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kUseSpectralIdt);
-        param->setLabel("Use spectral IDT");
-        param->setHint("Use spectral sensitivities IDT (AP0 only)");
-        param->setDefault(false);
-        if (page_colors)
-        {
-            page_colors->addChild(*param);
-        }
-    }  
-
     { 
         // raw, sRGB, Adobe, Wide, ProPhoto, XYZ, ACES, DCI-P3, Rec. 2020
         OFX::ChoiceParamDescriptor* param = desc.defineChoiceParam(kHighlightMode);
@@ -881,11 +870,40 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
     }
 
+    OFX::GroupParamDescriptor* WBgroup = desc.defineGroupParam(kGroupWhiteBalance);
+    WBgroup->setLabel("White balance");
+    WBgroup->setHint("White balance parameters");
+    WBgroup->setEnabled(true);
+    WBgroup->setOpen(true);
+    if (page_colors) {
+        page_colors->addChild(*WBgroup);
+    }
+
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kUseSpectralIdt);
+        param->setLabel("Use spectral IDT");
+        param->setHint("Use spectral sensitivities IDT (AP0 only)");
+        param->setDefault(false);
+        if (WBgroup)
+        {
+            param->setParent(*WBgroup);
+        }
+        if (page_colors)
+        {
+            page_colors->addChild(*param);
+        }
+    }  
+
+
     {
         OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kCameraWhiteBalance);
         param->setLabel("Camera white balance");
         param->setHint("Use camera white balance (if disabled, use the color temperature slider)");
         param->setDefault(true);
+        if (WBgroup)
+        {
+            param->setParent(*WBgroup);
+        }
         if (page_colors)
         {
             page_colors->addChild(*param);
@@ -899,6 +917,10 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setRange(2800, 8000);
         param->setDisplayRange(2800, 8000);
         param->setDefault(6500);
+        if (WBgroup)
+        {
+            param->setParent(*WBgroup);
+        }
         if (page_colors)
         {
             page_colors->addChild(*param);
@@ -908,6 +930,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
 
     OFX::GroupParamDescriptor* group = desc.defineGroupParam(kGroupColorAberration);
     group->setLabel("Color aberration correction");
+    group->setHint("Color aberration correction parameters (Useful in 3x3 pixel binning mode)");
     group->setEnabled(true);
     group->setOpen(false);
     if (page_colors) {

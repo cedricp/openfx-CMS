@@ -292,7 +292,7 @@ void CMSColorConversionPlugin::render(const OFX::RenderArguments &args)
     const double time = args.time;
     OFX::PixelComponentEnum srcComponents = _inputClip->getPixelComponents();
 
-    assert(OFX_COMPONENTS_OK(dstComponents));
+    //assert(OFX_COMPONENTS_OK(dstComponents));
 
     // checkComponents(dstBitDepth, dstComponents);
 

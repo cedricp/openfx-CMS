@@ -58,6 +58,7 @@
 #define kCACorrectionThreshold "cacorrection_threshold"
 #define kCACorrectionRadius "cacorrection_radius"
 #define kGroupColorAberration "groupColorAberration"
+#define kGroupWhiteBalance "groupWhiteBalance"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 

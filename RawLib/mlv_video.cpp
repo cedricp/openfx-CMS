@@ -5,7 +5,6 @@ extern "C"{
 	#include "llrawproc/llrawproc.h"
 	#include "audio_mlv.h"
 	#include <camid/camera_id.h>
-	#include <color_aberration/ColorAberrationCorrection.h>
 }
 #include <string.h>
 #include <algorithm>
@@ -349,17 +348,33 @@ void Mlv_video::low_level_process(RawInfo& ri)
 
 	char error_msg[128];
 	if (ri.darkframe_enable){
-		llrpSetDarkFrameMode(&mlvob, 1);
-		if( llrpValidateExtDarkFrame(&mlvob, ri.darkframe_file.c_str(), error_msg) == 0 ){
-			llrpInitDarkFrameExtFileName(&mlvob, ri.darkframe_file.c_str());
+		// Avoid reloading the dark frame if it is already set
+		printf("Dark frame file: %s %s\n", ri.darkframe_file.c_str(), mlvob.llrawproc->dark_frame_filename);
+		if (!ri.darkframe_file.empty() && mlvob.llrawproc->dark_frame_filename != NULL && strcmp(ri.darkframe_file.c_str(), mlvob.llrawproc->dark_frame_filename) == 0 && mlvob.llrawproc->dark_frame_data != NULL){
 			ri.darkframe_ok = true;
-			ri.darkframe_error = error_msg;
+			llrpSetDarkFrameMode(&mlvob, 1);
 		} else {
-			ri.darkframe_ok = false;
-			ri.darkframe_error.clear();
+			if( llrpValidateExtDarkFrame(&mlvob, ri.darkframe_file.c_str(), error_msg) == 0 ){
+				llrpSetDarkFrameMode(&mlvob, 1);
+				llrpInitDarkFrameExtFileName(&mlvob, ri.darkframe_file.c_str());
+				ri.darkframe_ok = true;
+				ri.darkframe_error = error_msg;
+			} else {
+				llrpSetDarkFrameMode(&mlvob, 0);
+				if (mlvob.llrawproc->dark_frame_data != NULL){
+					free(mlvob.llrawproc->dark_frame_data);
+					mlvob.llrawproc->dark_frame_data = NULL;
+				}
+				ri.darkframe_ok = false;
+				ri.darkframe_error.clear();
+			}
 		}
 	} else {
 		llrpSetDarkFrameMode(&mlvob, 0);
+		if (mlvob.llrawproc->dark_frame_data != NULL){
+			free(mlvob.llrawproc->dark_frame_data);
+			mlvob.llrawproc->dark_frame_data = NULL;
+		}
 		ri.darkframe_error.clear();        
 	}
 

@@ -170,7 +170,7 @@ void applyLLRawProcObject(mlvObject_t * video, uint16_t * raw_image_buff, size_t
     if(!video->llrawproc->fix_raw) return;
 
     /* subtruct dark frame if Ext or Int mode specified and df_init is successful */
-    if (!df_init(video))
+    if (video->llrawproc->dark_frame_data)//!df_init(video))
     {
 #ifndef STDOUT_SILENT
         printf("Subtracting Dark Frame... ");
