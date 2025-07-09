@@ -50,6 +50,8 @@ public:
 	uint16_t* get_raw_image();
 	uint16_t* postprocecessed_raw_buffer();
 
+	void destroy_darkframe_data();
+
 
 	uint32_t black_level();
 	uint32_t white_level();

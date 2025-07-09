@@ -724,7 +724,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         } 
     }
 
-    if (paramName == kDarkFrameButon){
+    if (paramName == kDarkFrameButton){
         int sf = _darkframeRange->getValue().x;
         int ef = _darkframeRange->getValue().y;
         if (sf >= ef) return;
@@ -739,6 +739,16 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
             mlv_video->generate_darkframe(filename.c_str(), sf, ef);
             mlv_video->unlock();
         }
+
+        for (auto &mlv : _mlv_video){
+            // Wait for the videostream to be released by renderer
+            while (mlv->locked()) {Sleep(100);}
+            // Destroy darkframe data on all streams
+            mlv->destroy_darkframe_data();
+        }
+        // This is the only way I found to invalidate the playback cache
+        _enableDarkFrame->setValue(false);
+        _enableDarkFrame->setValue(true);
     }
 
     if (paramName == kDualIso){
@@ -1179,7 +1189,7 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     }
     
     {
-        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kDarkFrameButon);
+        OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kDarkFrameButton);
         param->setLabel("Generate darkframe");
         param->setHint("Launch darkframe generation");
         if (DFgroup)

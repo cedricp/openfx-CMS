@@ -49,7 +49,7 @@
 #define kAudioExport "audioExport"
 #define kDarkFrameEnable "darkFrameEnable"
 #define kDarkframefilename "darkframeFilename"
-#define kDarkFrameButon "darkFrameButton"
+#define kDarkFrameButton "darkFrameButton"
 #define kDarkframeRange "darkframeRange"
 #define kBlackLevel "blackLevel"
 #define kWhiteLevel "whiteLevel"
@@ -84,7 +84,7 @@ public:
     MLVReaderPlugin(OfxImageEffectHandle handle) : OpenCLBase(handle)
     {
         _outputClip = fetchClip(kOfxImageEffectOutputClipName);
-        _darkFrameButton = fetchPushButtonParam(kDarkFrameButon);
+        _darkFrameButton = fetchPushButtonParam(kDarkFrameButton);
         _mlv_darkframefilename = fetchStringParam(kDarkframefilename);
         _darkframeRange = fetchInt2DParam(kDarkframeRange);
         _mlvfilename_param = fetchStringParam(kMLVfileParamter);

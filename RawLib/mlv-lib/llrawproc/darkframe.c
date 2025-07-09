@@ -53,6 +53,11 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
     if(!video->llrawproc->dark_frame_filename) return 1;
     /* Parse dark frame MLV */
     mlvObject_t * df_mlv = initMlvObject();
+
+    if (video->llrawproc->dark_frame_data){
+        free(video->llrawproc->dark_frame_data);
+        video->llrawproc->dark_frame_data = NULL;
+    }
     
     char err_msg[256] = { 0 };
     int ret = openMlvClip(df_mlv, video->llrawproc->dark_frame_filename, err_msg);

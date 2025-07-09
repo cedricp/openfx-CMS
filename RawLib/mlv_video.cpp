@@ -148,7 +148,6 @@ void Mlv_video::get_baseline_exposure(int32_t& min, int32_t& max)
 
 bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out)
 {
-
 	char error_message[256] = { 0 };
 	FILE* mlv_file = fopen(path, "wb");
 	mlvObject_t* video = _imp->mlv_object;
@@ -192,7 +191,7 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 		free(block_buf);
 		return false;
 	}
-	
+
 	saveMlvHeaders(video, mlv_file, 0, MLV_AVERAGED_FRAME, frame_in, frame_out, "1.0", error_message);
 
 	for (int i = frame_in; i < frame_out; ++i){
@@ -279,6 +278,16 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 	free(frame_buf);
 	free(block_buf);
 	return true;
+}
+
+void Mlv_video::destroy_darkframe_data()
+{
+	mlvObject_t* mlv = _imp->mlv_object;
+	if (mlv->llrawproc->dark_frame_data != NULL)
+	{
+		free(mlv->llrawproc->dark_frame_data);
+		mlv->llrawproc->dark_frame_data = NULL;
+	}
 }
 
 void Mlv_video::write_audio(std::string path)
