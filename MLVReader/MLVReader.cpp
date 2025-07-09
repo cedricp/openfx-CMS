@@ -290,6 +290,11 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             }
         }
     } else {
+        bool darkframe_fileok = std::filesystem::exists(_mlv_darkframefilename->getValue());
+        _enableDarkFrame->setEnabled(darkframe_fileok);
+        if (!darkframe_fileok){
+            _enableDarkFrame->setValue(false);
+        }
         // Common code for CPU and OpenCL
         Mlv_video::RawInfo rawInfo;
         rawInfo.dual_iso_mode = _dualIsoMode->getValue();
@@ -299,7 +304,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
         rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
         rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
-        rawInfo.darkframe_enable = std::filesystem::exists(rawInfo.darkframe_file);
+        rawInfo.darkframe_enable = darkframe_fileok && _enableDarkFrame->getValue() == true;
         mlv_video->low_level_process(rawInfo);
 
         if (getUseOpenCL()){
@@ -1117,6 +1122,30 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         }
     }
 
+    OFX::GroupParamDescriptor* DFgroup = desc.defineGroupParam(kGroupDarkFrame);
+    DFgroup->setLabel("Dark frame");
+    DFgroup->setHint("Dark frame parameters");
+    DFgroup->setEnabled(true);
+    DFgroup->setOpen(false);
+    if (page_raw) {
+        page_raw->addChild(*DFgroup);
+    }
+
+    {
+        OFX::BooleanParamDescriptor *param = desc.defineBooleanParam(kDarkFrameEnable);
+        param->setLabel("Use darkframe");
+        param->setHint("Use darkframe for noise reduction");
+        param->setDefault(false);
+        if (DFgroup)
+        {
+            param->setParent(*DFgroup);
+        }
+        if (page_raw)
+        {
+            page_raw->addChild(*param);
+        }
+    }
+
     {
         OFX::StringParamDescriptor *param = desc.defineStringParam(kDarkframefilename);
         param->setLabel("Darkframe Filename");
@@ -1124,6 +1153,10 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setDefault("darkframe.mlv");
         param->setFilePathExists(true);
         param->setStringType(OFX::eStringTypeFilePath);
+        if (DFgroup)
+        {
+            param->setParent(*DFgroup);
+        }
         if (page_raw)
         {
             page_raw->addChild(*param);
@@ -1135,6 +1168,10 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->setLabel("Darkframe frame range");
         param->setHint("Darkframe export frame range");
         param->setDefault(0,0);
+        if (DFgroup)
+        {
+            param->setParent(*DFgroup);
+        }
         if (page_raw)
         {
             page_raw->addChild(*param);
@@ -1144,7 +1181,11 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
     {
         OFX::PushButtonParamDescriptor *param = desc.definePushButtonParam(kDarkFrameButon);
         param->setLabel("Generate darkframe");
-        param->setHint("Lauch darkframe generation");
+        param->setHint("Launch darkframe generation");
+        if (DFgroup)
+        {
+            param->setParent(*DFgroup);
+        }
         if (page_raw)
         {
             page_raw->addChild(*param);

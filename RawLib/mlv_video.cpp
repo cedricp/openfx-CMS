@@ -153,6 +153,8 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 	FILE* mlv_file = fopen(path, "wb");
 	mlvObject_t* video = _imp->mlv_object;
 
+	printf("Averaging frames %d to %d from MLV file: %s\n", frame_in, frame_out, video->path);
+
  	uint64_t* avg_buf = (uint64_t *)calloc( video->RAWI.xRes * video->RAWI.yRes * sizeof( uint64_t ), 1 );
 
     mlv_vidf_hdr_t vidf_hdr = { 0 };
@@ -160,9 +162,37 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
     uint32_t pixel_count = video->RAWI.xRes * video->RAWI.yRes;
     uint32_t frame_size_packed = (uint32_t)(pixel_count * video->RAWI.raw_info.bits_per_pixel / 8);
     uint32_t frame_size_unpacked = pixel_count * 2;
-    uint32_t max_frame_number = frame_in - frame_out + 1;
+    uint32_t max_frame_number = frame_out - frame_in + 1;
 
+	uint16_t * frame_buf_unpacked = (uint16_t*)calloc(frame_size_unpacked, 1);
+	if(!frame_buf_unpacked)
+	{
+		sprintf(error_message, "Averaging: could not allocate memory for unpacked frame");
+		printf("\n%s\n", error_message);
+		free(avg_buf);
+		return false;
+	}
 
+	/* for safety allocate max possible size buffer for VIDF block, calculated for 16bits per pixel */
+	uint8_t * block_buf = (uint8_t*)calloc(sizeof(mlv_vidf_hdr_t) + frame_size_unpacked, 1);
+	if(!block_buf)
+	{
+		sprintf(error_message, "Could not allocate memory for VIDF block");
+		printf("\n%s\n", error_message);
+		free(frame_buf_unpacked);
+		free(avg_buf);
+		return false;
+	}
+	/* for safety allocate max possible size buffer for image data, calculated for 16bits per pixel */
+	uint8_t * frame_buf = (uint8_t*)calloc(frame_size_unpacked, 1);
+	if(!frame_buf)
+	{
+		sprintf(error_message, "Could not allocate memory for VIDF frame");
+		printf("\n%s\n", error_message);
+		free(block_buf);
+		return false;
+	}
+	
 	saveMlvHeaders(video, mlv_file, 0, MLV_AVERAGED_FRAME, frame_in, frame_out, "1.0", error_message);
 
 	for (int i = frame_in; i < frame_out; ++i){
@@ -170,35 +200,22 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 		uint32_t frame_size = video->video_index[i].frame_size;
 		uint64_t frame_offset = video->video_index[i].frame_offset;
 		uint64_t block_offset = video->video_index[i].block_offset;
-		    /* read VIDF block header */
+		/* read VIDF block header */
 		fseek(video->file[chunk], block_offset, SEEK_SET);
 		if(fread(&vidf_hdr, sizeof(mlv_vidf_hdr_t), 1, video->file[chunk]) != 1)
 		{
 			sprintf(error_message, "Could not read VIDF block header from:  %s", video->path);
 			printf("\n%s\n", error_message);
+			free(frame_buf);
+			free(block_buf);
+			free(frame_buf_unpacked);
+			free(avg_buf);
 			return false;
 		}
 
 		vidf_hdr.blockSize -= vidf_hdr.frameSpace;
 		vidf_hdr.frameSpace = 0;
 
-		/* for safety allocate max possible size buffer for VIDF block, calculated for 16bits per pixel */
-		uint8_t * block_buf = (uint8_t*)calloc(sizeof(mlv_vidf_hdr_t) + frame_size_unpacked, 1);
-		if(!block_buf)
-		{
-			sprintf(error_message, "Could not allocate memory for VIDF block");
-			printf("\n%s\n", error_message);
-			return false;
-		}
-		/* for safety allocate max possible size buffer for image data, calculated for 16bits per pixel */
-		uint8_t * frame_buf = (uint8_t*)calloc(frame_size_unpacked, 1);
-		if(!frame_buf)
-		{
-			sprintf(error_message, "Could not allocate memory for VIDF frame");
-			printf("\n%s\n", error_message);
-			free(block_buf);
-			return false;
-		}
 
 		/* read frame buffer */
 		fseek(video->file[chunk], frame_offset, SEEK_SET);
@@ -208,19 +225,12 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 			printf("\n%s\n", error_message);
 			free(frame_buf);
 			free(block_buf);
+			free(frame_buf_unpacked);
+			free(avg_buf);
 			return false;
 		}
 
 		{
-			uint16_t * frame_buf_unpacked = (uint16_t*)calloc(frame_size_unpacked, 1);
-			if(!frame_buf_unpacked)
-			{
-				sprintf(error_message, "Averaging: could not allocate memory for unpacked frame");
-				printf("\n%s\n", error_message);
-				free(frame_buf);
-				free(block_buf);
-				return false;
-			}
 			if(isMlvCompressed(video))
 			{
 				int ret = dng_decompress_image(frame_buf_unpacked, (uint16_t*)frame_buf, frame_size, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel);
@@ -231,6 +241,7 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 					free(frame_buf_unpacked);
 					free(frame_buf);
 					free(block_buf);
+					free(avg_buf);
 					return false;
 				}
 			}
@@ -243,33 +254,30 @@ bool Mlv_video::generate_darkframe(const char* path, int frame_in, int frame_out
 				avg_buf[i] += frame_buf_unpacked[i];
 			}
 
-			if(i == frame_out - 1)
-			{
-				for(uint32_t i = 0; i < pixel_count; i++)
-				{
-					frame_buf_unpacked[i] = (avg_buf[i] + max_frame_number / 2) / max_frame_number;
-				}
-				dng_pack_image_bits((uint16_t *)frame_buf, frame_buf_unpacked, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel, 0);
-
-				vidf_hdr.frameNumber = max_frame_number;
-				vidf_hdr.blockSize = sizeof(mlv_vidf_hdr_t) + frame_size_packed;
-				memcpy(block_buf, &vidf_hdr, sizeof(mlv_vidf_hdr_t));
-				memcpy((block_buf + sizeof(mlv_vidf_hdr_t)), frame_buf, frame_size_packed);
-
-				if(fwrite(block_buf, vidf_hdr.blockSize, 1, mlv_file) != 1)
-				{
-					sprintf(error_message, "Could not write darkvideo frame");
-					printf("\n%s\n", error_message);
-					free(frame_buf);
-					free(block_buf);
-				}
-				fclose(mlv_file);
-			}
-
-			free(frame_buf_unpacked);
 		}
 	}
+
+	for(uint32_t i = 0; i < pixel_count; i++)
+	{
+		frame_buf_unpacked[i] = avg_buf[i] / max_frame_number;
+	}
+	dng_pack_image_bits((uint16_t *)frame_buf, frame_buf_unpacked, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel, 0);
+
+	vidf_hdr.frameNumber = max_frame_number;
+	vidf_hdr.blockSize = sizeof(mlv_vidf_hdr_t) + frame_size_packed;
+	memcpy(block_buf, &vidf_hdr, sizeof(mlv_vidf_hdr_t));
+	memcpy((block_buf + sizeof(mlv_vidf_hdr_t)), frame_buf, frame_size_packed);
+
+	if(fwrite(block_buf, vidf_hdr.blockSize, 1, mlv_file) != 1)
+	{
+		sprintf(error_message, "Could not write darkvideo frame");
+	}
+	fclose(mlv_file);
+
+	free(frame_buf_unpacked);
 	free(avg_buf);
+	free(frame_buf);
+	free(block_buf);
 	return true;
 }
 
@@ -349,10 +357,9 @@ void Mlv_video::low_level_process(RawInfo& ri)
 	char error_msg[128];
 	if (ri.darkframe_enable){
 		// Avoid reloading the dark frame if it is already set
-		printf("Dark frame file: %s %s\n", ri.darkframe_file.c_str(), mlvob.llrawproc->dark_frame_filename);
 		if (!ri.darkframe_file.empty() && mlvob.llrawproc->dark_frame_filename != NULL && strcmp(ri.darkframe_file.c_str(), mlvob.llrawproc->dark_frame_filename) == 0 && mlvob.llrawproc->dark_frame_data != NULL){
-			ri.darkframe_ok = true;
 			llrpSetDarkFrameMode(&mlvob, 1);
+			ri.darkframe_ok = true;
 		} else {
 			if( llrpValidateExtDarkFrame(&mlvob, ri.darkframe_file.c_str(), error_msg) == 0 ){
 				llrpSetDarkFrameMode(&mlvob, 1);
@@ -365,6 +372,8 @@ void Mlv_video::low_level_process(RawInfo& ri)
 					free(mlvob.llrawproc->dark_frame_data);
 					mlvob.llrawproc->dark_frame_data = NULL;
 				}
+				if(mlvob.llrawproc->dark_frame_filename) free(mlvob.llrawproc->dark_frame_filename);
+    			mlvob.llrawproc->dark_frame_filename = NULL;
 				ri.darkframe_ok = false;
 				ri.darkframe_error.clear();
 			}

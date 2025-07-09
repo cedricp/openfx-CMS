@@ -47,6 +47,7 @@
 #define kDualIsoAveragingMethod "dualIsoAveragingMethod"
 #define kAudioFilename "audioFilename"
 #define kAudioExport "audioExport"
+#define kDarkFrameEnable "darkFrameEnable"
 #define kDarkframefilename "darkframeFilename"
 #define kDarkFrameButon "darkFrameButton"
 #define kDarkframeRange "darkframeRange"
@@ -59,6 +60,7 @@
 #define kCACorrectionRadius "cacorrection_radius"
 #define kGroupColorAberration "groupColorAberration"
 #define kGroupWhiteBalance "groupWhiteBalance"
+#define kGroupDarkFrame "groupDarkFrame"
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -108,6 +110,7 @@ public:
         _resetLevels = fetchBooleanParam(kResetLevels);
         _cacorrection_threshold = fetchDoubleParam(kCACorrectionThreshold);
         _cacorrection_radius = fetchIntParam(kCACorrectionRadius);
+        _enableDarkFrame = fetchBooleanParam(kDarkFrameEnable);
 
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -167,6 +170,7 @@ private:
     OFX::StringParam* _mlv_darkframefilename;
     OFX::PushButtonParam* _audioExportButton;
     OFX::PushButtonParam* _darkFrameButton;
+    OFX::BooleanParam* _enableDarkFrame;
     OFX::DoubleParam* _mlv_fps;
     OFX::ChoiceParam* _outputColorSpace;
     OFX::ChoiceParam* _debayerType;
