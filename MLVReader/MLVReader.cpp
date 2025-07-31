@@ -293,7 +293,11 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         bool darkframe_fileok = std::filesystem::exists(_mlv_darkframefilename->getValue());
         _enableDarkFrame->setEnabled(darkframe_fileok);
         if (!darkframe_fileok){
-            _enableDarkFrame->setValue(false);
+            darkframe_fileok = false;
+            if (_enableDarkFrame->getValue() == true){
+                setPersistentMessage(OFX::Message::eMessageWarning, "", std::string("Warning : Dark frame file not found, dark frame correction will not be applied"));
+            }
+
         }
         // Common code for CPU and OpenCL
         Mlv_video::RawInfo rawInfo;
@@ -304,7 +308,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         rawInfo.dualiso_fullres_blending = _dualIsoFullresBlending->getValue();
         rawInfo.dualiso_aliasmap = _dualIsoAliasMap->getValue();
         rawInfo.darkframe_file = _mlv_darkframefilename->getValue();
-        rawInfo.darkframe_enable = darkframe_fileok && _enableDarkFrame->getValue() == true;
+        rawInfo.darkframe_enable = darkframe_fileok;
         mlv_video->low_level_process(rawInfo);
 
         if (getUseOpenCL()){
