@@ -45,17 +45,6 @@ extern "C"{
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
-template <class T>
-static Matrix3x3<T> get_neutral_cam2rec709_matrix(const Matrix3x3<T> &xyzD65tocam)
-{
-    Matrix3x3f rgb2cam;
-    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
-    rgb2cam = xyzD65tocam * rec709_to_xyzD65_matrix<float>();
-    // Remove the white balance from the camera matrix
-    rgb2cam.normalize_rows();
-    // Invert RGB2CAM matrix
-    return rgb2cam.invert();
-}
 
 enum ColorSpaceFormat {
         ACES_AP0,
@@ -99,6 +88,7 @@ public:
                 }
 
                 Vector3f out = idt_matrix * in;
+                out *= headroom; // Apply headroom
                 out.copy_to(dstPix);
 
                 dstPix[3] = 1.f;
@@ -115,6 +105,7 @@ public:
     Vector3f cam_mult;
     int raw_width, raw_height;
     bool clip;
+    float headroom = 1.0f; // Headroom value for the output
 };
 
 bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArguments &args, OfxRectD &rod)
@@ -448,6 +439,8 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
             return;
         }
 
+        float headroom = _outputColorSpace->getValue() < 2 ? _headroom->getValue() : 1;
+
         
         cl::NDRange sizes( ROUNDUP(width, locopt.sizex), ROUNDUP(height, locopt.sizey) );
         cl::NDRange local( locopt.sizex, locopt.sizey );
@@ -460,7 +453,8 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
         kernel_demosaic_redblue.setArg(3, height);
         kernel_demosaic_redblue.setArg(4, bayer_filter);
         kernel_demosaic_redblue.setArg(5, matrixbuffer);
-        kernel_demosaic_redblue.setArg(6, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
+        kernel_demosaic_redblue.setArg(6, headroom);
+        kernel_demosaic_redblue.setArg(7, sizeof(float) * 4 * (locopt.sizex + 2) * (locopt.sizey + 2), nullptr);
         
         queue.enqueueWriteBuffer(matrixbuffer, CL_TRUE, 0, sizeof(float) * 9, cam_matrix.data());
         bool ok = queue.enqueueNDRangeKernel(kernel_demosaic_redblue, cl::NullRange, sizes, local, NULL, &timer);
@@ -516,6 +510,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.raw_height = height_img;
     processor.cam_mult = _asShotNeutral;
     processor.clip = _highlightMode->getValue() == 0;
+    processor.headroom = _outputColorSpace->getValue() < 2 ? _headroom->getValue() : 1;
     computeColorspaceMatrix(processor.idt_matrix);
 
     processor.process();
@@ -702,6 +697,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kColorSpaceFormat || paramName == kColorTemperature)
     {
         _idtDirty = true;
+        _headroom->setEnabled(_outputColorSpace->getValue() < 2);
     }
 
     if (paramName == kUseSpectralIdt)
@@ -714,7 +710,7 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         }
         _idtDirty = true;
     }
-    
+
     if (paramName == kAudioExport){
         std::string filename = _mlv_audiofilename->getValue();
         if (filename.empty()) return;
@@ -869,6 +865,18 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         param->appendOption("Rec.709", "", "rec709");
         param->appendOption("XYZ-D65", "", "xyz");
         param->setDefault(0);
+        if (page_colors)
+        {
+            page_colors->addChild(*param);
+        }
+    }
+
+    {
+        OFX::DoubleParamDescriptor* param = desc.defineDoubleParam(kHeadRoom);
+        param->setLabel("Headroom");
+        param->setHint("ACES Headroom value");
+        param->setDefault(4.5);
+        param->setRange(1.0, 10.0);
         if (page_colors)
         {
             page_colors->addChild(*param);

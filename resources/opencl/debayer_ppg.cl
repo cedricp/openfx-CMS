@@ -156,7 +156,7 @@ ppg_demosaic_green (read_only image2d_t in, write_only image2d_t out, const int 
  */
 kernel void
 ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const int width, const int height,
-                      const unsigned int filters, constant float *cameraMatrix, local float4 *buffer)
+                      const unsigned int filters, constant float *cameraMatrix, const float headroom, local float4 *buffer)
 {
   // image in contains full green and sparse r b
   const int x = get_global_id(0);
@@ -261,7 +261,7 @@ ppg_demosaic_redblue (read_only image2d_t in, write_only image2d_t out, const in
   tmp.y = cameraMatrix[3]*color.x + cameraMatrix[4]*color.y + cameraMatrix[5]*color.z;
   tmp.z = cameraMatrix[6]*color.x + cameraMatrix[7]*color.y + cameraMatrix[8]*color.z;
 
-  color = tmp;
+  color = tmp * headroom;
 
   color.w = 1.f;
 
