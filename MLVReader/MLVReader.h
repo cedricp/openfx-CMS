@@ -53,6 +53,7 @@
 #define kDarkframeRange "darkframeRange"
 #define kBlackLevel "blackLevel"
 #define kWhiteLevel "whiteLevel"
+#define kHeadRoom "headroom"
 #define kBpp "bpp"
 #define kUseSpectralIdt "useSpectralIdt"
 #define kResetLevels "resetLevels"
@@ -111,6 +112,7 @@ public:
         _cacorrection_threshold = fetchDoubleParam(kCACorrectionThreshold);
         _cacorrection_radius = fetchIntParam(kCACorrectionRadius);
         _enableDarkFrame = fetchBooleanParam(kDarkFrameEnable);
+        _headroom = fetchDoubleParam(kHeadRoom);
 
         _gThreadHost->multiThreadNumCPUs(&_numThreads);
         _gThreadHost->mutexCreate(&_videoMutex, 0);
@@ -172,6 +174,7 @@ private:
     OFX::PushButtonParam* _darkFrameButton;
     OFX::BooleanParam* _enableDarkFrame;
     OFX::DoubleParam* _mlv_fps;
+    OFX::DoubleParam* _headroom;
     OFX::ChoiceParam* _outputColorSpace;
     OFX::ChoiceParam* _debayerType;
     OFX::ChoiceParam* _highlightMode;

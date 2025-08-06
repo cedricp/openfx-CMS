@@ -140,6 +140,14 @@ public:
         return *this;
     }
 
+    Vector3& operator*=(const T &a)
+    {
+        vec[0] *= a;
+        vec[1] *= a;
+        vec[2] *= a;
+        return *this;
+    }
+
     Vector3& operator/=(const Vector3 &a)
     {
         vec[0] /= a.vec[0];
@@ -396,7 +404,7 @@ public:
     }
 };
 
-// Color primaries in xy format
+// Color primaries in xy coords
 template <class T>
 class PrimariesXY : public Vector2<T>
 {
@@ -696,4 +704,19 @@ Vector3<T> srgb_to_linear(const Vector3<T> &v)
     return Vector3<T>(v[0] <= 0.04045 ? v[0] / 12.92 : pow((v[0] + 0.055) / 1.055, 2.4),
                       v[1] <= 0.04045 ? v[1] / 12.92 : pow((v[1] + 0.055) / 1.055, 2.4),
                       v[2] <= 0.04045 ? v[2] / 12.92 : pow((v[2] + 0.055) / 1.055, 2.4));
+}
+
+
+// As the camera matrix already contains white balance RGB coefficients, we want to "neutralize" it.
+// More info here : https://stackoverflow.com/questions/68760625/how-to-apply-white-balance-coefficents-to-raw-image-for-srgb-output
+template <class T>
+static Matrix3x3<T> get_neutral_cam2rec709_matrix(const Matrix3x3<T> &xyzD65tocam)
+{
+    Matrix3x3f rgb2cam;
+    // RGB2CAM =  XYZTOCAMRGB(colormatrix) * REC709TOXYZ
+    rgb2cam = xyzD65tocam * rec709_to_xyzD65_matrix<float>();
+    // Remove the white balance from the camera matrix
+    rgb2cam.normalize_rows();
+    // Invert RGB2CAM matrix
+    return rgb2cam.invert();
 }
