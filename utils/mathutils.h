@@ -97,6 +97,20 @@ public:
             ref[i] = vec[i];
     }
 
+    T dot(const Vector3 &a) const
+    {
+        return vec[0] * a.vec[0] + vec[1] * a.vec[1] + vec[2] * a.vec[2];
+    }
+
+    Vector3 cross(const Vector3& b) const
+    {
+        return Vector3(
+            vec[1] * b.vec[2] - vec[2] * b.vec[1],
+            vec[2] * b.vec[0] - vec[0] * b.vec[2],
+            vec[0] * b.vec[1] - vec[1] * b.vec[0]
+        );
+    }
+
     Vector3 operator+(const Vector3 &a) const
     {
         return Vector3(vec[0] + a.vec[0], vec[1] + a.vec[1], vec[2] + a.vec[2]);
@@ -259,6 +273,16 @@ public:
     T operator[](int i) const
     {
         return vec[i];
+    }
+
+    T dot(const Vector2 &b) const
+    {
+        return vec[0] * b.vec[0] + vec[1] * b.vec[1];
+    }
+
+    Vector2 cross(const Vector2 &b) const
+    {
+        return Vector2(vec[0] * b.vec[1] - vec[1] * b.vec[0]);
     }
 
     Vector2& operator = (const Vector2& b)
@@ -475,6 +499,18 @@ const Matrix3x3<T> ciecat02_matrix(
     0.7328,  0.4296, -0.1624,
     -0.7036,  1.6975,  0.0061,
     0.0030,  0.0136,  0.9834);
+
+template <class T>
+const Matrix3x3<T> xyz_scaling_matrix(
+    1,0,0,
+    0,1,0,
+    0,0,1);
+
+template <class T>
+const Matrix3x3<T> von_kries_matrix(
+    0.40024, 0.7076, -0.08081,
+    -0.2263, 1.16532, 0.0457,
+    0.0000, 0.0000, 0.91822);
 
 // RGB primaries in xy format
 template <class T>

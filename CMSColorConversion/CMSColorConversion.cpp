@@ -263,6 +263,12 @@ Matrix3x3f CMSColorConversionPlugin::computeMatrix(double time, bool& invert, in
         case 2:
         ca_matrix = ciecat02_matrix<float>;
         break;
+        case 3:
+        ca_matrix = von_kries_matrix<float>;
+        break;
+        case 4:
+        ca_matrix = xyz_scaling_matrix<float>;
+        break;
         case 0:
         default:
         ca_matrix = bradford_matrix<float>;
@@ -551,6 +557,8 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
             param->appendOption("Bradford");
             param->appendOption("CMCCAT2000");
             param->appendOption("CIECAT02");
+            param->appendOption("Von Kries");
+            param->appendOption("XYZ Scaling");
             if (page)
             {
                 page->addChild(*param);
@@ -595,7 +603,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
         }
 
         OFX::GroupParamDescriptor* group = desc.defineGroupParam(kGroupPrimaries);
-        group->setLabel("Color primaries");
+        group->setLabel("Source color primaries");
         group->setEnabled(true);
         group->setOpen(false);
         if (page) {
@@ -604,7 +612,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
 
         {
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kRedPrimaryParam);
-            param->setLabel("Red primary");
+            param->setLabel("Source Red primary");
             param->setHint("The XY coordinates of the red primary in the CIE 1931 color space");
             param->setDefault(ChromaList[0].red_primaries().x(), ChromaList[0].red_primaries().y());
             if (group){
@@ -618,7 +626,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
 
         {
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kGreenPrimaryParam);
-            param->setLabel("Green primary");
+            param->setLabel("Source Green primary");
             param->setHint("The XY coordinates of the green primary in the CIE 1931 color space");
             param->setDefault(ChromaList[0].green_primaries().x(), ChromaList[0].green_primaries().y());
             if (group){
@@ -632,7 +640,7 @@ void CMSColorConversionPluginFactory::describeInContext(OFX::ImageEffectDescript
 
         {
             OFX::Double2DParamDescriptor *param = desc.defineDouble2DParam(kBluePrimaryParam);
-            param->setLabel("Blue primary");
+            param->setLabel("Source Blue primary");
             param->setHint("The XY coordinates of the blue primary in the CIE 1931 color space");
             param->setDefault(ChromaList[0].blue_primaries().x(), ChromaList[0].blue_primaries().y());
             if (group){
