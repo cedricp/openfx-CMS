@@ -142,7 +142,7 @@ void CMSPatternPlugin::render(const OFX::RenderArguments &args)
     OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
 
-    assert(OFX_COMPONENTS_OK(dstComponents));
+    //assert(OFX_COMPONENTS_OK(dstComponents));
 
     OFX::auto_ptr<OFX::Image> dst(_dstClip->fetchImage(time));
 

@@ -610,12 +610,6 @@ int Spst::loadSpst( const string &path, const char *maker, const char *model )
             if ( tmp_sen._BSen > max[2] )
                 max[2] = tmp_sen._BSen;
 
-            //                printf( "\"%i\": [ %18.13f,  %18.13f,  %18.13f ], \n",
-            //                        wavs[wavs.size()-1],
-            //                        data[0],
-            //                        data[1],
-            //                        data[2] );
-            //
             rgbsen.push_back( tmp_sen );
         }
         setWLIncrement( inc );

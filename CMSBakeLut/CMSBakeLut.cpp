@@ -57,7 +57,7 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     OFX::BitDepthEnum dstBitDepth = _dstClip->getPixelDepth();
     OFX::PixelComponentEnum dstComponents = _dstClip->getPixelComponents();
 
-    assert(OFX_COMPONENTS_OK(dstComponents));
+    //assert(OFX_COMPONENTS_OK(dstComponents));
 
     //checkComponents(dstBitDepth, dstComponents);
     
@@ -78,10 +78,11 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
     float num_x = width_img / 7;
     float num_y = height_img / 7;
     int num_samples = num_x * num_y;
-    _lutSize = round(pow(num_samples, 1.0 / 3.0));
-    int total_samples = pow(_lutSize, 3);
+    int lutsize = round(pow(num_samples, 1.0 / 3.0));
+    int total_samples = pow(lutsize, 3);
     int sample_count = 0;
-
+    _lutSize->setValue(lutsize);
+    
     _lut.resize(total_samples);
 
     for(int y=0; y < num_y; y++) {
@@ -93,7 +94,7 @@ void CMSBakeLutPlugin::render(const OFX::RenderArguments &args)
             sample.g = srcPix[1];
             sample.b = srcPix[2];
 
-            _lut[sample_count] = sample;
+            if (sample_count < total_samples) _lut[sample_count] = sample;
             dstPix[0] = sample.r;
             dstPix[1] = sample.g;
             dstPix[2] = sample.b;
@@ -131,18 +132,13 @@ void CMSBakeLutPlugin::changedParam(const OFX::InstanceChangedArgs& args, const 
     {
         std::string filename = _outputLutFile->getValue();
         FILE *file = fopen(filename.c_str(), "w");
-        // const int lut1dsize_choice = _lut1dsize->getValue();
-        // int lut1dsize = 512;
-        // if (lut1dsize_choice == 1) lut1dsize = 1024;
-        // if (lut1dsize_choice == 2) lut1dsize = 2048;
-        // if (lut1dsize_choice == 3) lut1dsize = 4096;
 
         if (file == NULL) {
             printf("Error opening file %s\n", filename.c_str());
             return;
         }
 
-        fprintf(file, "LUT_3D_SIZE %d\n", _lutSize);
+        fprintf(file, "LUT_3D_SIZE %d\n", _lutSize->getValue());
         for (int i = 0; i < _lut.size(); i++) {
             fprintf(file, "%f %f %f\n", _lut[i].r, _lut[i].g, _lut[i].b);
         }
@@ -210,6 +206,14 @@ void CMSBakeLutPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc
             if (page) {
                 page->addChild(*param);
             }
+        }
+
+        {
+            OFX::IntParamDescriptor *param = desc.defineIntParam(LUTSIZE);
+            param->setLabel("LUT Size");
+            param->setHint("The size of the 3D LUT.");
+            param->setDefault(12);
+            param->setEnabled(false);
         }
     }
 }

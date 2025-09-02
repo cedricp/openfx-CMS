@@ -5,43 +5,42 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Nuke",
+            "name": "(gdb) Execute Natron",
             "type": "cppdbg",
             "request": "launch",
-            "program": "e:/Applications/Nuke15.1v5/Nuke15.1.exe",
-            "args": ["-nc"],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "miDebuggerPath": "D:/Development/tools/msys2/mingw64/bin/gdb.exe",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
-        }
-
-        {
-            "name": "(gdb) Natron",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "E:/Applications/Natron-git/bin/Natron.exe",
+            "program": "C:/Users/cedric/Documents/Apps/NatronGit/bin/Natron.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "D:/Development/tools/msys2/mingw64/bin/gdb.exe",
+            "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "(gdb) Execute Nuke",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "c:/Program Files/Nuke12.0v5/Nuke12.0.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [{"name":"OFX_PLUGIN_PATH", "value":"C:/Users/cedric/Documents/ofx"}],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -55,7 +54,6 @@
                 }
             ]
         }
-
 
     ]
 }

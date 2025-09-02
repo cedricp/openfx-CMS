@@ -33,6 +33,8 @@ OFXS_NAMESPACE_ANONYMOUS_ENTER
 #define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGB)
 #endif
 
+#define LUTSIZE "LutSize"
+
 struct Color
 {
     float r, g, b;
@@ -50,7 +52,7 @@ public:
         _dstClip = fetchClip(kOfxImageEffectOutputClipName);
 
         _outputLutFile = fetchStringParam(kOfxImageEffectFileParamName);
-        //_lut1dsize = fetchChoiceParam(kLUT1DSizeParamName);
+        _lutSize = fetchIntParam(LUTSIZE);
     }
 
 private:
@@ -62,12 +64,11 @@ private:
     virtual bool isIdentity(const OFX::IsIdentityArguments& args, OFX::Clip*& identityClip, double& identityTime, int& view, std::string& plane) OVERRIDE;
 
 private:
-    int _lutSize;
     OFX::StringParam* _outputLutFile;
     std::vector<Color> _lut;
-    //OFX::ChoiceParam *_lut1dsize;
     OFX::Clip * _dstClip;
     OFX::Clip* _inputClip;
+    OFX::IntParam* _lutSize;
 };
 
 class CMSBakeLutPluginFactory : public OFX::PluginFactoryHelper<CMSBakeLutPluginFactory> { 
