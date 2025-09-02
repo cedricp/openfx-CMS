@@ -116,7 +116,7 @@ FILE(GLOB CMS_SOURCES
 FILE(GLOB CMS_RESOURCES
   "CMSPattern/net.sf.openfx.CMSPattern.png"
   "CMSPattern/net.sf.openfx.CMSPattern.svg"
-  "CMSMLVReader/net.sf.openfx.MLVReader.png"
+  "MLVReader/net.sf.openfx.MLVReader.png"
 )
 
 FILE(GLOB CMS_OCLSHADERS
