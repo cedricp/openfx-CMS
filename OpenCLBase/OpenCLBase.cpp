@@ -97,7 +97,7 @@ int openCLGetLocalBufferOpt(cl::Device dev,
             {
             printf(
             "[openCLGetLocalBufferOpt] no valid resource limits for curent device");
-            return FALSE;
+            return false;
         }
 
         if(*blocksizex > *blocksizey)
@@ -111,10 +111,10 @@ int openCLGetLocalBufferOpt(cl::Device dev,
         printf(
         "can not identify"
         " resource limits for current device");
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 void OpenCLBase::setupOpenCL()

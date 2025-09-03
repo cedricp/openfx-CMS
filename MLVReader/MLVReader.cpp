@@ -45,6 +45,10 @@ extern "C"{
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+#ifdef __linux__
+#include <unistd.h>
+#define Sleep(t) usleep(t*1000);
+#endif
 
 enum ColorSpaceFormat {
         ACES_AP0,

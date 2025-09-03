@@ -24,6 +24,7 @@
 #include <cmath>
 #include <climits>
 #include <cfloat>
+#include <stdarg.h>
 
 #include "CMSColorConversion.h"
 #include "../utils/utils.h"

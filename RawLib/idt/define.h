@@ -61,6 +61,7 @@
 
 #ifndef WIN32
 #    include <sys/stat.h>
+#    include <dirent.h>
 #endif
 
 #define INV_255 ( 1.0 / (double)255.0 )
@@ -363,7 +364,7 @@ inline vector<string> openDir(const string &directory)
     class dirent *ent;
     class stat st;
 
-    dir = opendir(directory);
+    dir = opendir(directory.c_str());
     while ((ent = readdir(dir)) != NULL) {
         const string file_name = ent->d_name;
         const string full_file_name = directory + "/" + file_name;

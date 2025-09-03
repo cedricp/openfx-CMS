@@ -126,6 +126,7 @@ FILE(GLOB CMS_OCLSHADERS
 
 IF(MINGW)
 SET(LINKFLAGS "-static-libgcc -static-libstdc++")
+SET(WINLIBS "ws2_32")
 ENDIF(MINGW)
 
 ADD_LIBRARY(CMS SHARED ${CMS_SOURCES} $<TARGET_OBJECTS:rawlib_static> $<TARGET_OBJECTS:mlvlib_static> )
@@ -146,7 +147,7 @@ endif()
 
 INCLUDE_DIRECTORIES(CMS libs/GFX)
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE ${TARGET_DEFS})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} supportext-static openfx-static libraw_static m ws2_32 Ceres::ceres gomp) 
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} supportext-static openfx-static libraw_static m ${WINLIBS} Ceres::ceres gomp) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html
