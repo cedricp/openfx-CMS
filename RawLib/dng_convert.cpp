@@ -11,7 +11,7 @@ struct Dng_processor::dngc_impl{
 	libraw_processed_image_t* _image;
 };
 
-Dng_processor::Dng_processor() : _buffer(NULL)
+Dng_processor::Dng_processor() : _buffer(NULL), _filebuffer(NULL)
 {
 	_imp = new dngc_impl;
 	_imp->libraw = new LibRaw;
@@ -22,6 +22,7 @@ Dng_processor::Dng_processor() : _buffer(NULL)
 Dng_processor::~Dng_processor()
 {
 	free_buffer();
+	free(_filebuffer);
 	delete _imp->libraw;
 	delete _imp;
 }
@@ -38,7 +39,38 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 	}
 }
 
-uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize, float wbrgb[4])
+void Dng_processor::load_dng(std::string filename)
+{
+	if (_filebuffer){
+		free(_filebuffer);
+		_filebuffer = NULL;
+	}
+	
+	FILE* f = fopen(filename.c_str(), "rb");
+	if (!f){
+		printf("Dng_processor::load_dng : Cannot open file %s\n", filename.c_str());
+		return;
+	}
+
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	rewind(f);
+	unsigned char* buffer = (unsigned char*)malloc(size);
+    size_t bytesRead = fread(buffer, 1, size, f);
+	if (bytesRead != (size_t)size){
+		printf("Dng_processor::load_dng : Cannot read file %s\n", filename.c_str());
+		fclose(f);
+		free(buffer);
+		buffer = nullptr;
+		return;
+	}
+
+	_filebuffer = get_processed_image(buffer, size);
+	free(buffer);
+	fclose(f);
+}
+
+uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 {
 	//_imp->libraw->recycle();
 
@@ -98,7 +130,29 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize,
 
 	_w = _imp->_image->width;
 	_h = _imp->_image->height;
+	_bpp = _imp->_image->bits;
+	_blacklevel = _imp->libraw->imgdata.color.dng_levels.dng_black;
+	_whitelevel = _imp->libraw->imgdata.color.dng_levels.dng_whitelevel[0];
 
+	_cam2xyz = Matrix3x3f(_imp->libraw->imgdata.color.cam_xyz[0][0], _imp->libraw->imgdata.color.cam_xyz[1][0], _imp->libraw->imgdata.color.cam_xyz[2][0],
+						  	_imp->libraw->imgdata.color.cam_xyz[0][1], _imp->libraw->imgdata.color.cam_xyz[1][1], _imp->libraw->imgdata.color.cam_xyz[2][1],
+						  	_imp->libraw->imgdata.color.cam_xyz[0][2], _imp->libraw->imgdata.color.cam_xyz[1][2], _imp->libraw->imgdata.color.cam_xyz[2][2]);
+
+	_asShotNeutral = Vector3f(1.f/_imp->libraw->imgdata.color.dng_levels.asshotneutral[0],
+								1.f/_imp->libraw->imgdata.color.dng_levels.asshotneutral[1],
+								1.f/_imp->libraw->imgdata.color.dng_levels.asshotneutral[2]);
+
+	_matrix1 = Matrix3x3f(_imp->libraw->imgdata.color.dng_color[0].colormatrix[0][0], _imp->libraw->imgdata.color.dng_color[0].colormatrix[1][0], _imp->libraw->imgdata.color.dng_color[0].colormatrix[2][0],
+							_imp->libraw->imgdata.color.dng_color[0].colormatrix[0][1], _imp->libraw->imgdata.color.dng_color[0].colormatrix[1][1], _imp->libraw->imgdata.color.dng_color[0].colormatrix[2][1],
+							_imp->libraw->imgdata.color.dng_color[0].colormatrix[0][2], _imp->libraw->imgdata.color.dng_color[0].colormatrix[1][2], _imp->libraw->imgdata.color.dng_color[0].colormatrix[2][2]);
+
+	_matrix2 = Matrix3x3f(_imp->libraw->imgdata.color.dng_color[1].colormatrix[0][0], _imp->libraw->imgdata.color.dng_color[1].colormatrix[1][0], _imp->libraw->imgdata.color.dng_color[1].colormatrix[2][0],
+							_imp->libraw->imgdata.color.dng_color[1].colormatrix[0][1], _imp->libraw->imgdata.color.dng_color[1].colormatrix[1][1], _imp->libraw->imgdata.color.dng_color[1].colormatrix[2][1],
+							_imp->libraw->imgdata.color.dng_color[1].colormatrix[0][2], _imp->libraw->imgdata.color.dng_color[1].colormatrix[1][2], _imp->libraw->imgdata.color.dng_color[1].colormatrix[2][2]);
+
+	_baseExpo = _imp->libraw->imgdata.color.dng_levels.baseline_exposure;
+	_calibrate_expo[0] =  _imp->libraw->imgdata.color.dng_color[0].illuminant;
+	_calibrate_expo[1] =  _imp->libraw->imgdata.color.dng_color[1].illuminant;
 	return (uint16_t*)&_imp->_image->data;
 }
 

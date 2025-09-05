@@ -366,6 +366,11 @@ public:
         return rows[0].data();
     }
 
+    T elem(int i) const
+    {
+        return rows[i / 3][i % 3];
+    }
+
     Vector3<T> &operator[](int i)
     {
         return rows[i];

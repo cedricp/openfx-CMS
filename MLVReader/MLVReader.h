@@ -155,6 +155,7 @@ private:
     void renderCLTest(OFX::Image* destimg, int width, int height);
     void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
     void renderCL(const OFX::RenderArguments &args, OFX::Image* destimg, Mlv_video* mlv_video, int time);
+    void renderDNG(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img);
 
     Mlv_video* getMlv();
     void computeIDT();
@@ -204,6 +205,7 @@ private:
     bool _levelsDirty = true;
 
     std::vector<Mlv_video*> _mlv_video;
+    Dng_processor* _dng_img = nullptr;
 };
 
 class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFactory> { 

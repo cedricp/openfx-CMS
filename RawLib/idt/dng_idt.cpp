@@ -86,6 +86,32 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	}
 }
 
+DNGIdt::DNGIdt (Dng_processor* dng, float *wbal )
+{
+	// Fill values as for a DNG file
+
+	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
+	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
+	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
+	_analogBalanceDNG      = vector < double > ( 3, 1.0 );
+	_neutralRGBDNG         = vector < double > ( 3, 1.0 );
+	_cameraXYZWhitePoint   = vector < double > ( 3, 1.0 );
+	_calibrateIllum        = vector < unsigned short > ( 2, 1.0 );
+
+    _baseExpo = dng->get_baseline_exposure();
+	_calibrateIllum[0] = dng->get_calibrate_expo1(); 
+	_calibrateIllum[1] = dng->get_calibrate_expo2();
+
+    FORI ( 3 ){
+         _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
+    }
+    
+    FORI ( 9 ) {
+		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( dng->matrix1().elem(i) );
+		_xyz2rgbMatrix2DNG[i] = static_cast < double > ( dng->matrix2().elem(i) );
+	}
+}
+
 DNGIdt::~DNGIdt() {
 }
 

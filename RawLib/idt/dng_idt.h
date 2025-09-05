@@ -3,12 +3,14 @@
 
 #include <vector>
 #include "../mlv_video.h"
+#include "../dng_convert.h"
 
 namespace DNGIdt{
 	class DNGIdt {
 		public:
 			DNGIdt();
 			DNGIdt (Mlv_video* mlv, float *wbal);
+			DNGIdt (Dng_processor* dng, float *wbal );
 			virtual ~DNGIdt();
 
 			double ccttoMired ( const double cct ) const;
