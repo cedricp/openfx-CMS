@@ -246,7 +246,7 @@ Mlv_video* MLVReaderPlugin::getMlv()
     return mlv_video;
 }
 
-Dng_processor* MLVReaderPlugin::getDng()
+Dng_processor* MLVReaderPlugin::getDng(double time)
 {
     Dng_processor *dngproc = nullptr;
 
@@ -255,6 +255,9 @@ Dng_processor* MLVReaderPlugin::getDng()
         if (!_dng_sequence[i]->locked()){
             _dng_sequence[i]->lock();
             dngproc = _dng_sequence[i];
+            std::string file_at_time = _mlvfilename_param->getValueAtTime(time);
+            printf("Loading DNG file : %s\n", file_at_time.c_str());
+            dngproc->load_dng(file_at_time);
             break;
         }
     }
@@ -267,7 +270,7 @@ Dng_processor* MLVReaderPlugin::getDng()
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
     Mlv_video *mlv_video = getMlv();
-    Dng_processor * dng_img = getDng();
+    Dng_processor * dng_img = getDng(args.time);
 
     if (mlv_video == nullptr && dng_img == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
@@ -572,6 +575,11 @@ void MLVReaderPlugin::renderDNG_CPU(const OFX::RenderArguments &args, OFX::Image
     // Get raw buffer -> raw colors
     uint16_t* processed_buffer = dng->get_processed_filebuffer();
 
+    if (processed_buffer == nullptr) {      
+        OFX::throwSuiteStatusException(kOfxStatFailed);
+        return;
+    }
+
     if (_levelsDirty){
         _blackLevel->setValue(dng->black_level());
         _whiteLevel->setValue(dng->white_level());
@@ -844,6 +852,9 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
     if (paramName == kMLVfileParamter)
     {
         std::string filename = _mlvfilename_param->getValue();
+        std::string fileattime;
+        _mlvfilename_param->getValueAtTime(args.time, fileattime);
+        printf("Loading file : %s\n", fileattime.c_str());
         std::string upperfn = filename;
         std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
         bool is_mlv = upperfn.find(".MLV");

@@ -13,7 +13,7 @@ struct Dng_processor::dngc_impl{
 	libraw_processed_image_t* _image;
 };
 
-Dng_processor::Dng_processor() : _buffer(NULL), _filebuffer(NULL)
+Dng_processor::Dng_processor() : _buffer(NULL)
 {
 	_imp = new dngc_impl;
 	_imp->libraw = new LibRaw;
@@ -43,10 +43,7 @@ void Dng_processor::unpack(uint8_t* buffer, size_t buffersize)
 
 bool Dng_processor::load_dng(std::string filename)
 {
-	if (_filebuffer){
-		free(_filebuffer);
-		_filebuffer = NULL;
-	}
+	free_buffer();
 	
 	FILE* f = fopen(filename.c_str(), "rb");
 	if (!f){
@@ -67,7 +64,7 @@ bool Dng_processor::load_dng(std::string filename)
 		return false;
 	}
 
-	_filebuffer = get_processed_image(buffer, size);
+	get_processed_image(buffer, size);
 	free(buffer);
 	fclose(f);
 	return true;
@@ -128,6 +125,7 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	
 	if (err != LIBRAW_SUCCESS){
 		printf("make mem image error\n");
+		_imp->_image = nullptr;
 		return NULL;
 	}
 
@@ -160,11 +158,17 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	return (uint16_t*)&_imp->_image->data;
 }
 
+uint16_t* Dng_processor::get_processed_filebuffer()
+{
+	if (_imp->_image) return (uint16_t*)&_imp->_image->data;
+	return nullptr;
+}
+
 void Dng_processor::free_buffer()
 {
 	if (_imp->libraw){
 		free(_imp->_image);
-		_imp->_image = 0;
+		_imp->_image = nullptr;
 	}
 }
 

@@ -126,6 +126,7 @@ public:
 
         if (_mlvfilename_param->getValue().empty() == false) {
             setMlvFile(_mlvfilename_param->getValue(), false);
+            _mlvfilename = _mlvfilename_param->getValue();
         }
     }
 
@@ -160,7 +161,7 @@ private:
     void renderDNG_GPU(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img);
     
     Mlv_video* getMlv();
-    Dng_processor* getDng();
+    Dng_processor* getDng(double time);
     void computeIDT();
     bool prepareSprectralSensIDT();
     void computeColorspaceMatrix(Matrix3x3f& out_matrix);

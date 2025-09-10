@@ -21,7 +21,7 @@ public:
 	void set_highlight(int i){_highlight_mode = i;}
 	void free_buffer();
 	bool load_dng(std::string filename);
-	uint16_t* get_processed_filebuffer(){return _filebuffer;}
+	uint16_t* get_processed_filebuffer();
 	int bpp(){return _bpp;}
 	int black_level(){return _blacklevel;}
 	int white_level(){return _whitelevel;}
@@ -44,7 +44,6 @@ public:
 	struct dngc_impl;
 	dngc_impl* _imp;
 	unsigned short *_buffer;
-	unsigned short *_filebuffer;
 	int _w, _h;
 	int _interpolation_mode = 3;
 	int _highlight_mode = 0;
