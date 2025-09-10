@@ -32,6 +32,8 @@
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
+using namespace MathUtils;
+
 
 // Any changes here need to be reflected in the plugin descriptor
 Chromaticities<double> ChromaList[] = {

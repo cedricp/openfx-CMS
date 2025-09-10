@@ -153,15 +153,19 @@ private:
     
     private:
     void renderCLTest(OFX::Image* destimg, int width, int height);
-    void renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
-    void renderCL(const OFX::RenderArguments &args, OFX::Image* destimg, Mlv_video* mlv_video, int time);
-    void renderDNG(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img);
-
+    void renderMLV_CPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img);
+    void renderMLV_GPU(const OFX::RenderArguments &args, OFX::Image* destimg, Mlv_video* mlv_video, int time);
+    void renderDNG_CPU(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img);
+    void renderCL(const OFX::RenderArguments &args, OFX::Image* dst, uint16_t* buffer, int black_level, int white_level, int time, int height_img, int width_img);
+    void renderDNG_GPU(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img);
+    
     Mlv_video* getMlv();
+    Dng_processor* getDng();
     void computeIDT();
     bool prepareSprectralSensIDT();
     void computeColorspaceMatrix(Matrix3x3f& out_matrix);
     void setMlvFile(std::string file, bool set = true);
+
 
     OfxMutexHandle _videoMutex, _idtMutex;
 
@@ -199,13 +203,12 @@ private:
     OFX::IntParam* _cacorrection_radius;
     Matrix3x3f _idt;
     Vector3f _asShotNeutral;
-    float _wbcompensation;
     int _maxValue=0;
     bool _idtDirty = true;
     bool _levelsDirty = true;
 
     std::vector<Mlv_video*> _mlv_video;
-    Dng_processor* _dng_img = nullptr;
+    std::vector<Dng_processor*> _dng_sequence;
 };
 
 class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFactory> { 

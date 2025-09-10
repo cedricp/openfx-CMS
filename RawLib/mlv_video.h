@@ -79,7 +79,7 @@ public:
 	std::string get_camera_make();
 	std::string get_camera_model();
 
-	void get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation, bool cam_wb = true);
+	void get_white_balance_coeffs(int temperature, float coeffs[3], bool cam_wb = true);
 
 	int get_camid();
 	float focal_length();

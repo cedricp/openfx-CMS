@@ -98,7 +98,7 @@ static const double xyz_rgb[3][3] = {
     { 0.019334, 0.119193, 0.950227 }
 };
 
-static inline void temperature_to_RGB(double T, double RGB[3])
+void temperature_to_RGB(double T, double RGB[3])
 {
     int c;
     double xD, yD, X, Y, Z, max;
@@ -136,7 +136,7 @@ static inline void temperature_to_RGB(double T, double RGB[3])
     for (c = 0; c < 3; c++) RGB[c] = RGB[c] / max;
 }
 
-static inline void pseudoinverse (double (*in)[3], double (*out)[3], int size)
+void pseudoinverse (double (*in)[3], double (*out)[3], int size)
 {
     double work[3][6], num;
     int i, j, k;
@@ -165,7 +165,7 @@ static inline void pseudoinverse (double (*in)[3], double (*out)[3], int size)
                 out[i][j] += work[j][k+3] * in[i][k];
 }
 
-static inline void cam_xyz_coeff (double cam_xyz[4][3], float pre_mul[4], float rgb_cam[3][4])
+void cam_xyz_coeff (double cam_xyz[4][3], float pre_mul[4], float rgb_cam[3][4])
 {
     double cam_rgb[4][3], inverse[4][3], num;
     int i, j, k;

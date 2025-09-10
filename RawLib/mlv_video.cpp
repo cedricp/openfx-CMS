@@ -549,7 +549,7 @@ std::string Mlv_video::get_camera_model()
 	return make.substr(make.find(" ")+1, std::string::npos);
 }
 
-void Mlv_video::get_white_balance_coeffs(int temperature, float coeffs[3], float &compensation,bool cam_wb)
+void Mlv_video::get_white_balance_coeffs(int temperature, float coeffs[3], bool cam_wb)
 {
 	int32_t wbal[6];
 	mlv_wbal_hdr_t  wbobj = _imp->mlv_object->WBAL;
@@ -561,5 +561,4 @@ void Mlv_video::get_white_balance_coeffs(int temperature, float coeffs[3], float
 	coeffs[0] = float(wbal[1]) / 1000000.f;
 	coeffs[1] = float(wbal[3]) / 1000000.f;
 	coeffs[2] = float(wbal[5]) / 1000000.f;
-	compensation = *std::max_element(coeffs, coeffs+3) / *std::min_element(coeffs, coeffs+3);
 }

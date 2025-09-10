@@ -81,4 +81,8 @@ uint8_t* getDngFrameBuffer(mlvObject_t * mlv_data, dngObject_t * dng_data, uint3
 void freeDngObject(dngObject_t * dng_data);
 void freeDngData(dngObject_t * dng_data);
 
+void cam_xyz_coeff (double cam_xyz[4][3], float pre_mul[4], float rgb_cam[3][4]);
+void pseudoinverse (double (*in)[3], double (*out)[3], int size);
+void temperature_to_RGB(double T, double RGB[3]);
+
 #endif

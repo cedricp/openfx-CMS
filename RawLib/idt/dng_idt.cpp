@@ -55,7 +55,7 @@ DNGIdt::DNGIdt() {
 	_baseExpo              = 1.0;
 }
 
-DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
+DNGIdt::DNGIdt ( Mlv_video* mlv, int color_temp, bool use_cam_wb) {
 	// Fill values as for a DNG file
     float matrix1[9], matrix2[9];
 	int32_t expomin, expomax;
@@ -76,8 +76,11 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	_calibrateIllum[0] = lsStandardLightA; // 2856K - lsStandardLightA  
 	_calibrateIllum[1] = lsD65; // 6500K - lsD65
 
+	MathUtils::Vector3f asShotNeutral;
+	mlv->get_white_balance_coeffs(color_temp, asShotNeutral.data(), use_cam_wb);
+
     FORI ( 3 ){
-         _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
+         _neutralRGBDNG[i] = static_cast < double > ( 1. / asShotNeutral[i] );
     }
     
     FORI ( 9 ) {
@@ -86,10 +89,8 @@ DNGIdt::DNGIdt ( Mlv_video* mlv, float *wbal ) {
 	}
 }
 
-DNGIdt::DNGIdt (Dng_processor* dng, float *wbal )
+DNGIdt::DNGIdt (Dng_processor* dng, int color_temp, bool use_cam_wb)
 {
-	// Fill values as for a DNG file
-
 	_cameraToXYZMtx        = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix1DNG     = vector < double > ( 9, 1.0 );
 	_xyz2rgbMatrix2DNG     = vector < double > ( 9, 1.0 );
@@ -102,13 +103,19 @@ DNGIdt::DNGIdt (Dng_processor* dng, float *wbal )
 	_calibrateIllum[0] = dng->get_calibrate_expo1(); 
 	_calibrateIllum[1] = dng->get_calibrate_expo2();
 
+	MathUtils::Vector3f asShotNeutral;
+	dng->get_white_balance_coeffs(color_temp, asShotNeutral.data(), use_cam_wb);
+
     FORI ( 3 ){
-         _neutralRGBDNG[i] = static_cast < double > ( 1. / wbal[i] );
+         _neutralRGBDNG[i] = static_cast < double > ( 1. / asShotNeutral[i] );
     }
     
+	Matrix3x3f m1 = dng->matrix1();
+	Matrix3x3f m2 = dng->matrix2();
+	
     FORI ( 9 ) {
-		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( dng->matrix1().elem(i) );
-		_xyz2rgbMatrix2DNG[i] = static_cast < double > ( dng->matrix2().elem(i) );
+		_xyz2rgbMatrix1DNG[i] = static_cast < double > ( m1.elem(i) );
+		_xyz2rgbMatrix2DNG[i] = static_cast < double > ( m2.elem(i) );
 	}
 }
 

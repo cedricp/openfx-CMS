@@ -1,5 +1,8 @@
 #pragma once
 
+namespace MathUtils
+{
+
 template <class T>
 inline void matrix_vector_mult(const T *mat, const T *vec, T *result)
 {
@@ -760,4 +763,6 @@ static Matrix3x3<T> get_neutral_cam2rec709_matrix(const Matrix3x3<T> &xyzD65toca
     rgb2cam.normalize_rows();
     // Invert RGB2CAM matrix
     return rgb2cam.invert();
+}
+
 }

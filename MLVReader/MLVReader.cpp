@@ -118,11 +118,11 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
         OFX::throwSuiteStatusException(kOfxStatFailed);
     }
 
-    if (_dng_img){
+    if (_dng_sequence.size() > 0){
         rod.x1 = 0;
-        rod.x2 = _dng_img->width();
+        rod.x2 = _dng_sequence[0]->width();
         rod.y1 = 0;
-        rod.y2 = _dng_img->height();
+        rod.y2 = _dng_sequence[0]->height();
         return true;
     }
 
@@ -195,74 +195,81 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
 
 void MLVReaderPlugin::computeIDT()
 {
-    IDT_MUTEX_LOCK
     int colorspace = _outputColorSpace->getValue();
-
+    
     if (colorspace == 3){
         return;
     }
 
-    if (_mlv_video.empty()){
-        return;
-    }
+    IDT_MUTEX_LOCK
 
-    if (_dng_img)
+    if (_dng_sequence.size() > 0)
     {
-        _asShotNeutral = _dng_img->as_shot_neutral();
+        _asShotNeutral = _dng_sequence[0]->as_shot_neutral();
+        DNGIdt::DNGIdt idt(_dng_sequence[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
+        idt.getDNGIDTMatrix(_idt.data(), colorspace);
+
+        // Clear checkbox
         _useSpectralIdt->setValue(false);
     }
-    else
+    else if (_mlv_video.size() > 0)
     {
-        if (_dng_img)
-        {
-            _asShotNeutral = _dng_img->as_shot_neutral();
-            DNGIdt::DNGIdt idt(_dng_img, _asShotNeutral.data());
+        // Thread safe...
+        if (!prepareSprectralSensIDT()){
+            // No spectral sensitivities IDT, fall back to DNG IDT
+            _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
+            DNGIdt::DNGIdt idt(_mlv_video[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
             idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
             // Clear checkbox
-             _useSpectralIdt->setValue(false);
-        }
-        else
-        {
-            // Thread safe...
-            _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _wbcompensation, _cameraWhiteBalance->getValue());
-            
-            if (!prepareSprectralSensIDT()){
-                // No spectral sensitivities IDT, fall back to DNG IDT
-                DNGIdt::DNGIdt idt(_mlv_video[0], _asShotNeutral.data());
-                idt.getDNGIDTMatrix(_idt.data(), colorspace);
-
-                // Clear checkbox
-                _useSpectralIdt->setValue(false);
-            }
+            _useSpectralIdt->setValue(false);
         }
     }
+
     IDT_MUTEX_UNLOCK
 }
 
 Mlv_video* MLVReaderPlugin::getMlv()
 {
     Mlv_video *mlv_video = nullptr;
-    {
-        if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
-        for (unsigned int i = 0; i < _mlv_video.size(); ++i){
-            if (!_mlv_video[i]->locked()){
-                _mlv_video[i]->lock();
-                mlv_video = _mlv_video[i];
-                break;
-            }
+
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
+    for (unsigned int i = 0; i < _mlv_video.size(); ++i){
+        if (!_mlv_video[i]->locked()){
+            _mlv_video[i]->lock();
+            mlv_video = _mlv_video[i];
+            break;
         }
-        _gThreadHost->mutexUnLock(_videoMutex);
-    } 
+    }
+    _gThreadHost->mutexUnLock(_videoMutex);
+
     return mlv_video;
+}
+
+Dng_processor* MLVReaderPlugin::getDng()
+{
+    Dng_processor *dngproc = nullptr;
+
+    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
+    for (unsigned int i = 0; i < _dng_sequence.size(); ++i){
+        if (!_dng_sequence[i]->locked()){
+            _dng_sequence[i]->lock();
+            dngproc = _dng_sequence[i];
+            break;
+        }
+    }
+    _gThreadHost->mutexUnLock(_videoMutex);
+
+    return dngproc;
 }
 
 // the overridden render function
 void MLVReaderPlugin::render(const OFX::RenderArguments &args)
 {
     Mlv_video *mlv_video = getMlv();
+    Dng_processor * dng_img = getDng();
 
-    if (mlv_video == nullptr && _dng_img == nullptr){
+    if (mlv_video == nullptr && dng_img == nullptr){
         OFX::throwSuiteStatusException(kOfxStatFailed);
         return;
     }
@@ -292,8 +299,8 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
         raw_width = mlv_video->raw_resolution_x();
         raw_height = mlv_video->raw_resolution_y();
     } else {
-        raw_width = _dng_img->width();
-        raw_height = _dng_img->height();
+        raw_width = dng_img->width();
+        raw_height = dng_img->height();
     }
     
     OfxRectI renderWin = args.renderWindow;
@@ -312,7 +319,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             raw_buffer = mlv_video->postprocecessed_raw_buffer();
         } else {
             float max_value = _maxValue;
-            raw_buffer = _dng_img->get_processed_filebuffer();
+            raw_buffer = dng_img->get_processed_filebuffer();
         }
 
         if (raw_buffer != nullptr){
@@ -329,9 +336,14 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             }
         }
     } else {
-        if (_dng_img)
+        if (dng_img)
         {
-            renderDNG(args, dst.get(), _dng_img, time, height_img, width_img);
+            //if (getUseOpenCL()){
+            //    renderDNG_GPU(args, dst.get(), dng_img, time, height_img, width_img);
+            //} else {
+            //    renderDNG_CPU(args, dst.get(), dng_img, time, height_img, width_img);
+            //}
+            renderDNG_CPU(args, dst.get(), dng_img, time, height_img, width_img);
         }
         else
         {
@@ -342,8 +354,8 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
                 if (_enableDarkFrame->getValue() == true){
                     setPersistentMessage(OFX::Message::eMessageWarning, "", std::string("Warning : Dark frame file not found, dark frame correction will not be applied"));
                 }
-
             }
+
             // Common code for CPU and OpenCL
             Mlv_video::RawInfo rawInfo;
             rawInfo.dual_iso_mode = _dualIsoMode->getValue();
@@ -357,42 +369,30 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
             mlv_video->low_level_process(rawInfo);
 
             if (getUseOpenCL()){
-                renderCL(args, dst.get(), mlv_video, time);
+                renderMLV_GPU(args, dst.get(), mlv_video, time);
                 
             } else {
-                renderCPU(args, dst.get(), mlv_video, time, raw_height, raw_width);
+                renderMLV_CPU(args, dst.get(), mlv_video, time, raw_height, raw_width);
             }
 
-            float cacorrection_threshold = _cacorrection_threshold->getValue();
-            if(cacorrection_threshold < 1.0){
-                uint8_t cacorrection_radius = (uint8_t)_cacorrection_radius->getValue();
-                // Apply color aberration correction
-                CACorrection(width_img, height_img, (float*)dst.get()->getPixelData(), cacorrection_threshold, cacorrection_radius);
-            }
+        }
+
+        float cacorrection_threshold = _cacorrection_threshold->getValue();
+        if(cacorrection_threshold < 1.0){
+            uint8_t cacorrection_radius = (uint8_t)_cacorrection_radius->getValue();
+            // Apply color aberration correction
+            CACorrection(width_img, height_img, (float*)dst.get()->getPixelData(), cacorrection_threshold, cacorrection_radius);
         }
     }
 
     if (mlv_video) mlv_video->unlock();
+    if (dng_img) dng_img->unlock();    
 }
 
-void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time)
+void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst, uint16_t* raw_buffer, int black_level, int white_level, int time, int height, int width)
 {
-    int dng_size = 0;
-
-    mlv_video->get_dng_buffer(time, dng_size, true);
-    uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
-
-    if (_levelsDirty){
-        _blackLevel->setValue(mlv_video->black_level());
-        _whiteLevel->setValue(mlv_video->white_level());
-        _resetLevels->setValue(false);
-        _levelsDirty = false;
-    }
-
     Matrix3x3f cam_matrix;
-    
-    uint32_t black_level = _blackLevel->getValue();  
-    uint32_t white_level = _whiteLevel->getValue();
+    computeColorspaceMatrix(cam_matrix);
 
     // Compute clip values
     float scale = 1. / float(white_level - black_level);
@@ -401,11 +401,6 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
     if (_highlightMode->getValue() > 0){
         clipping_value = 10000.f;
     }
-
-    computeColorspaceMatrix(cam_matrix);
-
-    int width = mlv_video->raw_resolution_x();
-    int height = mlv_video->raw_resolution_y();
 
     cl::Image2D img_in(getCurrentCLContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_UNSIGNED_INT16), width, height, 0, raw_buffer);
     cl::Image2D img_out(getCurrentCLContext(), CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, NULL);
@@ -527,7 +522,7 @@ void MLVReaderPlugin::renderCL(const OFX::RenderArguments &args, OFX::Image* dst
     queue.finish();
 }
 
-void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img)
+void MLVReaderPlugin::renderMLV_CPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time, int height_img, int width_img)
 {
     int dng_size = 0;
     mlv_video->set_dng_raw_levels(_blackLevel->getValue(), _whiteLevel->getValue());
@@ -572,7 +567,7 @@ void MLVReaderPlugin::renderCPU(const OFX::RenderArguments &args, OFX::Image* ds
     processor.process();
 }
 
-void MLVReaderPlugin::renderDNG(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img)
+void MLVReaderPlugin::renderDNG_CPU(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img)
 {
     // Get raw buffer -> raw colors
     uint16_t* processed_buffer = dng->get_processed_filebuffer();
@@ -592,23 +587,61 @@ void MLVReaderPlugin::renderDNG(const OFX::RenderArguments &args, OFX::Image* ds
     processor.bl = _blackLevel->getValue();
     processor.raw_width = width_img;
     processor.raw_height = height_img;
-    processor.cam_mult = _dng_img->as_shot_neutral();
+    processor.cam_mult = dng->as_shot_neutral();
     processor.clip = _highlightMode->getValue() == 0;
     processor.headroom = _outputColorSpace->getValue() < 2 ? _headroom->getValue() : 1;
     computeColorspaceMatrix(processor.idt_matrix);
-    //processor.idt_matrix.set_identity();
 
     processor.process();
 }
 
+void MLVReaderPlugin::renderDNG_GPU(const OFX::RenderArguments &args, OFX::Image* dst, Dng_processor* dng, int time, int height_img, int width_img)
+{
+    // Get raw buffer -> raw colors
+    uint16_t* processed_buffer = dng->get_processed_filebuffer();
+
+    if (_levelsDirty){
+        _blackLevel->setValue(dng->black_level());
+        _whiteLevel->setValue(dng->white_level());
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
+
+    renderCL(args, dst, processed_buffer, _blackLevel->getValue(), _whiteLevel->getValue(), time, height_img, width_img);
+}
+
+void MLVReaderPlugin::renderMLV_GPU(const OFX::RenderArguments &args, OFX::Image* dst, Mlv_video* mlv_video, int time)
+{
+    int dng_size = 0;
+
+    mlv_video->get_dng_buffer(time, dng_size, true);
+    uint16_t* raw_buffer = mlv_video->postprocecessed_raw_buffer();
+
+    if (_levelsDirty){
+        _blackLevel->setValue(mlv_video->black_level());
+        _whiteLevel->setValue(mlv_video->white_level());
+        _resetLevels->setValue(false);
+        _levelsDirty = false;
+    }
+
+    
+    uint32_t black_level = _blackLevel->getValue();  
+    uint32_t white_level = _whiteLevel->getValue();
+    
+    int width = mlv_video->raw_resolution_x();
+    int height = mlv_video->raw_resolution_y();
+
+    renderCL(args, dst, raw_buffer, black_level, white_level, time, height, width);
+}
+
 void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
 {
-    if (_dng_img)
+    if (_dng_sequence.size() > 0)
     {
         Matrix3x3f xyzd65tocam, rgb2rgb;
         int colorspace = _outputColorSpace->getValue();
 
-        xyzd65tocam = _dng_img->cam2xyz().invert();
+        xyzd65tocam = _dng_sequence[0]->matrix2();
         
         rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
         if (colorspace <= REC709){
@@ -669,84 +702,92 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
 {
     std::string extension = file.substr(file.find_last_of(".") + 1);
     std::transform(extension.begin(), extension.end(), extension.begin(), ::toupper);
-    if (extension == "DNG"){
-        _dng_img = new Dng_processor;
-        _dng_img->load_dng(file.c_str());
-        _maxValue = pow(2, _dng_img->bpp());
-        _bpp->setEnabled(true);
-        _bpp->setValue(_dng_img->bpp());
-        _bpp->setEnabled(false);
-        return;
-    }
 
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return;
 
-    for (Mlv_video* mlv : _mlv_video){
-        if (mlv){
-            // Wait for the videostream to be released by renderer
-            while (mlv->locked()){Sleep(10);}
-            // Now we're sure no one is using the stream
-            delete mlv;
-        }
+    for(auto dng: _dng_sequence){
+        while (dng->locked()){Sleep(10);}
+        delete dng;
     }
+
+    for(auto mlv: _mlv_video){
+        while (mlv->locked()){Sleep(10);}
+        delete mlv;
+    }
+
+    _dng_sequence.clear();
     _mlv_video.clear();
-    free(_dng_img);
-    _dng_img = nullptr;
 
-    // As mlv-lib does not support multi threading
-    // because of file operations, I just create
-    // multiples instances
-    Mlv_video* mlv_video = new Mlv_video(file);
-    _mlvfilename = file;
-    if (!mlv_video->valid()){
-        delete mlv_video;
+    if (extension == "DNG"){
+        Dng_processor* _dng_img = new Dng_processor;
+        if (_dng_img->load_dng(file.c_str())){
+            _maxValue = pow(2, _dng_img->bpp());
+            _bpp->setEnabled(true);
+            _bpp->setValue(_dng_img->bpp());
+            _bpp->setEnabled(false);
+
+            _dng_sequence.push_back(_dng_img);
+            for (int i = 0; i < _numThreads+4; ++i){
+                Dng_processor* dng = new Dng_processor;
+                _dng_sequence.push_back(dng);
+            }
+        }
     } else {
-        _maxValue = pow(2, mlv_video->bpp());
-        OfxPointI tr;
-        tr.x = 0;
-        tr.y = mlv_video->frame_count();
-        _timeRange->setValue(tr);
-        _mlv_fps->setValue(mlv_video->fps());
-        _mlv_video.push_back(mlv_video);
-        _bpp->setEnabled(true);
-        _bpp->setValue(mlv_video->bpp());
-        _bpp->setEnabled(false);
-        _levelsDirty = false;
-        if (set){
-            _levelsDirty = true;
+        // As mlv-lib does not support multi threading
+        // because of file operations, I just create
+        // multiples instances
+        Mlv_video* mlv_video = new Mlv_video(file);
+
+        if (!mlv_video->valid()){
+            delete mlv_video;
+        } else {
+            _maxValue = pow(2, mlv_video->bpp());
+            OfxPointI tr;
+            tr.x = 0;
+            tr.y = mlv_video->frame_count();
+            _timeRange->setValue(tr);
+            _mlv_fps->setValue(mlv_video->fps());
+            _mlv_video.push_back(mlv_video);
+            _bpp->setEnabled(true);
+            _bpp->setValue(mlv_video->bpp());
+            _bpp->setEnabled(false);
+            _levelsDirty = false;
+            if (set){
+                _levelsDirty = true;
+            }
+            // Reserve as MLV readers as threads + some extra for safety 
+            for (unsigned int i = 0; i < _numThreads+4; ++i){
+                // Copy video stream, fast way
+                Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
+                _mlv_video.push_back(mlv_videodup);
+            }
+    
+            _idtDirty = true;
         }
     }
-
-    // Reserve as MLV readers as threads + some extra for safety 
-    for (unsigned int i = 0; i < _numThreads+4; ++i){
-        // Copy video stream, fast way
-        Mlv_video* mlv_videodup = new Mlv_video(*mlv_video);
-        _mlv_video.push_back(mlv_videodup);
-    }
-
-    _idtDirty = true;
 
     _gThreadHost->mutexUnLock(_videoMutex);
 }
 
 void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPreferences)
 {
-    Mlv_video* mlv;
     OfxRectI format;
+    float fps = 25.f;
 
-    if (_dng_img)
+    if (_dng_sequence.size() > 0)
     {
         format.x1 = 0;
-        format.x2 = _dng_img->width();
+        format.x2 = _dng_sequence[0]->width();
         format.y1 = 0;
-        format.y2 = _dng_img->height();
+        format.y2 = _dng_sequence[0]->height();
     }
-    else if (mlv = getMlv())
+    else if (_mlv_video.size())
     {
         format.x1 = 0;
-        format.x2 = mlv->raw_resolution_x();
+        format.x2 = _mlv_video[0]->raw_resolution_x();
         format.y1 = 0;
-        format.y2 = mlv->raw_resolution_y();
+        format.y2 = _mlv_video[0]->raw_resolution_y();
+        fps = _mlv_video[0]->fps();
     }
     else
     {
@@ -760,11 +801,9 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
     clipPreferences.setPixelAspectRatio(*_outputClip, 1);
     clipPreferences.setClipBitDepth(*_outputClip, OFX::eBitDepthFloat);
     clipPreferences.setClipComponents(*_outputClip, OFX::ePixelComponentRGBA);
-    clipPreferences.setOutputFrameRate(mlv->fps());
+    clipPreferences.setOutputFrameRate(fps);
     clipPreferences.setOutputPremultiplication(OFX::eImageUnPreMultiplied);
     clipPreferences.setOutputHasContinuousSamples(false);
-
-    if (mlv) mlv->unlock();
 }
 
 void MLVReaderPlugin::changedClip(const OFX::InstanceChangedArgs& /*p_Args*/, const std::string& p_ClipName)
@@ -809,15 +848,16 @@ void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const s
         std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
         bool is_mlv = upperfn.find(".MLV");
         bool is_dng = upperfn.find(".DNG");
-        if (!is_mlv || !is_dng){
+        bool is_cr2 = upperfn.find(".CR2");
+        if (!is_mlv || !is_dng || !is_cr2){
             setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
             OFX::throwSuiteStatusException(kOfxStatFailed);
             return;
         }
 
         if (filename != _mlvfilename){
-            setMlvFile(filename);
             _mlvfilename = filename;
+            setMlvFile(filename);
         }
     }
 

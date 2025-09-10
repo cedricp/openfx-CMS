@@ -9,8 +9,8 @@ namespace DNGIdt{
 	class DNGIdt {
 		public:
 			DNGIdt();
-			DNGIdt (Mlv_video* mlv, float *wbal);
-			DNGIdt (Dng_processor* dng, float *wbal );
+			DNGIdt (Mlv_video* mlv, int color_temp, bool use_cam_wb);
+			DNGIdt (Dng_processor* dng, int color_temp, bool use_cam_wb);
 			virtual ~DNGIdt();
 
 			double ccttoMired ( const double cct ) const;

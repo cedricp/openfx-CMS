@@ -42,8 +42,11 @@
 #define kPrintMatrix "printMatrixOnTerminal"
 #define kGroupPrimaries "ColorPrimaries"
 
+namespace MathUtils
+{
 template <class T> class Matrix3x3;
-typedef Matrix3x3<float> Matrix3x3f;
+typedef MathUtils::Matrix3x3<float> Matrix3x3f;
+}
 
 OFXS_NAMESPACE_ANONYMOUS_ENTER
 
@@ -96,7 +99,7 @@ private:
     bool isIdentity(const OFX::IsIdentityArguments &args, OFX::Clip *&identityClip, double &identityTime, int &view, std::string &plane) OVERRIDE FINAL;
 
 private:
-    Matrix3x3f computeMatrix(double time, bool& invert, int &trc);
+    MathUtils::Matrix3x3f computeMatrix(double time, bool& invert, int &trc);
 
     OFX::Clip *_inputClip;
     OFX::Clip *_outputClip;
