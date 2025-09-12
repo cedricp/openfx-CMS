@@ -34,6 +34,8 @@ extern "C" {
 #include <filesystem>
 #include <fstream>
 #include <stddef.h>
+#include <regex>
+#include <filesystem>
 #include "ofxOpenGLRender.h"
 
 extern "C"{
@@ -56,6 +58,67 @@ enum ColorSpaceFormat {
         REC709,
         XYZ
 };
+
+struct SequenceRange {
+    int first;
+    int last;
+    bool found;
+};
+
+SequenceRange detectSequence(const std::string& pattern) {
+    const std::string directory = std::filesystem::path(pattern).parent_path().string();
+    const std::string basefilename = std::filesystem::path(pattern).filename().string();
+    printf("Searching for sequence in directory : %s\n", directory.c_str());
+    // Convert pattern "file.####.ext" to regex: "file\.(\d+)\.ext"
+    std::string regexPattern = std::regex_replace(basefilename, std::regex("#+"), R"((\d+))");
+    std::regex re(regexPattern);
+
+    int minNum = std::numeric_limits<int>::max();
+    int maxNum = std::numeric_limits<int>::min();
+    bool found = false;
+
+    for (auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (!entry.is_regular_file()) continue;
+        std::string filename = entry.path().filename().string();
+
+        std::smatch match;
+        if (std::regex_match(filename, match, re)) {
+            if (match.size() > 1) {
+                int num = std::stoi(match[1].str());
+                minNum = std::min(minNum, num);
+                maxNum = std::max(maxNum, num);
+                found = true;
+            }
+        }
+    }
+
+    if (!found) {
+        return {0, 0, false};
+    }
+    return {minNum, maxNum, true};
+}
+
+bool makeFilename(const std::string& pattern, int number, std::string& result) {
+    // Find the run of '#' characters
+    size_t first = pattern.find('#');
+    if (first == std::string::npos) {
+        return false;
+    }
+
+    size_t last = pattern.find_last_of('#');
+    size_t count = last - first + 1;  // number of '#' characters
+
+    // Build number with leading zeros
+    std::ostringstream oss;
+    oss << std::setw(static_cast<int>(count)) << std::setfill('0') << number;
+    std::string numStr = oss.str();
+
+    // Replace the run of '#' with numStr
+    result = pattern;
+    result.replace(first, count, numStr);
+
+    return true;
+}
 
 class ColorProcessor : public OFX::ImageProcessor
 {
@@ -145,6 +208,19 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     // No color space conversion
     // No camera matrix
     std::string datapath = _pluginPath + "/Contents/Resources/data";
+    
+    std::string camera_make;
+    std::string camera_model;
+
+    if (_mlv_video.size() > 0){
+        camera_make = _mlv_video[0]->get_camera_make();
+        camera_model = _mlv_video[0]->get_camera_model();
+    } else if (_dng_sequence.size() > 0){
+        camera_make = _dng_sequence[0]->camera_make();
+        camera_model = _dng_sequence[0]->camera_model();
+    } else {
+        return false;
+    }
 
     _useSpectralIdt->setEnabled(false);
     
@@ -159,7 +235,7 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     ok = 0;
     std::vector< std::string > jsonfiles = openDir(datapath + "/camera");
     for (auto json : jsonfiles){
-        ok = idt.loadCameraSpst(json, _mlv_video[0]->get_camera_make().c_str(), _mlv_video[0]->get_camera_model().c_str());
+        ok = idt.loadCameraSpst(json, camera_make.c_str(), camera_model.c_str());
         if (ok) break;
     }
 
@@ -205,19 +281,22 @@ void MLVReaderPlugin::computeIDT()
 
     if (_dng_sequence.size() > 0)
     {
-        _asShotNeutral = _dng_sequence[0]->as_shot_neutral();
-        DNGIdt::DNGIdt idt(_dng_sequence[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
-        idt.getDNGIDTMatrix(_idt.data(), colorspace);
+        //_asShotNeutral = _dng_sequence[0]->as_shot_neutral();
+        _dng_sequence[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
+        if (!prepareSprectralSensIDT()){
+            DNGIdt::DNGIdt idt(_dng_sequence[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
+            idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
-        // Clear checkbox
-        _useSpectralIdt->setValue(false);
+            // Clear checkbox
+            _useSpectralIdt->setValue(false);
+        }
     }
     else if (_mlv_video.size() > 0)
     {
         // Thread safe...
+        _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
         if (!prepareSprectralSensIDT()){
             // No spectral sensitivities IDT, fall back to DNG IDT
-            _mlv_video[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
             DNGIdt::DNGIdt idt(_mlv_video[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
             idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
@@ -255,9 +334,9 @@ Dng_processor* MLVReaderPlugin::getDng(double time)
         if (!_dng_sequence[i]->locked()){
             _dng_sequence[i]->lock();
             dngproc = _dng_sequence[i];
-            std::string file_at_time = _mlvfilename_param->getValueAtTime(time);
-            printf("Loading DNG file : %s\n", file_at_time.c_str());
-            dngproc->load_dng(file_at_time);
+            std::string file = _mlvfilename_param->getValue();
+            makeFilename(file, (int)time, file);
+            dngproc->load_dng(file);
             break;
         }
     }
@@ -595,7 +674,7 @@ void MLVReaderPlugin::renderDNG_CPU(const OFX::RenderArguments &args, OFX::Image
     processor.bl = _blackLevel->getValue();
     processor.raw_width = width_img;
     processor.raw_height = height_img;
-    processor.cam_mult = dng->as_shot_neutral();
+    processor.cam_mult = _asShotNeutral;
     processor.clip = _highlightMode->getValue() == 0;
     processor.headroom = _outputColorSpace->getValue() < 2 ? _headroom->getValue() : 1;
     computeColorspaceMatrix(processor.idt_matrix);
@@ -646,47 +725,51 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
 {
     if (_dng_sequence.size() > 0)
     {
-        Matrix3x3f xyzd65tocam, rgb2rgb;
-        int colorspace = _outputColorSpace->getValue();
-
-        xyzd65tocam = _dng_sequence[0]->matrix2();
-        
-        rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
-        if (colorspace <= REC709){
-            // Using DNG IDT matrix
-            out_matrix = _idt * rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+        if (_useSpectralIdt->getValue()){
+            // Spectral sensitivity based matrix
+            out_matrix = _idt;
         } else {
-            // XYZD50 output
-            out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+            Matrix3x3f xyzd65tocam, rgb2rgb;
+            int colorspace = _outputColorSpace->getValue();
+
+            xyzd65tocam = _dng_sequence[0]->matrix2();
+            
+            rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
+            if (colorspace <= REC709){
+                // Using DNG IDT matrix
+                out_matrix = _idt * rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+            } else {
+                // XYZD50 output
+                out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+            }
         }
-        return;
-    }
-
-    Mlv_video * mlv_video = getMlv();
-    if (mlv_video == nullptr){
-        return;
-    }
-
-    if (_useSpectralIdt->getValue()){
-        // Spectral sensitivity based matrix
-        out_matrix = _idt;
     } else {
-        Matrix3x3f xyzd65tocam, rgb2rgb;
-        int colorspace = _outputColorSpace->getValue();
-
-        mlv_video->get_camera_matrix2f(xyzd65tocam.data());
-        
-        rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
-        if (colorspace <= REC709){
-            // Using DNG IDT matrix
-            out_matrix = _idt * rec709_to_xyzD50_matrix<float>() * rgb2rgb;
-        } else {
-            // XYZD50 output
-            out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+        Mlv_video * mlv_video = getMlv();
+        if (mlv_video == nullptr){
+            return;
         }
-    }
 
-    mlv_video->unlock();
+        if (_useSpectralIdt->getValue()){
+            // Spectral sensitivity based matrix
+            out_matrix = _idt;
+        } else {
+            Matrix3x3f xyzd65tocam, rgb2rgb;
+            int colorspace = _outputColorSpace->getValue();
+
+            mlv_video->get_camera_matrix2f(xyzd65tocam.data());
+            
+            rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
+            if (colorspace <= REC709){
+                // Using DNG IDT matrix
+                out_matrix = _idt * rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+            } else {
+                // XYZD50 output
+                out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
+            }
+        }
+
+        mlv_video->unlock();
+    }
 }
 
 bool MLVReaderPlugin::getTimeDomain(OfxRangeD& range)
@@ -727,18 +810,37 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
     _mlv_video.clear();
 
     if (extension == "DNG"){
+        SequenceRange seq = detectSequence(file);
+        if (seq.found){
+            OfxPointI tr;
+            tr.x = seq.first;
+            tr.y = seq.last;
+            _timeRange->setValue(tr);
+            makeFilename(file, seq.first, file);
+        } else {
+            OfxPointI tr;
+            tr.x = 0;
+            tr.y = 0;
+            _timeRange->setValue(tr);
+        }
+
         Dng_processor* _dng_img = new Dng_processor;
+        _dng_img->lock();
         if (_dng_img->load_dng(file.c_str())){
+            
             _maxValue = pow(2, _dng_img->bpp());
             _bpp->setEnabled(true);
             _bpp->setValue(_dng_img->bpp());
             _bpp->setEnabled(false);
 
             _dng_sequence.push_back(_dng_img);
+            _dng_img->unlock();
             for (int i = 0; i < _numThreads+4; ++i){
                 Dng_processor* dng = new Dng_processor;
                 _dng_sequence.push_back(dng);
             }
+        } else {
+            delete _dng_img;
         }
     } else {
         // As mlv-lib does not support multi threading
@@ -848,27 +950,28 @@ void MLVReaderPluginFactory::describe(OFX::ImageEffectDescriptor &desc)
 
 void MLVReaderPlugin::changedParam(const OFX::InstanceChangedArgs& args, const std::string& paramName)
 {
-    
     if (paramName == kMLVfileParamter)
     {
-        std::string filename = _mlvfilename_param->getValue();
-        std::string fileattime;
-        _mlvfilename_param->getValueAtTime(args.time, fileattime);
-        printf("Loading file : %s\n", fileattime.c_str());
-        std::string upperfn = filename;
-        std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
-        bool is_mlv = upperfn.find(".MLV");
-        bool is_dng = upperfn.find(".DNG");
-        bool is_cr2 = upperfn.find(".CR2");
-        if (!is_mlv || !is_dng || !is_cr2){
-            setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
-            OFX::throwSuiteStatusException(kOfxStatFailed);
-            return;
-        }
+        if (args.reason != OFX::eChangeTime) {
+            std::string filename = _mlvfilename_param->getValue();
+            std::string fileattime;
+            _mlvfilename_param->getValueAtTime(args.time, fileattime);
+            printf("Loading file : %s\n", fileattime.c_str());
+            std::string upperfn = filename;
+            std::transform(upperfn.begin(), upperfn.end(), upperfn.begin(), ::toupper);
+            bool is_mlv = upperfn.find(".MLV");
+            bool is_dng = upperfn.find(".DNG");
+            bool is_cr2 = upperfn.find(".CR2");
+            if (!is_mlv || !is_dng || !is_cr2){
+                setPersistentMessage(OFX::Message::eMessageError, "", std::string("Unsupported file extension"));
+                OFX::throwSuiteStatusException(kOfxStatFailed);
+                return;
+            }
 
-        if (filename != _mlvfilename){
-            _mlvfilename = filename;
-            setMlvFile(filename);
+            if (filename != _mlvfilename){
+                _mlvfilename = filename;
+                setMlvFile(filename);
+            }
         }
     }
 
@@ -1006,9 +1109,10 @@ void MLVReaderPluginFactory::describeInContext(OFX::ImageEffectDescriptor &desc,
         OFX::StringParamDescriptor *param = desc.defineStringParam(kMLVfileParamter);
         param->setLabel("Filename");
         param->setHint("Name of the MLV file");
-        param->setDefault("");
         param->setFilePathExists(true);
+        param->setAnimates(false);
         param->setStringType(OFX::eStringTypeFilePath);
+        param->setScriptName(kMLVfileParamter);
         desc.addClipPreferencesSlaveParam(*param);
         if (page)
         {

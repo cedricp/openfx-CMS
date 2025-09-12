@@ -34,6 +34,8 @@ public:
 	void get_white_balance_coeffs(int temperature, float coeffs[3], bool cam_wb);
 	void get_white_balance(mlv_wbal_hdr_t wbal_hdr, int32_t *wbal);
 	float* cam_mult(){return _cam_mult;}
+	std::string camera_make(){return _camera_make;}
+	std::string camera_model(){return _camera_model;}
 
 	void lock(){dng_lock = true;}
 	void unlock(){dng_lock = false;}
@@ -58,4 +60,7 @@ public:
 	unsigned short _calibrate_expo[2] = {17, 21};
 	bool dng_lock = false;
 	float _cam_mult[3] = {1.0, 1.0, 1.0};
+
+	std::string _camera_model;
+	std::string _camera_make;
 };

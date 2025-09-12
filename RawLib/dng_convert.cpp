@@ -155,6 +155,9 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_cam_mult[1] = _imp->libraw->imgdata.color.cam_mul[1];
 	_cam_mult[2] = _imp->libraw->imgdata.color.cam_mul[2];
 
+	_camera_make = _imp->libraw->imgdata.idata.make;
+	_camera_model = _imp->libraw->imgdata.idata.model;
+
 	return (uint16_t*)&_imp->_image->data;
 }
 

@@ -221,6 +221,7 @@ class MLVReaderPluginFactory : public OFX::PluginFactoryHelper<MLVReaderPluginFa
         virtual void describe(OFX::ImageEffectDescriptor &desc);
         virtual void describeInContext(OFX::ImageEffectDescriptor &desc, OFX::ContextEnum context);
         virtual OFX::ImageEffect* createInstance(OfxImageEffectHandle handle, OFX::ContextEnum context);
+        bool isVideoStreamPlugin() const { return false; } 
 };
 
 OFXS_NAMESPACE_ANONYMOUS_EXIT
