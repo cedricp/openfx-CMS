@@ -40,6 +40,7 @@ public:
 	void lock(){dng_lock = true;}
 	void unlock(){dng_lock = false;}
 	bool locked(){return dng_lock;}
+	bool is_init(){return _init;}
 	
 	private:
 	void kelvin_green_to_multipliers(double temperature, double green, double chanMulArray[3]);
@@ -60,6 +61,7 @@ public:
 	unsigned short _calibrate_expo[2] = {17, 21};
 	bool dng_lock = false;
 	float _cam_mult[3] = {1.0, 1.0, 1.0};
+	bool _init = false;
 
 	std::string _camera_model;
 	std::string _camera_make;

@@ -182,10 +182,13 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
     }
 
     if (_dng_sequence.size() > 0){
+        if (_dngh == 0 || _dngw == 0){
+            return false;
+        }
         rod.x1 = 0;
-        rod.x2 = _dng_sequence[0]->width();
+        rod.x2 = _dngw;
         rod.y1 = 0;
-        rod.y2 = _dng_sequence[0]->height();
+        rod.y2 = _dngh;
         return true;
     }
 
@@ -193,16 +196,14 @@ bool MLVReaderPlugin::getRegionOfDefinition(const OFX::RegionOfDefinitionArgumen
         return false;
     }
 
-    if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return false;
     rod.x1 = 0;
     rod.x2 = _mlv_video[0]->raw_resolution_x();
     rod.y1 = 0;
     rod.y2 = _mlv_video[0]->raw_resolution_y();
-    _gThreadHost->mutexUnLock(_videoMutex);
     return true;
 }
 
-bool MLVReaderPlugin::prepareSprectralSensIDT()
+bool MLVReaderPlugin::prepareSprectralSensIDT(Dng_processor* dng)
 {
     // matMethod0
     // No color space conversion
@@ -215,9 +216,9 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     if (_mlv_video.size() > 0){
         camera_make = _mlv_video[0]->get_camera_make();
         camera_model = _mlv_video[0]->get_camera_model();
-    } else if (_dng_sequence.size() > 0){
-        camera_make = _dng_sequence[0]->camera_make();
-        camera_model = _dng_sequence[0]->camera_model();
+    } else if (dng){
+        camera_make = dng->camera_make();
+        camera_model = dng->camera_model();
     } else {
         return false;
     }
@@ -269,7 +270,7 @@ bool MLVReaderPlugin::prepareSprectralSensIDT()
     return false;
 }
 
-void MLVReaderPlugin::computeIDT()
+void MLVReaderPlugin::computeIDT(Dng_processor* dng)
 {
     int colorspace = _outputColorSpace->getValue();
     
@@ -279,12 +280,10 @@ void MLVReaderPlugin::computeIDT()
 
     IDT_MUTEX_LOCK
 
-    if (_dng_sequence.size() > 0)
-    {
-        //_asShotNeutral = _dng_sequence[0]->as_shot_neutral();
-        _dng_sequence[0]->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
+    if (dng){
+        dng->get_white_balance_coeffs(_colorTemperature->getValue(), _asShotNeutral.data(), _cameraWhiteBalance->getValue());
         if (!prepareSprectralSensIDT()){
-            DNGIdt::DNGIdt idt(_dng_sequence[0], _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
+            DNGIdt::DNGIdt idt(dng, _colorTemperature->getValue(), _cameraWhiteBalance->getValue());
             idt.getDNGIDTMatrix(_idt.data(), colorspace);
 
             // Clear checkbox
@@ -330,6 +329,7 @@ Dng_processor* MLVReaderPlugin::getDng(double time)
     Dng_processor *dngproc = nullptr;
 
     if (_gThreadHost->mutexLock(_videoMutex) != kOfxStatOK) return nullptr;
+    
     for (unsigned int i = 0; i < _dng_sequence.size(); ++i){
         if (!_dng_sequence[i]->locked()){
             _dng_sequence[i]->lock();
@@ -340,6 +340,7 @@ Dng_processor* MLVReaderPlugin::getDng(double time)
             break;
         }
     }
+
     _gThreadHost->mutexUnLock(_videoMutex);
 
     return dngproc;
@@ -357,7 +358,7 @@ void MLVReaderPlugin::render(const OFX::RenderArguments &args)
     }
 
     if (_idtDirty){
-        computeIDT();
+        computeIDT(dng_img);
         _idtDirty = false;
     }
 
@@ -721,9 +722,9 @@ void MLVReaderPlugin::renderMLV_GPU(const OFX::RenderArguments &args, OFX::Image
     renderCL(args, dst, raw_buffer, black_level, white_level, time, height, width);
 }
 
-void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
+void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix, Dng_processor* dng)
 {
-    if (_dng_sequence.size() > 0)
+    if (dng)
     {
         if (_useSpectralIdt->getValue()){
             // Spectral sensitivity based matrix
@@ -732,7 +733,7 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
             Matrix3x3f xyzd65tocam, rgb2rgb;
             int colorspace = _outputColorSpace->getValue();
 
-            xyzd65tocam = _dng_sequence[0]->matrix2();
+            xyzd65tocam = dng->matrix2();
             
             rgb2rgb = get_neutral_cam2rec709_matrix(xyzd65tocam);
             if (colorspace <= REC709){
@@ -743,6 +744,7 @@ void MLVReaderPlugin::computeColorspaceMatrix(Matrix3x3f& out_matrix)
                 out_matrix = rec709_to_xyzD50_matrix<float>() * rgb2rgb;
             }
         }
+        dng->unlock();
     } else {
         Mlv_video * mlv_video = getMlv();
         if (mlv_video == nullptr){
@@ -827,7 +829,8 @@ void MLVReaderPlugin::setMlvFile(std::string file, bool set)
         Dng_processor* _dng_img = new Dng_processor;
         _dng_img->lock();
         if (_dng_img->load_dng(file.c_str())){
-            
+            _dngh = _dng_img->height();
+            _dngw = _dng_img->width();
             _maxValue = pow(2, _dng_img->bpp());
             _bpp->setEnabled(true);
             _bpp->setValue(_dng_img->bpp());
@@ -886,10 +889,13 @@ void MLVReaderPlugin::getClipPreferences(OFX::ClipPreferencesSetter &clipPrefere
 
     if (_dng_sequence.size() > 0)
     {
-        format.x1 = 0;
-        format.x2 = _dng_sequence[0]->width();
-        format.y1 = 0;
-        format.y2 = _dng_sequence[0]->height();
+        if (_dng_sequence.size())
+        {
+            format.x1 = 0;
+            format.x2 = _dngw;
+            format.y1 = 0;
+            format.y2 = _dngh;
+        }
     }
     else if (_mlv_video.size())
     {

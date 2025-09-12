@@ -162,9 +162,9 @@ private:
     
     Mlv_video* getMlv();
     Dng_processor* getDng(double time);
-    void computeIDT();
-    bool prepareSprectralSensIDT();
-    void computeColorspaceMatrix(Matrix3x3f& out_matrix);
+    void computeIDT(Dng_processor* dng = nullptr);
+    bool prepareSprectralSensIDT(Dng_processor* dng = nullptr);
+    void computeColorspaceMatrix(Matrix3x3f& out_matrix, Dng_processor* dng = nullptr);
     void setMlvFile(std::string file, bool set = true);
 
 
@@ -207,6 +207,7 @@ private:
     int _maxValue=0;
     bool _idtDirty = true;
     bool _levelsDirty = true;
+    int _dngw = 0, _dngh = 0;
 
     std::vector<Mlv_video*> _mlv_video;
     std::vector<Dng_processor*> _dng_sequence;

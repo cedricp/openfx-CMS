@@ -158,6 +158,8 @@ uint16_t* Dng_processor::get_processed_image(uint8_t* buffer, size_t buffersize)
 	_camera_make = _imp->libraw->imgdata.idata.make;
 	_camera_model = _imp->libraw->imgdata.idata.model;
 
+	_init = true;
+
 	return (uint16_t*)&_imp->_image->data;
 }
 
