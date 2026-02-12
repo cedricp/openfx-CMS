@@ -937,7 +937,7 @@ int Idt::loadIlluminant( const vector<string> &paths, string type )
 
 void Idt::loadTrainingData( const string &path )
 {
-    struct stat st;
+    // struct stat st;
     //assert( !stat( path.c_str(), &st ) );
 
     if ( _trainingSpec.size() > 0 )

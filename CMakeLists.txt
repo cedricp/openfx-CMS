@@ -64,11 +64,11 @@ INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/include)
 INCLUDE_DIRECTORIES(${OPENFX_PATH}/Support/Plugins/include)
 INCLUDE_DIRECTORIES(${OpenCL_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLBase)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/libs/mingw64/ceres/include)
-INCLUDE_DIRECTORIES(utils)
 
 include(FindOpenGL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCL REQUIRED)
+INCLUDE_DIRECTORIES(utils)
 
 add_subdirectory(libs)
 
@@ -147,7 +147,7 @@ endif()
 
 INCLUDE_DIRECTORIES(CMS libs/GFX)
 TARGET_COMPILE_DEFINITIONS(CMS PRIVATE ${TARGET_DEFS})
-TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} supportext-static openfx-static libraw_static m ${WINLIBS} Ceres::ceres gomp) 
+TARGET_LINK_LIBRARIES(CMS ${OPENGL_gl_LIBRARY} ${OpenCL_LIBRARIES} Eigen3::Eigen supportext-static openfx-static libraw_static m ${WINLIBS} Ceres::ceres gomp) 
 
 # Find and set the arch name.
 # http://openeffects.org/documentation/reference/ch02s02.html

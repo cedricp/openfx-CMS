@@ -63,16 +63,17 @@
 #define kGroupWhiteBalance "groupWhiteBalance"
 #define kGroupDarkFrame "groupDarkFrame"
 
-OFXS_NAMESPACE_ANONYMOUS_ENTER
-
-
-#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGBA)
 
 extern "C"
 {
     extern char FOCUSPIXELMAP_DIRECTORY[256];
     extern int FOCUSPIXELMAP_OK;
 }
+
+OFXS_NAMESPACE_ANONYMOUS_ENTER
+
+
+#define OFX_COMPONENTS_OK(c) ((c) == OFX::ePixelComponentRGBA)
 
 void loadPlugin();
 

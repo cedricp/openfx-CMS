@@ -829,10 +829,11 @@ bool CovarianceImpl::ComputeCovarianceValuesUsingEigenSparseQR() {
   event_logger.AddEvent("Evaluate");
 
   typedef Eigen::SparseMatrix<double, Eigen::ColMajor> EigenSparseMatrix;
+  typedef Eigen::Map<Eigen::SparseMatrix<double, Eigen::RowMajor> > MapMat;
 
   // Convert the matrix to column major order as required by SparseQR.
   EigenSparseMatrix sparse_jacobian =
-      Eigen::MappedSparseMatrix<double, Eigen::RowMajor>(
+      MapMat(
           jacobian.num_rows, jacobian.num_cols,
           static_cast<int>(jacobian.values.size()),
           jacobian.rows.data(), jacobian.cols.data(), jacobian.values.data());
